@@ -1,0 +1,188 @@
+// Copyright (C) 2018 Applied Intuition, Inc. All rights reserved.
+// This source code file is distributed under and subject to the LICENSE in license.txt
+syntax = "proto3";
+
+package simian_public.spatial;
+
+import "applied/simian/public/proto/field_options.proto";
+import "applied/simian/public/proto/geometry.proto";
+
+// <!-- TODO(rolo) rename Vector3d for consistency across the codebase. -->
+message Point {
+  double x = 1;
+  double y = 2;
+  double z = 3;
+}
+
+message AZEL {
+  float az = 1;
+  float el = 2;
+}
+
+message AZELArray {
+  repeated float az = 1;
+  repeated float el = 2;
+}
+
+enum CoordinateSystemHandedness {
+  NOT_SET = 0;
+  LEFT_HAND = 1;
+  RIGHT_HAND = 2;
+  LEGACY_LEFT_HAND = 3;
+}
+
+// <!-- TODO(rolo) rename Pose3d for consistency across the codebase.
+// Used for serializing internal representation to use internal unit quaternions.
+// To specify a more general pose, use PoseSpec. -->
+message Pose {
+  double px = 1;  // position X component
+  double py = 2;  // position Y component
+  double pz = 3;  // position Z component
+
+  // Note that we declare W first here, but keep it at the originally used field number. This is to
+  // avoid confusion. When working with Applied library poses and utilities, the order is (w,x,y,z).
+  double qw = 7;  // orientation quaternion W component
+  double qx = 4;  // orientation quaternion X component
+  double qy = 5;  // orientation quaternion Y component
+  double qz = 6;  // orientation quaternion Z component
+}
+
+message Screw {
+  double tx = 1;  // translational X component
+  double ty = 2;  // translational Y component
+  double tz = 3;  // translational Z component
+  double rx = 4;  // rotational X component
+  double ry = 5;  // rotational Y component
+  double rz = 6;  // rotational Z component
+}
+
+// <!-- TODO(rolo) Rename MotionState for consistency across the codebase. -->
+// <!-- TODO(rolo) Use this in ego output, and modify converters to use 6 DOF state (position and
+// orientation), as well as first and second order derivatives. --> 6 DOF state (position and
+// orientation), as well as first and second order derivatives.
+message State {
+  // Position and orientation.
+  spatial.Pose pose = 1;
+  // Linear [m/s] and angular [rad/s] velocities of the ego.
+  spatial.Screw velocity = 2;
+  // Linear [m/s^2] and angular [rad/s^2] accelerations of the ego.
+  spatial.Screw acceleration = 3;
+}
+
+// Allows specifying the orientation piece of a pose using various methods.
+// Use when specifying poses that may not use unit quaternions.
+message PoseSpec {
+  // X component of the position of the origin of this frame, along the parent's X axis.
+  double px = 1 [(field_options.units) = M];
+  // Y component of the position of the origin of this frame, along the parent's Y axis.
+  double py = 2 [(field_options.units) = M];
+  // Z component of the position of the origin of this frame, along the parent's Z axis.
+  double pz = 3 [(field_options.units) = M];
+
+  oneof orientation {
+    // Roll-pitch-yaw Euler angles.
+    RollPitchYaw rpy = 4;
+    simian_public.common.Quaternion quaternion = 7;
+    Empty no_rotation = 5;
+  }
+
+  // Euler angles, applied in yaw-pitch-roll order.
+  message RollPitchYaw {
+    double roll = 1 [(field_options.units) = RAD];
+    double pitch = 2 [(field_options.units) = RAD];
+    double yaw = 3 [(field_options.units) = RAD];
+  }
+
+  message Empty {}
+}
+
+// Transform in 3 dimensions composed of translation, rotation, and scale.
+// Rotations are defined as Euler for usability, but should be converted
+// to Quaternions as soon as you need perform transform operations.
+// This structure can be useful while working with Spectral assets.
+message ScaledPoseSpec {
+  // Translation of this transformation is represented as a vector (px, py, pz).
+  // Rotation is represented as Euler angles or no_rotation. Remember to convert
+  // Euler to Quaternion if you have to operate with rotations.
+  PoseSpec pose = 1;
+  // Unless stated otherwise in the documentation for a particular feature, scaling is applied in
+  // the local frame, i.e. before rotation.
+  oneof scale_type {
+    // Same value will be used for the 3 components of the 3D scale vector.
+    double scale = 2;
+    // 3D scale as a vector.
+    Point scale_vector = 3;
+  }
+}
+
+// This message is used in scenarios.  It corresponds to TransformForest.SpecEntry but has more
+// intuitive naming for scenario yaml.
+message TransformNode {
+  // You can omit `name` if there is no need to refer to this node from a node further down.
+  string name = 1;
+
+  // Identifies the parent node in the `TransformForest`.  This may be a built-in name (see the
+  // manual) or another named `TransformNode`. Defaults to the origin of the parent section.
+  // Omit `parent` to imply ego section in `vehicle:` or
+  // `trailer:` stanza, or actor in `obstacle:` etc.
+  string parent = 2;
+
+  // The pose of this node relative to its parent (parent_T_name).  Omit for the identity
+  // transformation.
+  PoseSpec pose = 3;
+}
+
+message TransformForest {
+  repeated SpecEntry specs = 1;
+  repeated Entry entries = 2;
+
+  message SpecEntry {
+    string src = 1;
+    string dst = 2;
+    PoseSpec src_T_dst = 3;
+  }
+
+  message Entry {
+    string src = 1;
+    string dst = 2;
+    Pose src_T_dst = 3;
+  }
+}
+
+message InertiaSpec {
+  oneof inertia_spec_type {
+    PlanarInertia planar_inertia = 1;
+    PrincipleInertia principle_inertia = 2;
+  }
+
+  message PlanarInertia {
+    Point com_loc = 1;      // [m] (x,y,z) of the center of mass, z is ignored for planar inertia
+    double moment_Izz = 2;  // [kg*m2] Mass moment of inertia about vertical axis at center of mass
+  }
+
+  message PrincipleInertia {
+    Point com_loc = 1;  // [m] (x,y,z) of the center of mass, z is ignored for planar inertia
+    double moment_Izz = 2;
+    double moment_Iyy = 3;
+    double moment_Ixx = 4;
+  }
+}
+
+message Ray {
+  spatial.Point origin = 1;
+  float length = 2;
+  spatial.Point direction = 3;
+}
+
+message Trajectory {
+  // Each sample must be ordered in order of timestamp (if the trajectory is time-variant) or in
+  // order of the line string joining the list of poses that make up the trajectory (if the
+  // trajectory is time-invariant).
+  repeated Sample samples = 1;
+
+  message Sample {
+    double time = 1;  // time represents the sim_time [s] associated with the state. OK to omit if
+    // the trajectory is time-invariant.
+    State state = 2;
+  }
+}

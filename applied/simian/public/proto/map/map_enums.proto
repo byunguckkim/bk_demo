@@ -1,0 +1,343 @@
+// Copyright (C) 2021 Applied Intuition, Inc. All rights reserved.
+// This source code file is distributed under and subject to the LICENSE in
+// license.txt.
+
+syntax = "proto3";
+
+package simian_public.hdmap;
+
+// The intention of this file is to allow proto3 to use these enums.
+// This file is using proto3 due the limitation of proto3 not being able to import proto2 enums.
+// However, proto2 can import proto3 enums.
+
+/* ****************************************************** */
+/*                         Common                         */
+/* ****************************************************** */
+// Must be in sync with map_common.proto.
+
+message ElementTypeEnum {
+  enum ElementType {
+    UNSET = 0;
+    LANE = 1;
+    REGION = 2;
+    SIGNAL = 3;
+    SIGN = 4;
+    LINE = 5;
+    ROAD = 6;
+    ROAD_MARKING = 7;
+    INTERSECTION = 8;
+    LANE_GROUP = 9;
+  }
+}
+
+message MapSourceEnum {
+  enum MapSource {
+    UNSET_SOURCE = 0;
+    MERIDIAN = 1;
+    OPEN_SOURCE = 2;
+    VENDOR = 3;
+    CUSTOMER = 4;
+  }
+}
+
+/* ****************************************************** */
+/*                          Lane                          */
+/* ****************************************************** */
+// Must be in sync with map_lane.proto.
+
+message DrivingSideEnum {
+  // Represents the side of the road that vehicles travel on.
+  // In the United States and most of Europe, this is on the right.
+  // In the UK and Japan, this is on the left.
+  enum DrivingSide {
+    UNSET = 0;
+    RIGHT = 1;
+    LEFT = 2;
+  }
+}
+
+message LaneBoundaryTypeEnum {
+  enum LaneBoundaryType {
+    option allow_alias = true;
+    UNSET = 0;
+    UNKNOWN = 0;
+    DOTTED_YELLOW = 1;
+    DOTTED_WHITE = 2;
+    SOLID_YELLOW = 3;
+    SOLID_WHITE = 4;
+    DOUBLE_YELLOW = 5;
+    DOUBLE_WHITE = 7;
+    CURB = 6;
+    ROAD_EDGE = 8;
+    DOUBLE_DOTTED_WHITE = 9;
+    DOUBLE_DOTTED_YELLOW = 24;
+    DOUBLE_SW_DW = 10;
+    DOUBLE_DW_SW = 11;
+    DOUBLE_SW_SY = 12;
+    DOUBLE_SY_SW = 13;
+    DOUBLE_DW_SY = 14;
+    DOUBLE_SY_DW = 15;
+    DOUBLE_SY_DY = 22;
+    DOUBLE_DY_SY = 23;
+    TRIPLE_SW_SW_SY = 16;
+    TRIPLE_SY_SW_SW = 17;
+    TRIPLE_SY_SW_SY = 18;
+    TRIPLE_SY_DW_SY = 19;
+    QUARTET_SY_SW_SW_SY = 20;
+    VIRTUAL = 21;
+  }
+}
+
+message LaneTypeEnum {
+  enum LaneType {
+    option allow_alias = true;
+    UNSET = 0;
+    UNKNOWN = 0;
+    UNDEFINED_TYPE = 0;
+    NONE = 1;
+    CITY_DRIVING = 2;
+    BIKING = 3;
+    SIDEWALK = 4;
+    PARKING = 5;
+    SHOULDER = 6;
+    BUS_ONLY = 7;
+    CUSTOM = 8;
+    ON_RAMP = 9;
+    EMERGENCY = 10;
+    HIGHWAY = 11;
+    SUBURBAN = 12;
+  }
+}
+
+message LaneTurnEnum {
+  enum LaneTurn {
+    option allow_alias = true;
+    UNSET = 0;
+    UNDEFINED_TURN = 0;
+    NO_TURN = 1;
+    LEFT_TURN = 2;
+    RIGHT_TURN = 3;
+    U_TURN = 4;
+    CUSTOM_TURN = 5;
+  }
+}
+
+message LaneDirectionEnum {
+  enum LaneDirection {
+    option allow_alias = true;
+    UNSET = 0;
+    UNSET_DIRECTION = 0;
+    FORWARD = 1;
+    BACKWARD = 2;
+    BIDIRECTION = 3;
+    CUSTOM_DIRECTION = 4;
+  }
+}
+
+message LaneSurfaceEnum {
+  enum LaneSurface {
+    UNSET = 0;
+    UNKNOWN = 1;
+    ASPHALT = 2;
+    UNPAVED = 3;
+    PAVED = 4;
+    GROUND = 5;
+    CONCRETE = 6;
+    DIRT = 7;
+    STONE = 8;
+    SETT = 9;
+    COBBLESTONE = 10;
+    PEBBLESTONE = 11;
+    PAVING_STONES = 12;
+    UNHEWN_COBBLESTONE = 13;
+    CUSTOM_LANE_SURFACE = 14;
+  }
+}
+
+/* ****************************************************** */
+/*                         Region                         */
+/* ****************************************************** */
+// Must be in sync with map_region.proto.
+
+message RegionTypeEnum {
+  enum RegionType {
+    option allow_alias = true;
+    UNSET = 0;
+    GENERIC = 0;
+    CUSTOM = 1;
+    CLEAR_AREA = 2;
+    CROSSWALK = 3;
+    JUNCTION = 4;
+    PARKING_SPACE = 5;
+    PARKING_LOT = 6;
+    SIDEWALK = 7;
+    TRAVERSABLE_SURFACE = 8;
+    NO_GO_ZONE = 9;
+    PICKUP_DROPOFF = 10;
+    SPEED_BUMP = 11;
+    DIP = 12;
+    STOP_REGION = 13;
+    ROAD_SURFACE = 14;
+    ROAD_MARK = 15;
+    TRAFFIC_LIGHT_REGION = 16;
+  }
+}
+
+/* ****************************************************** */
+/*                         Signal                         */
+/* ****************************************************** */
+// Must be in sync with map_signal.proto.
+
+message SignalTypeEnum {
+  enum SignalType {
+    UNSET = 0;
+    UNKNOWN = 1;
+    MIX_2_HORIZONTAL = 2;
+    MIX_2_VERTICAL = 3;
+    MIX_3_HORIZONTAL = 4;
+    MIX_3_VERTICAL = 5;
+    SINGLE = 6;
+    CUSTOM = 7;
+  }
+}
+
+message SubsignalTypeEnum {
+  enum SubsignalType {
+    SUBSIGNAL_UNSPECIFIED = 0;
+    UNKNOWN = 1;
+    CIRCLE = 2;
+    ARROW_LEFT = 3;
+    ARROW_FORWARD = 4;
+    ARROW_RIGHT = 5;
+    ARROW_LEFT_AND_FORWARD = 6;
+    ARROW_RIGHT_AND_FORWARD = 7;
+    ARROW_U_TURN = 8;
+    PEDESTRIAN = 9;
+    BIKE = 10;
+    CUSTOM = 11;
+  }
+}
+
+message SubsignalColorEnum {
+  enum SubsignalColor {
+    COLOR_UNKNOWN = 0;
+    COLOR_OTHER = 1;
+    COLOR_RED = 2;
+    COLOR_YELLOW = 3;
+    COLOR_GREEN = 4;
+    COLOR_BLUE = 5;
+    COLOR_WHITE = 6;
+  }
+}
+
+/* ****************************************************** */
+/*                          Sign                          */
+/* ****************************************************** */
+// Must be in sync with map_sign.proto.
+
+message SignTypeEnum {
+  enum SignType {
+    option allow_alias = true;
+    UNSET = 0;
+    UNKNOWN = 0;
+    CUSTOM = 9;
+    STOP = 1;
+    YIELD = 2;
+    NO_PARKING_ANYTIME = 3;
+    GENERAL_SIGN = 4;
+    BIKE_LANE = 5;
+    SPEED_LIMIT = 6;
+    NO_STOPPING_ANYTIME = 7;
+    NO_PARKING = 8;
+    LEFT_LANE_CLOSED = 10;
+    RIGHT_LANE_CLOSED = 11;
+    ROAD_WORK_AHEAD = 13;
+    WORK_ZONE = 14;
+    TEMPORARY_SPEED_LIMIT = 15;
+    LANE_SHIFT = 16;
+    SHOULDER_CLOSED = 17;
+    EXIT_CLOSED = 18;
+    ROAD_CLOSED = 19;
+    END_ROAD_WORK = 20;
+    ROAD_WORK_ZONE = 21;
+  }
+}
+
+message SignColorEnum {
+  enum SignColor {
+    option allow_alias = true;
+    UNSET = 0;
+    UNKNOWN_COLOR = 0;
+    CUSTOM_COLOR = 6;
+    WHITE = 1;
+    RED = 2;
+    GREEN = 3;
+    BLUE = 4;
+    YELLOW = 5;
+  }
+}
+
+message SignShapeEnum {
+  enum SignShape {
+    option allow_alias = true;
+    UNSET = 0;
+    UNKNOWN_SHAPE = 0;
+    CUSTOM_SHAPE = 6;
+    SQUARE = 1;
+    TRIANGLE = 2;
+    CIRCLE = 3;
+    OCTAGON = 4;
+    INVERTED_TRIANGLE = 5;
+  }
+}
+
+/* ****************************************************** */
+/*                          Line                          */
+/* ****************************************************** */
+// Must be in sync with map_line.proto.
+
+message LineTypeEnum {
+  enum LineType {
+    UNKNOWN = 0;
+    CUSTOM = 1;
+    STOP_LINE = 2;
+    LANE_LINE = 3;
+    NAVIGABLE_BOUNDARY = 4;
+    YIELD_LINE = 5;
+  }
+}
+
+/* ****************************************************** */
+/*                      Road Marking                      */
+/* ****************************************************** */
+// Must be in sync with map_road_marking.proto.
+message RoadMarkingTypeEnum {
+  enum RoadMarkingType {
+    UNKNOWN = 0;
+    CUSTOM = 1;
+    LEFT_TURN_ONLY = 2;
+    THRU_ONLY = 3;
+    RIGHT_TURN_ONLY = 4;
+    LEFT_THRU = 5;
+    RIGHT_THRU = 6;
+    LEFT_RIGHT_THRU = 7;
+    LEFT_LANE_REDUCTION = 8;
+    RIGHT_LANE_REDUCTION = 9;
+    GORE_ZONES = 10;
+    STOP_BAR = 11;
+    CROSSWALK = 12;
+  }
+}
+
+message MarkingColorEnum {
+  enum MarkingColor {
+    UNSET = 0;
+    CUSTOM_COLOR = 1;
+    WHITE = 2;
+    RED = 3;
+    GREEN = 4;
+    BLUE = 5;
+    YELLOW = 6;
+    ORANGE = 7;
+  }
+}

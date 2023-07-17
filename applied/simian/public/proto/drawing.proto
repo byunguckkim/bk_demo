@@ -1,0 +1,229 @@
+// Copyright (C) 2018 Applied Intuition, Inc. All rights reserved.
+// This source code file is distributed under and subject to the LICENSE in license.txt
+
+syntax = "proto3";
+
+package simian_public.drawing;
+
+import "google/protobuf/duration.proto";
+import "applied/simian/public/proto/common.proto";
+import "applied/simian/public/proto/sensor_sim/basic_types.proto";
+import "applied/simian/public/proto/spatial.proto";
+
+// <!-- Next ID: 25 -->
+message Drawing {
+  // A unique identifier. Optional.
+  uint32 identifier = 13;
+  // Namespace to organize drawings of similar purpose in the user interface.
+  string group = 15;
+  // This field is required for drawings sent from a customer interface via SendDrawing().
+  // The combination of {name}-{identifier} must be unique.
+  string name = 1;
+  // Sets the color for the drawing; default is black.
+  // NOTE: For DrawnPointCloud, this field has no effect; you must set the color of individual
+  // points.
+  Color color = 2;
+  oneof drawing_type {
+    DrawnSpline spline = 3;
+    DrawnPolyline polyline = 4;
+    DrawnPolygon polygon = 5;
+    DrawnPointCloud point_cloud = 8;
+    DrawnText text = 9;
+    DrawnSphere sphere = 18;
+    DrawnCircle circle = 20;
+    DrawnAxes axes = 12;
+    DrawnBox box = 14;
+    DrawnRay ray = 19;
+    DrawnCylinder cylinder = 22;
+    DrawnTube tube = 23;
+    DrawnTrajectory trajectory = 24;
+
+    // 2D shapes drawn on images from a channel. Channel name is required for these to
+    // show up correctly.
+    ImagePolyline image_polyline = 10;
+    ImagePolygon image_polygon = 11;
+  }
+  // Elevation (distance above the world frame's XY plane) at which to draw a planar drawing.
+  double z = 6;
+  // This label appears when the cursor hovers over the drawing in the visualizer. Optional.
+  // The label does not need to be unique across drawings.
+  string label = 7;
+  // The duration the drawing should persist for before being deleted.
+  // 0 indicates the drawing should persist forever. Default is 100ms.
+  google.protobuf.Duration lifetime = 16;
+  repeated common.KeyValuePair drawing_metadata = 17;
+
+  // Populated if this drawing is a bounding box representing a 2d actor.
+  string actor2d_channel_name = 21;
+}
+
+// A 3D box.
+message DrawnBox {
+  // The pose describes the position of the center of the box
+  // and the orientation of the box relative to the world frame.
+  // If the pose's quaternion is identity, then the box's
+  // x, y, and z axes align with the world x, y, and z axes.
+  spatial.Pose pose = 1;
+
+  // If only 2 of these dimensions is nonzero, the box will be
+  // flattened along the 3rd dimension
+  // The extents of the box along the box's x axis.
+  float dimension_x = 2;
+  // The extents of the box along the box's y axis.
+  float dimension_y = 3;
+  // The extents of the box along the box's z axis.
+  float dimension_z = 4;
+
+  // Box will default to solid fill
+  Style style = 5;
+}
+
+// Text drawn in the renderer using Drawing label as the display text.
+message DrawnText {
+  oneof position {
+    // Coordinates in world reference frame.
+    spatial.Point point = 1;
+  }
+  // Depth of the 3D text, defaults to 0.001.
+  // NOTE: This is deprecated in favor of billboarded text which is 2D and does not have thickness.
+  float thickness = 2 [deprecated = true];
+  // Sets the vertical size of the text. Width is relative to height.
+  // Default value is 1.
+  float text_size = 3;
+  // The width of the stroke proportional to the text size. A value of 0 disables stroking.
+  // Default value is 0.
+  float stroke_width = 4;
+  // The color of the text stroke; default is black.
+  // NOTE: Stroke color can multiply with the primary color when the primary color is transparent.
+  Color stroke_color = 5;
+}
+
+// Spline is planar.
+message DrawnSpline {
+  float line_width = 1;               // in meters
+  repeated spatial.Point points = 2;  // coordinates in world reference frame
+}
+
+// Polyline is planar.
+message DrawnPolyline {
+  float line_width = 1;               // in meters
+  repeated spatial.Point points = 2;  // coordinates in world reference frame
+}
+
+message DrawnPolygon {
+  repeated spatial.Point points = 1;
+}
+
+message DrawnPointCloud {
+  message PointAttributes {
+    // Positions are relative to frame of reference defined by `pose`.
+    spatial.Point position = 1;
+    Color color = 2;
+  }
+  // Attributes for every single point.
+  repeated PointAttributes points = 1;
+  // Frame of reference; center of point cloud.
+  spatial.Pose pose = 2;
+  // Size of a point measured in pixels.
+  float size = 3;
+  // Whether the size of points is attenuated by the camera depth. Default value is false.
+  bool size_attenuation = 4;
+}
+
+// By default (in non-3D mode), the Simian frontend draws the sphere with center.z = 0.
+// In 3D mode, the Simian frontend obeys the sphere's center.z.
+message DrawnSphere {
+  // The sphere is drawn using the center's z value; the Drawing's z is ignored.
+  spatial.Point center = 1;
+  float radius = 2;
+}
+
+// <!-- Next ID: 5 -->
+// Default orientation of the circle is parallel to the ground.
+message DrawnCircle {
+  float line_width = 1;  // in meters
+  // The circle is drawn using the coordinates and orientation specified in the pose_spec.
+  spatial.PoseSpec pose_spec = 2;
+  float radius = 3;  // in meters
+  // Circle will default to solid.
+  Style style = 4;
+}
+
+message DrawnAxes {
+  // Draws a 3D coordinate axes
+  // The pose here describes the pose of the origin of the coordinate axes.
+  spatial.Pose pose = 1;
+  // Length of each of the 3 axes. Defaults to 1 meter.
+  double axes_length = 2;  // [m]
+}
+
+// Draws a 3D cylinder.
+message DrawnCylinder {
+  double radius = 1;  // in meters
+  double height = 2;  // in meters
+  Style style = 3;
+  spatial.Pose pose = 4;
+}
+
+message Point {
+  spatial.Point position = 1;
+  Color color = 2;
+}
+
+message DrawnTube {
+  repeated Point points = 1;
+  // The number of segments that make up the tube.
+  uint32 tubular_segments = 2;
+  // The radius of the tube.
+  float radius = 3;
+  // The number of segments that make up the cross-section.
+  uint32 radial_segments = 4;
+  // Determines if the tube ends are open or closed.
+  bool closed = 5;
+}
+
+message Node {
+  oneof spatial_mode {
+    spatial.Point position = 1;
+    // Pose (including orientation) will be specifiable in the future.
+  }
+  Color color = 2;
+  float size = 3;
+}
+
+message DrawnTrajectory {
+  repeated Node nodes = 1;
+  // The width of the trajectory.
+  float width = 2;
+}
+
+message ImagePolyline {
+  float line_width = 1;
+  repeated simian_public.sensor_sim.basic_types.ImagePoint image_points = 2;
+  string channel_name = 3;
+}
+
+message ImagePolygon {
+  repeated simian_public.sensor_sim.basic_types.ImagePoint image_points = 1;
+  string channel_name = 2;
+}
+
+// Color in RGBA
+message Color {
+  int32 red = 1;    // in the interval [0, 256)
+  int32 green = 2;  // in the interval [0, 256)
+  int32 blue = 3;   // in the interval [0, 256)
+  float alpha = 4;  // in the interval (0, 1]; opacity 0 is not supported
+}
+
+enum Style {
+  STYLE_UNSET = 0;
+  STYLE_EDGES = 1;  // Display edges only.
+  STYLE_SOLID = 2;
+}
+
+message DrawnRay {
+  spatial.Ray ray = 1;
+  float head_length = 2;
+  float head_radius = 3;
+}

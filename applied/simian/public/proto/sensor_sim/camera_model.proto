@@ -1,0 +1,68 @@
+// Copyright (C) 2022 Applied Intuition, Inc. All rights reserved.
+// This source code file is distributed under and subject to the LICENSE in license.txt
+
+// Describes submessages specific to the camera model
+syntax = "proto3";
+
+package simian_public.camera_model;
+
+import "applied/simian/public/proto/common.proto";
+
+message OpenCVDistortionParams {
+  float k1 = 1;
+  float k2 = 2;
+  float k3 = 3;
+  float k4 = 4;
+  float k5 = 5;
+  float k6 = 6;
+  float p1 = 7;
+  float p2 = 8;
+}
+
+message CameraIntrinsicParams {
+  float fx = 1;
+  float fy = 2;
+  float cx = 3;
+  float cy = 4;
+}
+
+message Downsampling {
+  // The percentage in which the lens_projection_field is downsampled where:
+  // new_height = height * downsample_percent
+  // new_width = width * downsample_percent
+  float downsample_percent = 1;
+}
+
+message LensProjectionField {
+  common.Vector2 resolution = 1;
+  // vector field defining rays from optical center to image plane where a pixel will be sampled:
+  // pixel_location(x, y) = data[(pix_index)+0],data[(pix_index)+1]data[(pix_index)+2]]
+  // where pix_index = (y*width+w)*3
+  // datatype is serialized floats
+  bytes data = 2;
+  // Uri path to an image which describes a lens projection field.
+  // This must be in the format of a float32 EXR image with the same resolution as the output image.
+  // Each pixel's RGB value describes the vector from the pinhole center to the sample location in
+  // the rendered image.
+  string projection_field_uri = 3;
+  Downsampling downsampling = 4;
+}
+
+message RollingShutter {
+  // row_delay: Time between each rows readout time.
+  // Units: NanoSeconds
+  float row_delay = 1;
+  // col_delay: Time between each columns readout time.
+  // Units: NanoSeconds
+  float col_delay = 2;
+  // Number of time steps between the original frame start and the end of the exposure.
+  // Units: None
+  uint32 num_time_steps = 3;
+}
+
+// Image file that will be used in a post process shader over the camera. Useful for HUDs
+// User should put their desired file into the example_spectral/sim/input/models folder and set
+// file_uri to models://workspace/<image_file>.png
+message ImageOverlay {
+  string file_uri = 1;
+}

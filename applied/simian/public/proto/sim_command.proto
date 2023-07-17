@@ -1,0 +1,420 @@
+// Copyright (C) 2018 Applied Intuition, Inc. All rights reserved.
+// This source code file is distributed under and subject to the LICENSE in license.txt
+
+syntax = "proto3";
+
+package simian_public.sim_command;
+
+import "google/protobuf/empty.proto";
+import "applied/simian/public/proto/actor.proto";
+import "applied/simian/public/proto/common.proto";
+import "applied/simian/public/proto/geometry.proto";
+import "applied/simian/public/proto/planar.proto";
+import "applied/simian/public/proto/route.proto";
+import "applied/simian/public/proto/scenario/vehicle_config.proto";
+import "applied/simian/public/proto/sensor_model.proto";
+import "applied/simian/public/proto/shape.proto";
+import "applied/simian/public/proto/spatial.proto";
+
+// <!-- Next ID: 30 -->
+message SimCommand {
+  oneof sim_command_type {
+    SetEgoPose set_ego_pose = 1;
+    SetActorPose set_actor_pose = 2;
+    SetObstacleType set_obstacle_type = 3;
+    SpawnActor spawn_actor = 4;
+    SetEgoTriggeredMessage ego_triggered_message = 5;
+    SetDesiredActorVelocity set_desired_actor_velocity = 6;
+    SetStaticObstaclePoseSpec set_static_obstacle_pose_spec = 7;
+    DespawnActor despawn_actor = 8;
+    SetVehicleModel set_vehicle_model = 9;
+    SetSensorModelMount set_sensor_model_mount = 10;
+    SetSensorModel set_sensor_model = 11;
+    AddBehaviorLive add_behavior_live = 12;
+    PauseActorBehavior pause_actor_behavior = 13;
+    SetEgoMeshAndShape set_ego_mesh_and_shape = 14;
+    RaiseFifthWheel raise_fifth_wheel = 15;
+    AnimationRequest animation_request = 16;
+    SetTrafficBlockState set_traffic_block_state = 17;
+    SetKinematicArticulationState set_kinematic_articulation_state = 18;
+    SetEgoState3d set_ego_state3d = 19;
+    SetTrafficLightBulbState set_traffic_light_bulb_state = 20;
+    SetTripAgent set_trip_agent = 21;
+    MountActor mount_actor = 22;
+    SetActorPose3d set_actor_pose3d = 23;
+    SetActorState3d set_actor_state3d = 24;
+    SetActorState2dFull set_actor_state2d_full = 25;
+    SetInteractiveFieldTransformerEngagement set_interactive_field_transformer_engagement = 26;
+    SetEgoTriggeredDataPoint ego_triggered_data_point = 27;
+    AddSignalLive add_signal_live = 29;
+  }
+  // reserved 28;
+
+  // <!-- Next ID: 5 -->
+  message AddBehaviorLive {
+    oneof identifier {
+      // Used to identify a single actor
+      int32 actor_id = 1;
+      // Used to identify an ego, set to "default" if only one ego.
+      string ego_name = 3;
+    }
+    // This should be the yaml of behavior to be added, like it would be in the
+    // GUI scenario editor.
+    string behavior_yaml = 2;
+    // Discard current behavior sequence to add this behavior
+    bool override_behavior_sequence = 4;
+  }
+
+  // <!-- Next ID: 5 -->
+  message AddSignalLive {
+    oneof identifier {
+      // Used to identify a single actor
+      int32 actor_id = 1;
+      // <!-- Used to identify an ego, set to "default" if only one ego.
+      // TODO: Currently add_ego_signal is not supported yet.
+      //       Uncomment below when we support add_ego_signal SimAPI.
+      // string ego_name = 3; -->
+    }
+    // This should be the yaml of signal to be added, like it would be in the
+    // GUI scenario editor.
+    string signal_yaml = 2;
+    // Discard current signals to add this signal
+    bool override_signals = 4;
+    // reserved 3;
+  }
+
+  // Set the ego destination to be re-calculated by the trip agent.
+  message SetTripAgent {
+    simian_public.common.TripBehavior trip_behavior = 1;
+  }
+
+  // Set the 2d pose of the ego. Will reset the current ego behavior from the new pose.
+  message SetEgoPose {
+    planar.Pose2d pose = 1;
+    // If true, continue sending interactive messages during live edit to stack even while the sim
+    // is paused.
+    bool update_while_paused = 2;
+  }
+
+  // Set the 3d state (pose, velocity, and acceleration) of the ego. Will reset the current ego
+  // behavior from the new state. Pose is expressed (relative to) the world frame. Velocity and
+  // acceleration are observed in the world frame, and expressed in the frame of the section.
+  message SetEgoState3d {
+    spatial.State state = 1;
+  }
+
+  message SetActorPose {
+    int32 actor_id = 1;
+    planar.Pose2d pose = 2;
+  }
+
+  message PauseActorBehavior {
+    int32 actor_id = 1;
+    bool pause = 2;
+  }
+
+  message SetObstacleType {
+    // Id of the actor to change the obstacle type.
+    int32 actor_id = 1;
+    // obstacle type to set for given actor.
+    actor.Actor.ObstacleType obstacle_type = 2;
+    // If true, will update the shape when updating obstacle type.
+    // Otherwise, the shape will not be updated.
+    bool override_shape = 3;
+  }
+
+  // <!-- Next ID: 16 -->
+  message SpawnActor {
+    simian_public.actor.Actor.ObstacleType obstacle_type = 1;
+    oneof initial_state_dimension {
+      simian_public.planar.State2d initial_state = 2;
+      simian_public.spatial.State initial_state_3d = 14;
+    }
+    // This field explicitly determines if this actor should be interpreted as a 3D actor.
+    bool is_obstacle_3d = 15;
+    simian_public.planar.State2d final_state = 3;
+    simian_public.shape.Shape shape = 4;
+    double speed_mps = 5;
+    simian_public.common.Vector3 movement = 6;
+    repeated simian_public.actor.ReferencePoint reference_points = 7;
+    int32 actor_id = 8;
+    // Use default velocity based on obstacle type
+    bool use_default_velocity = 9;
+
+    simian_public.actor.Actor.SpectralModel spectral_model = 10;
+    simian_public.actor.Actor.SpectralStaticModel spectral_static_model = 11;
+
+    // Configuration of the Spectral asset.
+    simian_public.actor.AssetConfig asset_config = 16;
+
+    string mesh_name = 12;
+  }
+
+  message SetEgoTriggeredMessage {
+    repeated simian_public.common.Message message = 1;
+  }
+
+  message SetEgoTriggeredDataPoint {
+    repeated simian_public.common.DataPoint data_points = 1;
+    repeated simian_public.common.TimestampedDataPoint timestamped_data_points = 2;
+  }
+
+  message SetDesiredActorVelocity {
+    int32 actor_id = 1;
+    double velocity = 2;
+    double max_acceleration = 3;  // set max acceleration used to obtain desired speed
+  }
+
+  // This sim command is deprecated. Use SetActorPose3d instead.
+  message SetStaticObstaclePoseSpec {
+    int32 actor_id = 1;
+    simian_public.spatial.PoseSpec pose_spec = 3;
+  }
+
+  message DespawnActor {
+    int32 actor_id = 1;
+  }
+
+  message SetVehicleModel {
+    repeated simian_public.scenario.TrailerConfig trailers = 1;
+  }
+
+  message SetSensorModelMount {
+    string sensor_name = 1;
+    simian_public.spatial.PoseSpec mount = 2;
+  }
+
+  message SetSensorModel {
+    simian_public.sensor_model.Description sensor_model = 16;
+  }
+
+  message SetEgoMeshAndShape {
+    string mesh_name = 1;
+    simian_public.shape.Shape shape = 2;
+  }
+
+  message RaiseFifthWheel {
+    // Raise fifth wheel to the desired absolute height.
+    // Height here refers to the (+z) offset of the fifth wheel (hitch point) along the tractor's
+    // (+z) vertical axis.
+    double height = 1;  // [m]
+  }
+
+  // Specify an animation request to Spectral
+  message AnimationRequest {
+    oneof animation_request_type {
+      ComponentRequest component_request = 1;
+      GlobalEffectRequest global_effect_request = 2;
+    }
+
+    message ComponentRequest {
+      oneof recipient {
+        int32 actor_id = 1;
+        int32 ego_section = 2;
+      }
+
+      string component_name = 3;
+      oneof component_request_type {
+        SetComponentPosition set_component_position = 4;
+        ActivateComponent activate_component = 5;
+      }
+      // Instantly move the specified component to this position.
+      // Note that there may be limitations on the range of motion that are applied.
+      message SetComponentPosition {
+        oneof spatial_type {
+          spatial.PoseSpec pose_spec = 4;
+          spatial.Pose pose = 5;
+        }
+      }
+      // Activating a component means different things depending on the component specified
+      message ActivateComponent {}
+    }
+
+    message GlobalEffectRequest {
+      string effect_name = 1;
+      spatial.PoseSpec pose_spec = 2;
+      simian_public.common.ScaleFactor scale_factor = 3;
+    }
+  }
+
+  message SetTrafficBlockState {
+    // For more information on traffic lights, see the documentation here:
+    // https://home.applied.co/manual/simian/latest/#/simulated_environment/traffic_lights/introduction
+    // If the block name or state name are invalid, the sim command will be ignored.
+    string block_name = 1;
+    string block_state_name = 2;
+  }
+
+  message SetTrafficLightBulbState {
+    // For more information on traffic lights, see the documentation here:
+    // https://home.applied.co/manual/simian/latest/#/simulated_environment/traffic_lights/introduction
+    // If the bulb name or state name are invalid, the sim command will be ignored.
+    string bulb_name = 1;
+    string bulb_state_name = 2;
+  }
+
+  // A kinematic articulation is a robotic linkage mounted on a vehicle whose
+  // joints are controlled by kinematic (e.g. position) commands.
+  message SetKinematicArticulationState {
+    // Currently applies only to section 0 of the ego.
+    oneof command_type {
+      SetJointPositions set_joint_positions = 1;
+    }
+    // Set the position (joint angle or translation) for a subset of the degrees of freedom in a
+    // kinematic articulation. Joints not specified by this sim command retain their current
+    // position. Initial joint positions are set as follows:
+    //   * continuous joints: 0
+    //   * prismatic or revolute for which 0 is within the joint limits: 0
+    //   * prismatic or revolute for which 0 is NOT within the joint limits: midpoint of the lower
+    //   and upper joint limits
+    // <!-- Next ID: 3 -->
+    message SetJointPositions {
+      repeated Coordinate coordinates = 1;
+      // Currently, joints may have at most 1 degree of freedom, so the name of a coordinate (degree
+      // of freedom) is the name of the joint.
+      message Coordinate {
+        // The name of a joint (e.g., "pin_joint") in the Unified Robot Description Format (URDF)
+        // file. Specifying an incorrect name causes an error. See http://wiki.ros.org/urdf.
+        string name = 1;
+        // The position for this coordinate (this is an absolute position, not an increment from a
+        // previous time). Specifying a value outside the joint limits (for "prismatic" or
+        // "revolute" joints in the URDF) causes an error, or outputs a warning. See
+        // PositionValidationOptions. In case of VALIDATION_LENIENT mode, clamp the joint position
+        // to be within limits specified in the URDF file. The units and meaning of this position
+        // are determined by the URDF file. Note: URDF "continuous" joints do not have joint limits.
+        double position = 2;
+      }
+
+      enum PositionValidationMode {
+        // Default. Throw an error when joint positions are out of limits.
+        VALIDATION_STRICT = 0;
+        // Throw a warning when joint positions are out of limits.
+        VALIDATION_LENIENT = 1;
+      }
+
+      PositionValidationMode position_validation_mode = 2;
+    }
+  }
+
+  message MountActor {
+    // Mount an actor on the ego or a link in the ego's kinematic articulation so that
+    // the actor is rigidly attached to the ego or articulation link.
+    // The pose of the actor in the world frame is preserved when changing the mount frame.
+    // You can unmount the actor by setting the mount frame to the world frame.
+    // You can invoke this sim command repeatedly with different frames.
+    // This sim command requires the following:
+    // - the actor is not fixed to another actor (using fixed.to in the scenario),
+    // - the actor does not have a trailer,
+    // - the actor is specified as a static_obstacle or obstacle_3d in the scenario
+    //   (the actor was not generated by the procedural map (that is map.edits),
+    //   the actor was not spawned by a sim command),
+    // - the actor does not have behaviors.
+    //
+    // The following sim commands *can* be used with mounted actors:
+    // - set_ego_pose
+    // - set_ego_state3d
+    // - set_actor_pose3d
+    // - set_kinematic_articulation_state
+    // - despawn_actor
+    //
+    // The following sim commands *cannot* be used with mounted actors:
+    // - add_behavior_live
+    // - set_actor_pose
+    oneof identifier {
+      // The ID of the actor that should be mounted on the frame specified below.
+      // The simulation will terminate if this actor_id is invalid.
+      int32 actor_id = 1;
+    }
+    Frame frame = 2;
+    message Frame {
+      oneof frame {
+        // Mount the actor in the world frame (that is, unmount the actor from the ego or
+        // articulation link).
+        google.protobuf.Empty world = 1;
+        // Mount the actor in section 0 of the ego.
+        Ego ego = 2;
+        // Specify the name of a kinematic articulation link (on section 0 of the ego),
+        // as specified in `name` attribute of a `link` element in the URDF file.
+        // Kinematic articulations can be specified in a scenario under
+        // vehicle.articulation.kinematic. The simulation will terminate if a link with the
+        // specified name does not exist.
+        string ego_articulation_link = 3;
+      }
+      message Ego {}
+    }
+  }
+
+  message SetActorPose3d {
+    // Set the pose of an actor in 3D.
+    // This sim command requires the following:
+    // - the actor is not fixed to another actor (using fixed.to in the scenario),
+    // - the actor does not have a trailer,
+    // - the actor is specified as a static_obstacle or obstacle_3d in the scenario
+    //   (the actor was not generated by the procedural map (that is map.edits),
+    //   the actor was not spawned by a sim command),
+    // - the actor does not have behaviors.
+    //
+    // If the actor is mounted (using the mount_actor sim command), the actor continues to be
+    // mounted to the same mount frame after this sim command is invoked, though the pose
+    // of the actor in the mount frame is set according to the pose provided below
+    // (the relative.to frame does *not* need to be the same as the mount frame provided in
+    // mount_actor).
+    //
+    // The ID of the actor whose pose to set.
+    // The simulation will terminate if this actor_id is invalid.
+    int32 actor_id = 1;
+
+    // The new pose of the actor, relative to the `relative.to` frame.
+    // The orientation in this pose cannot be a quaternion.
+    simian_public.spatial.PoseSpec pose = 2;
+
+    RelativePose relative = 3;
+
+    message RelativePose {
+      Frame to = 1;
+    }
+
+    message Frame {
+      oneof frame {
+        // The pose is relative to the world frame.
+        // This is the default if a `relative.to` frame is not specified.
+        google.protobuf.Empty world = 1;
+        // The pose is relative to the frame of section 0 of the ego.
+        Ego ego = 2;
+        // The pose is relative to a link in the ego's kinematic articulation.
+        // The simulation will terminate if a link with the specified name does not exist.
+        string ego_articulation_link = 3;
+      }
+      message Ego {}
+    }
+  }
+
+  // Set the 3d state (pose, velocity, and acceleration) of an actor. Will reset the current actor
+  // behavior from the new state. Pose is expressed (relative to) the world frame. Velocity and
+  // acceleration are observed in the world frame, and expressed in the actor frame. The consistency
+  // of the velocity and acceleration values sent via this command is not verified.
+  message SetActorState3d {
+    int32 actor_id = 1;
+    simian_public.spatial.State state = 2;
+  }
+
+  message SetInteractiveFieldTransformerEngagement {
+    // Set the engagement status of the transformer if interactive field is enabled.
+
+    // Set engaged to true to allow transformer to interact with fields.
+    // This default value is false.
+    bool engaged = 1;
+
+    // For a single ego vehicle, specify which section's transformer to engage.
+    uint32 ego_section_index = 2;
+  }
+
+  // Set the state2d full (2D pose, 2D velocity, and 2D acceleration) of an actor. Will reset the
+  // current actor behavior from the new state. Pose is expressed (relative to) the world frame.
+  // Velocity and acceleration are observed in the world frame, and expressed in the actor frame.
+  // The consistency of the velocity and acceleration values sent via this command is not verified.
+  message SetActorState2dFull {
+    int32 actor_id = 1;
+    simian_public.planar.State2dFull state = 2;
+  }
+}

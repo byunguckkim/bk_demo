@@ -1,0 +1,132 @@
+// Copyright (C) 2021 Applied Intuition, Inc. All rights reserved.
+// This source code file is distributed under and subject to the LICENSE in license.txt
+
+syntax = "proto3";
+
+package public_triage;
+
+import "google/protobuf/struct.proto";
+import "google/protobuf/timestamp.proto";
+
+// <!-- Next ID: 22 -->
+message TriageEvent {
+  // Required unique identifier for the event.
+  string uuid = 1;
+  // Event time (relative to start of drive)
+  google.protobuf.Timestamp time = 2;
+  // Event start time (relative to start of drive)
+  google.protobuf.Timestamp start_time = 10;
+  // Event end time (relative to start of drive)
+  google.protobuf.Timestamp end_time = 11;
+  // Operator comment for the event
+  string driver_comment = 3;
+  bool from_disengagement = 4;
+  // Trigger or reason for the event
+  string reason = 5;
+  // Event location (this will be inferred using ego pose if not provided)
+  Location location = 6;
+  // Email of the assignee for the event
+  string assignee_email = 12;
+  // Root causes for the event
+  repeated string root_causes = 13;
+
+  message Location {
+    float lat = 1;
+    float lng = 2;
+  }
+  repeated TriageCustomField custom_fields = 7;
+  repeated string tags = 14;
+
+  // Snippet log path used to create Logstream scenarios.
+  string snippet_log_path = 8;
+
+  // The following fields cannot be populated by the drive conversion interface.
+  repeated Comment comments = 15;
+  repeated ResimResult resim_results = 16;
+  google.protobuf.Struct taxonomy_json = 17;
+
+  string key = 18;
+  // Short, human-readable unique identifier for the event.
+  string simple_identifier = 19;
+
+  TriageEventActions actions = 20;
+  // If a name is provided, it will show up when viewing an event on UI.
+  string name = 21;
+
+  // reserved 9;
+  // reserved "relative_time";
+}
+
+message TriageEventActions {
+  oneof resim_or_extract {
+    // If set to true, then this triage event will be automatically re-simulated
+    bool auto_resim = 1;
+    // If set to true, then a re-sim scenario will be extracted in Strada without being enqueued
+    bool extract_resim_scenario = 2;
+  }
+}
+
+message Comment {
+  string author = 1;
+  string message = 2;
+}
+
+// See SimianRun.ObserverSummary in simian/modules/run/proto/run_common.proto.
+enum ResimResult {
+  STATUS_UNDEFINED = 0;
+  // All observers passed.
+  SUCCESS = 1;
+  // One or more observer criteria failed.
+  FAILURE = 2;
+  // Error while running simulation or post-processing, either in customer or Simian stack.
+  ERROR = 3;
+  // Simulation should be ignored due to some user-specified conditions.
+  IGNORED = 4;
+}
+
+message TriageDrive {
+  // Required unique identifier for the drive.
+  string uuid = 1;
+  // Optional identifier for the vehicle used for the drive.
+  string vehicle_name = 2;
+  // Optional identifier for the map used for the drive.
+  string map_key = 3;
+  // Optional identifier for the stack version used for the drive.
+  string stack_version = 4;
+
+  google.protobuf.Timestamp start_time = 5;
+  google.protobuf.Timestamp end_time = 6;
+
+  // Used to display/calculate drive wide states.
+  oneof autonomous_distance_driven {
+    float autonomous_miles = 7;
+    float autonomous_meters = 8;
+  }
+
+  // Drive log path used to create Logstream scenarios.
+  string log_path = 9;
+}
+
+message DriveMetadata {
+  repeated TriageCustomField custom_fields = 1;
+  string uuid = 2;
+  string log_path = 3;
+  string vehicle_name = 4;
+  string map_key = 5;
+  string stack_version = 6;
+}
+
+message TriageCustomField {
+  string field_name = 1;
+  // Whether users can edit the custom field in the UI
+  bool user_editable = 2;
+  oneof value {
+    string string_value = 3;
+    RepeatedStringValue repeated_string_value = 4;
+    bool boolean_value = 5;
+  }
+
+  message RepeatedStringValue {
+    repeated string values = 1;
+  }
+}

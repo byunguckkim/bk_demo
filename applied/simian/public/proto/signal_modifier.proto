@@ -1,0 +1,22 @@
+// Copyright (C) 2019 Applied Intuition, Inc. All rights reserved.
+// This source code file is distributed under and subject to the LICENSE in license.txt
+
+syntax = "proto3";
+
+package simian_public.signal_modifier;
+
+// Commands for signal modification.
+message SignalModifier {
+  oneof modifier {
+    // Delay and rate limit the output of a signal.
+    DelayedRateLimiter delay_rate_limiter = 1;
+    // drl here exists only for forwards compatibility. Please use delay_rate_limiter instead.
+    DelayedRateLimiter drl = 2;
+  }
+
+  message DelayedRateLimiter {
+    double max_rate = 1;       // [command units / sec]
+    double delay = 2;          // [sec]
+    double initial_state = 3;  // [command units] Populate delay buffer with this (constant) command
+  }
+}

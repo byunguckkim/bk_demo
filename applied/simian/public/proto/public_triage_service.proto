@@ -1,0 +1,227 @@
+// Copyright (C) 2019 Applied Intuition, Inc. All rights reserved.
+// This source code file is distributed under and subject to the LICENSE in
+// license.txt
+
+syntax = "proto3";
+
+package public_triage;
+
+import "google/protobuf/duration.proto";
+import "applied/simian/public/proto/common.proto";
+import "applied/simian/public/proto/plugin_schema.proto";
+import "applied/simian/public/proto/triage.proto";
+import "applied/simian/public/proto/v2/io.proto";
+
+message AddTriageDriveEventsRequest {
+  public_triage.TriageDrive drive = 1;
+  repeated public_triage.TriageEvent events = 2;
+}
+
+message AddTriageDriveEventsResponse {
+  simian_public.common.CommonResponse common = 1;
+  repeated string event_uuids = 2;
+}
+
+// <!-- Next ID: 9 -->
+// We use a separate proto message for AddDataToLogRequest rather than the
+// ConvertDriveRequest so that the user can have a simplified entrypoint.
+message AddDataToLogRequest {
+  // The path to the log to convert.
+  string log_path = 1;
+
+  // If there is a workspace provided, we will attempt to pull
+  // both the log_config_path and the include_file_paths from the specified
+  // workspace.
+  // If there is no workspace provided, we will use the default
+  // workspace to pull the log_config_path and include_file_paths
+  // NOTE: Workspaces are only applicable in a cloud environment.
+  // The workspace will also dictate where the generated scenario is stored.
+  string workspace = 2;
+  repeated string include_file_paths = 3;
+  // Optional log config path to use for the ingestion request.
+  // If not specified, the log config path of the primary log run in strada will be used.
+  string log_config_path = 4;
+
+  // List of additional channels for an incremental log ingestion.
+  // The key, value metadata for each channel will be stored in
+  // strada -> ingestion_parameters section of the scenario, which will be sent to the interface in
+  // set_startup_options_v2_1. Each of the channels specified here will also be automatically
+  // added to the v2_api_basic section of the drive config, with
+  // source: VEHICLE_LOG -> sink: ADP with the specified type.
+  repeated simian_public.simulator.v2.IngestionParameters.IngestionChannel channels = 5;
+
+  // Simulation flags for drive conversion. If left empty, the sim flags from the primary drive run
+  // are used.
+  string sim_flags = 6;
+  // Name of the run environment to use for drive conversions to specify the run environment that
+  // the simulation runs in.
+  string run_environment_name = 7;
+  // Tenant whose resources this drive will be run on.
+  string tenant_name = 8;
+}
+
+message LogPermissions {
+  enum LogAccessRole {
+    UNDEFINED = 0;
+
+    // Ability to delete the log, edit permissions on log, etc.
+    OWNER = 1;
+
+    // Ability to re-ingest the log or partially ingest.
+    // Ability to edit attributes of a log (i.e. add tags, custom fields, etc.)
+    EDITOR = 2;
+
+    // Ability to view and query within a log.
+    VIEWER = 3;
+  }
+
+  message UserRole {
+    string user = 1;
+    LogAccessRole role = 2;
+  }
+
+  repeated UserRole user_roles = 1;
+}
+
+// <!-- Next ID: 27 -->
+message ConvertDriveRequest {
+  ///////////////////// SCENARIO DETAILS //////////////////////////////////
+
+  // If there is a workspace provided, we will attempt to pull
+  // both the drive_config_path and the include_file_paths from the specified
+  // workspace.
+  // If there is no workspace provided, we will use the default
+  // workspace to pull the drive_config_path and include_file_paths
+  // NOTE: Workspaces are only applicable in a cloud environment.
+  // The workspace will also dictate where the generated scenario is stored.
+  string workspace = 21;
+  string drive_config_path = 2;
+  repeated string include_file_paths = 22;
+
+  // The folder inside the workspace where the generated scenario will be stored.
+  // Default is currently strada-generated
+  string output_workspace_folder = 8;
+
+  // Additional yaml to be appended to the drive config.
+  // This will be uploaded to the same workspace.
+  string trailing_yaml = 9;
+
+  // This field is populated if you want to pull
+  // the drive configs from a configured ingestion image.
+  // This config is considered valid if it is successfully
+  // configured in the UI.
+  IngestionConfig log_ingestion_config = 18;
+
+  ///////////////////// LOG METADATA DETAILS //////////////////////////////////
+  int64 drive_duration_secs = 3;
+  string map_key = 5;
+  repeated simian_public.common.CustomField custom_fields = 12;
+  string vehicle_name = 13;
+  repeated LogSource logs = 15;
+  string drive_name = 16;
+  repeated public_triage.TriageEvent events = 19;
+
+  ///////////////////// INGESTION DETAILS //////////////////////////////////
+  string sim_flags = 4;
+  string run_environment_name = 7;
+  // Tenant whose resources this drive will be run on.
+  string tenant_name = 14;
+  int32 max_auto_retries = 17;
+  // The user who enqueued this drive conversion (if from the UI).
+  // This will not be populated for REST API requests.
+  string email = 20;
+
+  // Whether the request is an incremental ingestion or a full
+  // ingestion.
+  bool is_partial = 23;
+
+  // List of additional channels for an incremental log ingestion.
+  // The key, value metadata for each channel will be stored in
+  // strada -> ingestion_parameters section of the scenario, which will be sent to the interface in
+  // set_startup_options_v2_1. Each of the channels specified here will also be automatically
+  // added to the v2_api_basic section of the drive config, with
+  // source: VEHICLE_LOG -> sink: ADP with the specified type.
+  repeated simian_public.simulator.v2.IngestionParameters.IngestionChannel channels = 25;
+
+  ///////////////////// BASIS REQUIREMENTS LINKING //////////////////////////////////
+  string requirement_uuid = 6;
+  uint32 test_cycle_id = 10;
+
+  // The auth token used when triggering the ConvertDriveRequest.
+  // This is sent with the QueueBatchAdditionRequest when enqueing the drive conversion.
+  string auth_token = 24;
+
+  // A mapping between user and permissions. This will allow customers to specify
+  // permissions on a log at ingestion time. Consider the following:
+  // {user_1: VIEWER, user_2: EDITOR}. This would mean that user_1 can only
+  // view this log in the UI, but user_2 can READ and UPDATE the log. User can be any
+  // arbitrary string representing an email OR a user group.
+  // At authentication time, users will be identified with an email and any user groups
+  // that they are a part of. That email and user group attributes will be used to check
+  // against the permissions specified here.
+  // If this is left empty, then only the user ingesting the log (the "OWNER") will be able to
+  // interact with it. They will be able to update permissions later if necessary.
+  LogPermissions log_permissions = 26;
+
+  ///////////////////// DEPRECATED //////////////////////////////////
+  // The drive_log_uri field will be deprecated in favor of the multiple logs field below.
+  string drive_log_uri = 1 [deprecated = true];
+
+  // reserved 11;
+}
+
+message ConvertDriveResponse {
+  simian_public.common.CommonResponse common = 1;
+  string uuid = 2;
+}
+
+message IngestionConfig {
+  // The image that should be used to convert this log.
+  // If configured = True, then this image should correspond with the image configured
+  // in the UI.
+  string ingestion_image = 1;
+  // The mode of log ingestion which should match an entry
+  // in the config.yaml inside the /strada section of the image.
+  string ingestion_mode = 2;
+  // Set to true if this is pre-configured in the Strada settings page.
+  bool configured = 3;
+}
+
+message LogSource {
+  string name = 1;
+  string interface_name = 2;
+  string path = 3;
+  google.protobuf.Duration start_offset = 4;
+}
+
+message CreateEventsRequest {
+  message EventDetails {
+    string drive_uuid = 1;
+    int64 event_time_ms = 2;
+    string reason = 3;
+    int64 event_start_time_ms = 4;
+    int64 event_end_time_ms = 5;
+    repeated string channels = 7;
+    repeated string tags = 8;
+    string uuid_prefix = 9;
+    string key = 10;
+  }
+  repeated EventDetails event_details = 1;
+  // Optional dataset name if we are creating dataset items.
+  string dataset_name = 2;
+  // Collection to add the event to.
+  string collection_name = 9;
+  string email = 3;
+  string extra_data_string = 4;
+  bool enforce_unique_name = 5;
+  string auth_token = 6;
+  bool create_dataset_items = 7;
+  simian_public.plugin_schema.DatasetItemCreationSchema schema = 8;
+}
+
+message CreateEventsResponse {
+  int64 dataset_id = 1;
+  int64 collection_id = 4;
+  simian_public.common.CommonResponse common = 2;
+  repeated string event_uuids = 3;
+}

@@ -1,0 +1,83 @@
+syntax = "proto2";
+
+package simian_public.routing;
+
+import "applied/simian/public/proto/geometry.proto";
+import "applied/simian/public/proto/map/map_parking_space.proto";
+import "applied/simian/public/proto/routing/error_code.proto";
+import "applied/simian/public/proto/routing/header.proto";
+
+message LaneWaypoint {
+  optional string id = 1;
+  optional double s = 2;
+  optional simian_public.common.PointENU pose = 3;
+}
+
+// Represents a segment (partial or whole) of a lane in the underlying map.
+message LaneSegment {
+  // The ID of the lane in the map that this segment is a subset of.
+  optional string id = 1;
+  // Distance [m] along the lane centerline this segment begins.
+  optional double start_s = 2;
+  // Distance [m] along the lane centerline this segment ends.
+  optional double end_s = 3;
+  // The points along the underlying lane centerline covered by this segment.
+  repeated simian_public.common.PointENU centerline_points = 4;
+}
+
+message RoutingRequest {
+  optional simian_public.routing.Header header = 1;
+  // At least two points. The first is start point, the end is final point.
+  // The routing must go through each point in waypoint.
+  repeated LaneWaypoint waypoint = 2;
+  repeated LaneSegment blacklisted_lane = 3;
+  repeated string blacklisted_road = 4;
+  optional bool broadcast = 5 [default = true];
+  optional simian_public.hdmap.ParkingSpace parking_space = 6;
+  optional bool enable_change_lane_in_result = 7;
+}
+
+message Measurement {
+  optional double distance = 1;
+}
+
+enum ChangeLaneType {
+  FORWARD = 0;
+  LEFT = 1;
+  RIGHT = 2;
+}
+
+message Passage {
+  repeated LaneSegment segment = 1;
+  // If this field is set to true, the ego can reach the last waypoint
+  // designated in the RoutingRequest by following this passage.
+  // If this field is set to false, the ego cannot reach the last waypoint
+  // designated in the RoutingRequest by following this passage, so the passage
+  // is effectively invalid.
+  optional bool can_exit = 2;
+  // Default: FORWARD
+  // This field indicates in which direction the ego must change lanes in order to
+  // follow this passage.
+  // When this field is set to FORWARD, the ego does not need to change lanes to
+  // follow this passage.
+  optional ChangeLaneType change_lane_type = 3 [default = FORWARD];
+}
+
+message RoadSegment {
+  // ID of the road
+  optional string id = 1;
+  // Passages are lists of lane segments that the ego can follow to
+  // potentially reach the the endpoint specified in the RoutingRequest.
+  repeated Passage passage = 2;
+}
+
+message RoutingResponse {
+  optional simian_public.routing.Header header = 1;
+  repeated RoadSegment road = 2;
+  optional Measurement measurement = 3;
+  optional RoutingRequest routing_request = 4;
+
+  // the map version which is used to build road graph
+  optional bytes map_version = 5;
+  optional simian_public.routing.StatusPb status = 6;
+}

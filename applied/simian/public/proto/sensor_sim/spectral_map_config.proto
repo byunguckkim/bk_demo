@@ -1,0 +1,62 @@
+// Copyright (C) Applied Intuition, Inc. All rights reserved.
+// This source code file is distributed under and subject to the LICENSE in license.txt
+
+syntax = "proto3";
+
+package simian_public.sensor_sim.map_config;
+
+import "applied/simian/public/proto/common.proto";
+
+message SpectralMapConfig {
+  oneof spectral_map_type {
+    // An Applied Intuition created world.
+    // This is the default option if no spectral_map_type
+    // or SpectralMapConfig is specified.
+    AppliedProvided applied_provided = 1;
+
+    // Use a custom Unreal pak file for the Spectral world
+    CustomDLCMap custom_dlc_map = 2;
+
+    // Use a Spectral mesh generated through the
+    // Procedural Generation Pipeline.
+    FBXMesh fbx_mesh = 3;
+
+    RoadrunnerFBXMesh roadrunner_fbx_mesh = 4;
+  }
+  // [Optional] If this value is not populated we will use the default start
+  // position in map_config.defaults
+  simian_public.common.UTM map_offset = 5;
+}
+
+message AppliedProvided {}
+
+message CustomDLCMap {
+  // [Optional] The human readable name of the umap asset to load in Spectral.
+  // Only used for logging
+  string umap_name = 1;
+  // [Optional] The uri to the map .pak files within the DLC input directory.
+  // If not specified, the simulation will search for a file matching
+  // dlc://workspace/spectral/<any_patch_name>/content/maps/{map_key}.pak
+  string pak_uri = 2;
+}
+
+// The FBX mesh is assumed to be generated via the Spectral Procedural Map
+// Generation Pipeline. As such, properties of the fbx are assumed to
+// already match that which Spectral expects.
+message FBXMesh {
+  // [Required] URI or relative path of the fbx mesh directory.
+  // For instance: "maps://workspace/my_map/worldgen_data_dir"
+  // or "worldgen_data_dir"
+  // |mesh_uri| is somewhat of a misnomer in that this should
+  // actually be a directory
+  string mesh_uri = 1;
+}
+
+// The Roadrunner FBX mesh is assumed to be generated from roadrunner and imported
+// by the user
+message RoadrunnerFBXMesh {
+  // [Required] URI or relative path of the fbx mesh directory.
+  // For instance: "maps://workspace/my_map/roadrunner_data_dir"
+  // or "roadrunner_data_dir"
+  string mesh_data_dir = 1;
+}

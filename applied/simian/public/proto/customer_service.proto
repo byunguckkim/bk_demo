@@ -1,0 +1,117 @@
+// Copyright (C) 2018 Applied Intuition, Inc. All rights reserved.
+// This source code file is distributed under and subject to the LICENSE in license.txt
+
+syntax = "proto3";
+
+package simian_public.simulator;
+
+import "google/protobuf/duration.proto";
+import "google/protobuf/struct.proto";
+import "google/protobuf/timestamp.proto";
+import "applied/simian/public/proto/common.proto";
+import "applied/simian/public/proto/custom_actor.proto";
+import "applied/simian/public/proto/map_config.proto";
+import "applied/simian/public/proto/scenario/scenario_digest.proto";
+import "applied/simian/public/proto/sim_data.proto";
+
+service CustomerStack {
+  rpc GetStackInfo(GetStackInfoRequest) returns (GetStackInfoResponse);
+  rpc Initialize(InitializeRequest) returns (InitializeResponse);
+  // <!-- TODO(fahhem): Support deterministic sim (where the customer stack knows
+  // when processing is finished and can return their response right away
+  // without us tracking real time.
+  // rpc AdvanceDeterministically (stream AdvanceRequest) returns (stream AdvanceResponse); -->
+  rpc ReceiveSimulatorTime(ReceiveSimulatorTimeRequest) returns (ReceiveSimulatorTimeResponse);
+  rpc ReceiveSimulatorOutput(ReceiveSimulatorOutputRequest)
+      returns (ReceiveSimulatorOutputResponse);
+  rpc SendSimulatorInput(SendSimulatorInputRequest) returns (SendSimulatorInputResponse);
+  rpc Finalize(FinalizeRequest) returns (FinalizeResponse);
+}
+
+message GetStackInfoRequest {
+  CustomerStartupOptions options = 1;
+}
+
+message GetStackInfoResponse {
+  common.CommonResponse common = 1;
+  string stack_version = 3;
+  int32 simulation_hz = 4;  // default = 10
+  int32 clock_hz = 5;       // default = 100
+  string customer_server_version = 6;
+}
+
+message InitializeRequest {
+  sim_data.SimulatorOutput simulator_output = 1;
+  CustomerSoftwareStatus previous_status = 2;
+  google.protobuf.Timestamp sim_time = 3;
+  repeated custom_actor.Description custom_actors = 4;
+}
+
+// <!-- Next ID: 12 -->
+message CustomerStartupOptions {
+  bool start_stack_visualization = 1;
+  string record_stack_data = 2;
+  oneof stack_options {
+    string launcher_filename = 3;
+    string launcher_contents = 4;
+  }
+  google.protobuf.Value scenario_extra_data = 5;
+  simian_public.map_config.MapConfig map_config = 6;
+  string map_key = 7;
+  bool perception_stack_startup = 8;
+
+  scenario.ScenarioDigest scenario_digest = 9;
+
+  // Use this address to connect to the public map service.
+  string map_service_address = 10;
+
+  // Use this path to write all data set artifacts.
+  string record_spectral_dataset = 11;
+}
+
+message InitializeResponse {
+  common.CommonResponse common = 1;
+}
+
+message ReceiveSimulatorTimeRequest {
+  google.protobuf.Timestamp sim_time = 1;
+}
+message ReceiveSimulatorTimeResponse {
+  common.CommonResponse common = 1;
+}
+
+message ReceiveSimulatorOutputRequest {
+  sim_data.SimulatorOutput simulator_output = 1;
+  google.protobuf.Timestamp sim_time = 2;
+  google.protobuf.Duration sim_tick_duration = 3;
+}
+message ReceiveSimulatorOutputResponse {
+  common.CommonResponse common = 1;
+}
+
+message SendSimulatorInputRequest {
+  google.protobuf.Duration sim_tick_duration = 1;
+}
+message SendSimulatorInputResponse {
+  common.CommonResponse common = 1;
+  sim_data.SimulatorInput simulator_input = 2;
+}
+
+message FinalizeRequest {
+  CustomerSoftwareStatus requested_status = 1;
+}
+
+message FinalizeResponse {
+  common.CommonResponse common = 1;
+  CustomerSoftwareStatus status = 2;
+  repeated common.ObserverEvent custom_observer_events = 3;
+}
+
+message CustomerSoftwareStatus {
+  bool stack_running = 1;
+  bool middleware_running = 2;
+}
+
+message ObserverEvents {
+  repeated common.ObserverEvent custom_observer_events = 1;
+}

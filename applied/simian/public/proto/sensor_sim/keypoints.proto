@@ -1,0 +1,65 @@
+// Copyright (C) 2020 Applied Intuition, Inc. All rights reserved.
+// This source code file is distributed under and subject to the LICENSE in license.txt
+
+syntax = "proto3";
+
+package simian_public.sensor_sim.keypoints;
+
+import "applied/simian/public/proto/spatial.proto";
+
+message ActorKeypoint {
+  spatial.Point point = 1;
+  KeypointType keypoint_type = 2;
+
+  enum KeypointType {
+    UNSET = 0;
+    ROOT = 1;            // root is the geometric center with z = 0 of the actor
+    // reserved 2 to 1000;  // reserved for shared keypoints
+
+    HUMAN_NOSE = 1001;
+    HUMAN_L_EYE = 1002;
+    HUMAN_R_EYE = 1003;
+    HUMAN_L_EAR = 1004;
+    HUMAN_R_EAR = 1005;
+    HUMAN_L_SHOULDER = 1006;
+    HUMAN_R_SHOULDER = 1007;
+    HUMAN_L_ELBOW = 1008;
+    HUMAN_R_ELBOW = 1009;
+    HUMAN_L_WRIST = 1010;
+    HUMAN_R_WRIST = 1011;
+    HUMAN_L_HIP = 1012;
+    HUMAN_R_HIP = 1013;
+    HUMAN_L_KNEE = 1014;
+    HUMAN_R_KNEE = 1015;
+    HUMAN_L_ANKLE = 1016;
+    HUMAN_R_ANKLE = 1017;
+    HUMAN_L_HAND_END = 1018;
+    HUMAN_R_HAND_END = 1019;
+    HUMAN_HEAD_TOP = 1020;
+    // reserved 1021 to 2000;  // reserved for more pedestrian keypoints
+
+    VEHICLE_FRONT_PLATE = 2001;
+    VEHICLE_BACK_PLATE = 2002;
+    VEHICLE_L_HEADLIGHT = 2003;
+    VEHICLE_R_HEADLIGHT = 2004;
+    VEHICLE_L_TAILLIGHT = 2005;
+    VEHICLE_R_TAILLIGHT = 2006;
+    // Vehicles may have more than 2 left and 2 right wheels (e.g. semitrucks).
+    // If a vehicle does not, then VEHICLE_WHEEL...03 and VEHICLE_WHEEL...04 fields will be empty.
+    VEHICLE_WHEEL_L_01 = 2007;
+    VEHICLE_WHEEL_L_02 = 2008;
+    VEHICLE_WHEEL_L_03 = 2009;
+    VEHICLE_WHEEL_L_04 = 2010;
+    VEHICLE_WHEEL_R_01 = 2011;
+    VEHICLE_WHEEL_R_02 = 2012;
+    VEHICLE_WHEEL_R_03 = 2013;
+    VEHICLE_WHEEL_R_04 = 2014;
+    // reserved 2015 to 2100;  // reserved for more wheels
+
+    VEHICLE_ROOF_FRONT_L = 2101;
+    VEHICLE_ROOF_FRONT_R = 2102;
+    VEHICLE_ROOF_BACK_L = 2103;
+    VEHICLE_ROOF_BACK_R = 2104;
+    // reserved 2105 to 3000;  // reserved for more vehicle keypoints
+  }
+}

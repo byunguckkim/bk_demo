@@ -1,0 +1,32 @@
+// Copyright (C) 2021 Applied Intuition, Inc. All rights reserved.
+// This source code file is distributed under and subject to the LICENSE in license.txt
+
+syntax = "proto3";
+
+package simian_public.fmu;
+
+// Defines the structure of the FMU config JSON.
+// An example fmu config JSON can be found in the User Manual:
+// https://home.applied.co/manual/simian/latest/#/integrating_with_simian/fmu/fmu_and_simian?id=fmu-config-json-structure
+message FMUConfig {
+  // Channels that source from ADP and sink to the FMU.
+  repeated ChannelMapping from_adp_channels = 1;
+  // Channels that source from the FMU and sink to ADP.
+  repeated ChannelMapping to_adp_channels = 2;
+
+  message ChannelMapping {
+    // Unique name to identify the channel, e.g. "simian_controls"
+    string channel_name = 1;
+    repeated FieldMapping fields = 2;
+
+    message FieldMapping {
+      // Name of the field from the ADP proto.
+      // Should be formatted as a json pointer string
+      // Example: "/normalizedDbw/steering" to access the steering field in a
+      // simian_public.motion_model.Input message
+      string adp_field_name = 1;
+      // Name of the signal from the FMU.
+      string fmu_field_name = 2;
+    }
+  }
+}

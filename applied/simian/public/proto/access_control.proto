@@ -1,0 +1,48 @@
+// Copyright (C) 2023 Applied Intuition, Inc. All rights reserved.
+// This source code file is distributed under and subject to the LICENSE in
+// license.txt
+
+syntax = "proto3";
+
+package public_access_control;
+
+import "applied/simian/public/proto/common.proto";
+
+message ProductAction {
+  enum ADPAction {
+    UNDEFINED_ACTION = 0;
+    ADD_NON_SIM_PLUGIN = 1;
+    SUBMIT_BUG_REPORT = 2;
+    GRANT_PERMISSION = 3;
+    REVOKE_PERMISSION = 4;
+  }
+
+  // This policy structure can be used to specify
+  // policies on non-DB resource. For now, adp_action
+  // will refer to policies set on the "ROOT" resource.
+  oneof action {
+    ADPAction adp_action = 1;
+  }
+}
+
+// Describes access control policies
+// at the ADP-level. This is where to specify which
+// users can take certain actions within a product. For example,
+// if you want only users in group "admin" to be able to ingest logs into Strada,
+// you will need to specify that here. By default, no one will be able to
+// take any of these actions.
+message Policy {
+  message GroupPolicy {
+    // Identifier refers to either an individual email associated with a user
+    // or a user group that is sent to ADP as part of the authentication
+    // process.
+    string identifier = 1;
+    repeated ProductAction product_actions = 2;
+  }
+
+  // The policy version currently being specified.
+  // Right now, we are on Major version 0 and minor
+  // version 1. These will be populated by default in the UI.
+  simian_public.common.VersionMajorMinor version = 1;
+  repeated GroupPolicy group_policies = 2;
+}

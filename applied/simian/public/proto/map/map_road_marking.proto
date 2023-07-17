@@ -1,0 +1,86 @@
+// Copyright (C) 2022 Applied Intuition, Inc. All rights reserved.
+// This source code file is distributed under and subject to the LICENSE in
+// license.txt
+
+syntax = "proto2";
+
+package simian_public.hdmap;
+
+import "applied/simian/public/proto/common.proto";
+import "applied/simian/public/proto/map/map_common.proto";
+import "applied/simian/public/proto/map/map_geometry.proto";
+import "applied/simian/public/proto/map/map_id.proto";
+import "applied/simian/public/proto/spatial.proto";
+
+// <!--Next ID: 9.-->
+message RoadMarking {
+  // DisplayType: Readonly.
+  // DisplayType: NestedToFlatten.
+  // A unique identifier for the road marking.
+  optional Id id = 1;
+  // Position describes the center of the road marking.
+  oneof position {
+    // A pose with a scaling representing the position of the road marking.
+    simian_public.spatial.ScaledPoseSpec scaled_pose = 2;
+    // Lane relative coordinates specifying the position of the road marking.
+    simian_public.common.LanePoint lane_relative = 3;
+  }
+  // DisplayType: Editable.
+  // The type of the road marking. See RoadMarkingType for enum values.
+  optional RoadMarkingType type = 4;
+  // Only used when type is CUSTOM.
+  // DisplayType: Editable.
+  // DisplayType: OnlyDisplayIf: type, CUSTOM.
+  optional string custom_type = 5;
+  // <!--Must be in sync with map_enums.proto-->.
+  enum RoadMarkingType {
+    UNKNOWN = 0;
+    CUSTOM = 1;
+    LEFT_TURN_ONLY = 2;
+    THRU_ONLY = 3;
+    RIGHT_TURN_ONLY = 4;
+    LEFT_THRU = 5;
+    RIGHT_THRU = 6;
+    LEFT_RIGHT_THRU = 7;
+    LEFT_LANE_REDUCTION = 8;
+    RIGHT_LANE_REDUCTION = 9;
+    GORE_ZONES = 10;
+    STOP_BAR = 11;
+    CROSSWALK = 12;
+  }
+  // DisplayType: Readonly.
+  // DisplayType: NestedToFlatten.
+  // DisplayType: Association.
+  // The lane to which this road marking is associated.
+  repeated Id associated_lane = 6;
+
+  // Custom tags that can be used to store semantic information about an element.
+  repeated CustomTag custom_tags = 7;
+  // Bounding box encompassing the road marking.
+  // Used by sensors reporting road markings to detect if the marking is in the field of view.
+  // These points need to be specified in the map frame.
+  optional Polygon polygon = 8;
+
+  // <!--Must be in sync with map_enums.proto-->
+  enum MarkingColor {
+    UNSET = 0;
+    CUSTOM_COLOR = 1;
+    WHITE = 2;
+    RED = 3;
+    GREEN = 4;
+    BLUE = 5;
+    YELLOW = 6;
+    ORANGE = 7;
+  }
+
+  // DisplayType: Editable.
+  // The color of this road marking. See MarkingColor for enum values.
+  optional MarkingColor color = 9;
+  // Only used when color is CUSTOM_COLOR.
+  // DisplayType: Editable.
+  // DisplayType: OnlyDisplayIf: color, CUSTOM_COLOR.
+  optional string custom_color = 10;
+  // DisplayType: Editable.
+  // The thickness of this road marking. Used for sensor simulation.
+  optional double thickness = 11;
+}

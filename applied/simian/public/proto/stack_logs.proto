@@ -1,0 +1,41 @@
+// Copyright (C) 2018 Applied Intuition, Inc. All rights reserved.
+// This source code file is distributed under and subject to the LICENSE in license.txt
+
+syntax = "proto3";
+
+package simian_public.stack_logs;
+
+import "google/protobuf/timestamp.proto";
+
+// Custom stack log entry. Only msg and time are required. Setting an
+// explicit log_level is recommended.
+//
+// These end up in the "Stack" tab on a sim run page. If a
+// StackLogLine has a LogLevel of ERROR or FATAL, that sim run will be
+// marked as failing the "Stack logs" observer. This can be used to
+// inject stack specific observers from the customer interface code.
+message StackLogLine {
+  string source_file = 1;
+  int32 source_line = 2;
+  string source_module = 3;
+  int32 thread_id = 4;
+  string thread_name = 5;
+
+  string msg = 6;
+  google.protobuf.Timestamp time = 7;
+
+  enum LogLevel {
+    NOTSET = 0;
+    DEBUG = 10;
+    INFO = 20;
+    WARN = 30;
+    ERROR = 40;
+    FATAL = 50;
+  }
+
+  LogLevel log_level = 8;
+}
+
+message StackLogs {
+  repeated StackLogLine line = 1;
+}

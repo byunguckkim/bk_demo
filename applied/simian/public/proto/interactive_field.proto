@@ -1,0 +1,90 @@
+// Copyright (C) 2022 Applied Intuition, Inc. All rights reserved.
+// This source code file is distributed under and subject to the LICENSE in license.txt
+
+syntax = "proto3";
+
+package simian_public.interactive_field;
+
+import "google/protobuf/empty.proto";
+import "applied/simian/public/proto/common.proto";
+import "applied/simian/public/proto/shape.proto";
+
+enum BuiltInFieldState {
+  FIELD_CORN_HARVESTED = 0;
+  FIELD_CORN_UNHARVESTED = 1;
+  FIELD_WHEAT_HARVESTED = 2;
+  FIELD_WHEAT_UNHARVESTED = 3;
+  FIELD_SOY_HARVESTED = 4;
+  FIELD_SOY_UNHARVESTED = 5;
+  FIELD_TILLED = 6;
+  FIELD_UNTILLED = 7;
+}
+
+// Types of field state that the user can specify.
+message FieldState {
+  oneof type {
+    BuiltInFieldState builtin_field_state = 1;
+  }
+}
+
+// Describes the initial field state using for map regions.
+// Each initial state applies to a list of map region IDs.
+// We allow the same field state to appear in multiple InitialFieldDescription within a
+// InteractiveField. A given region ID can be assigned onlyu one initial field state; If a region is
+// assigned multiple different intial field states, an error is raised.
+message InitialFieldDescription {
+  FieldState field_state = 1;
+
+  // These region IDs should match the ID of a map region in the base map.
+  repeated string region_ids = 2;
+}
+
+// Allows the user to be able to interact with the regions specified in map.
+// User can specify initial field state by using initial_field_descriptions.
+message InteractiveField {
+  repeated InitialFieldDescription initial_field_descriptions = 1;
+
+  // A circle formed with this radius cnetered at primary ego starting position should emcompass all
+  // of the map regions specified in InteractiveField. This is used for MapsV3. Only map regions
+  // within this radius will be loaded for interactive field when using Interactive Field. The
+  // default is 1000m.
+  double map_lookahead_radius = 2;  // [m]
+}
+
+// General-purpose Polygon in local coordinate without having to specify reference
+// This polygon should include at least three points.
+// The points must follow either clockwise or counter-clockwise orientation in order.
+// The first and last points cannot be the same.
+message Polygon {
+  repeated simian_public.common.Vector2 points = 1;
+}
+
+message InteractiveFieldTransformerConfig {
+  // Specify which field state the transformer changes the field to.
+  FieldState transform_to_state = 1;
+
+  // Specify the initial engagement status of the transformer. Set to true if the transformer is
+  // engaged.
+  bool engaged = 2;
+
+  // User can either specify whether the entire ego's section shape or a custom polygon is
+  // interacting with the field.
+  oneof transformer_shape {
+    // Set the entire ego section's shape to interact with the field.
+    // The default is to use entire_section.
+    google.protobuf.Empty entire_section = 3;
+
+    // Polygon is used to define a portion of the ego, relative to the ego sectioon frame, that will
+    // interact with the field.
+    Polygon section_polygon = 4;
+  }
+
+  // Mesh name for engaged transformer in Spectral.
+  string engaged_mesh_name = 5;
+
+  // The shape of the ego section mesh after it is engaged.
+  // The "Shape" proto message is the same as ego trailer's shape.
+  // Note that this is different from how VehicleShape is defined for ego vehicle itself.
+  // If using vertical_prism, the first and the last point cannot be the same.
+  simian_public.shape.Shape engaged_shape = 6;
+}

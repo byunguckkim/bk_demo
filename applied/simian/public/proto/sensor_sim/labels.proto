@@ -1,0 +1,498 @@
+// Copyright (C) 2020 Applied Intuition, Inc. All rights reserved.
+// This source code file is distributed under and subject to the LICENSE in license.txt
+
+syntax = "proto3";
+
+package simian_public.sensor_sim.labels;
+
+import "applied/simian/public/proto/common.proto";
+import "applied/simian/public/proto/map/map_enums.proto";
+import "applied/simian/public/proto/map/map_lane.proto";
+import "applied/simian/public/proto/map/map_region.proto";
+import "applied/simian/public/proto/sensor_sim/basic_types.proto";
+import "applied/simian/public/proto/sensor_sim/keypoints.proto";
+import "applied/simian/public/proto/sensor_sim/model_output.proto";
+import "applied/simian/public/proto/sensor_sim/models.proto";
+import "applied/simian/public/proto/spatial.proto";
+import "applied/simian/public/proto/spectral_assets.proto";
+
+message LabelRequest {
+  string request_name = 1;
+  SensorSpecificRequest sensor_filter = 2;
+  oneof request_type {
+    BoundingBox2DRequest bounding_box_2d = 3;
+    BoundingBox3DRequest bounding_box_3d = 4;
+    SemanticImageRequest semantic_image = 5;
+    DepthImageRequest depth_image = 6;
+    ActorRequest actor = 7;
+    LaneMarkings2DRequest lane_markings_2d = 8;
+    FreeSpaceRequest free_space = 10;
+    DecalRequest decal = 11;
+    DisparityRequest disparity = 12;
+    CurbwallRequest curbwall = 13;
+    ParkingSpaceRequest parking_space = 14;
+    RoadMarkingsRequest road_markings = 15;
+  }
+
+  // reserved 9;
+  // reserved "decal_info";
+}
+
+// BoundingBox2DRequest is deprecated and support will be removed in 1.36.
+// Instead, please use the ActorRequest with the BOUNDING_BOX_2D field.
+message BoundingBox2DRequest {
+  // object_type encodes the kinds of objects to be labeled
+  // by this request.
+  ObjectType object_type = 1;
+  string image_mapping_name = 2;
+}
+
+// BoundingBox3DRequest is deprecated and support will be removed in 1.36.
+// Instead, please use the ActorRequest with the BOUNDING_BOX_3D field.
+message BoundingBox3DRequest {
+  ObjectType object_type = 1;
+  repeated FrameDescription reference_frames = 2;
+  bool enable_image_projection = 3;
+}
+
+message SemanticImageRequest {}
+message DepthImageRequest {}
+
+enum LaneMarkingsAlgo {
+  DEFAULT_LANE_MARKINGS_ALGO = 0;
+  LEGACY_LANE_MARKINGS = 1;
+  RAYCAST_LANE_MARKINGS = 2;
+}
+
+message TrafficLightBulbBoxType {
+  enum TrafficLightBulbBoxTypeEnum {
+    BLOCK = 0;
+    BULB = 1;
+  }
+}
+
+message LaneMarkings2DRequest {
+  // If omitted, will be set to default value, 200 meters.
+  double search_radius = 1;
+  bool trace_perimeter = 2;
+  LaneMarkingsAlgo lane_markings_algo = 3;
+}
+
+message FreeSpaceRequest {}
+
+message DecalRequest {
+  // If this flag is set, then the decal image will be returned as decal_image in a LabelOutput.
+  // In either case, the decal bounding boxes will be returned as decal_bounding_box_2ds in a
+  // LabelOutput.
+  bool return_decal_image = 1;
+}
+
+message DisparityRequest {
+  // Each pixel in the "primary camera" will be reprojected into 3d space and then projected into
+  // the "secondary camera", and the Euclidean distance between those pixels will be associated in
+  // the returned label to the pixel in the image from the primary camera.
+  string primary_camera_name = 1;
+  string secondary_camera_name = 2;
+}
+
+message CurbwallRequest {}
+
+message ParkingSpaceRequest {
+  // If omitted, will be set to default value, 200 meters.
+  double search_radius = 1;
+  // Flag to enable legacy behavior, presumably a little faster.
+  bool run_without_depth_filtering = 2;
+}
+
+message RoadMarkingsRequest {
+  // If omitted, will be set to default value, 200 meters.
+  double search_radius = 1;
+}
+
+// ActorRequest requests per actor annotations.  Each actor can be annotated
+// in a variety of ways, some of which are computationally expensive (e.g.
+// image occlusion related annotations involve many extra renderings of the scene).
+message ActorRequest {
+  enum ActorOutputFields {
+    _UNUSED = 0;
+    KEYPOINTS = 1;
+    BOUNDING_BOX_2D = 2;
+    BOUNDING_BOX_3D = 3;
+    COMPONENT_BOUNDING_BOX_2D = 4;
+    COMPONENT_BOUNDING_BOX_3D = 5;
+    MODEL_DESCRIPTION = 6;
+    TRUNCATION_SCORE = 7;
+  }
+  // `fields` lists the fields that should be populated for this annotation request.
+  // This can be used to reduce the computation time to produce labels when only a
+  // subset of label fields are required.  An empty list causes all fields applicable
+  // to a sensor to be populated.
+  // See comments on the ActorOutput message for the semantics of each field.
+  repeated ActorOutputFields fields = 1;
+  repeated FrameDescription reference_frames = 2;
+  ActorLabelConfig extra_config = 3;
+  message ActorLabelConfig {
+    // Estimate visual degradation.  Applies only to BOUNDING_BOX_2D requests, and only to traffic
+    // signs.
+    bool estimate_visual_degradation = 1;
+  }
+}
+
+// SensorSpecificRequest encodes how to match a request for labels with the
+// set of sensors in the scenario.  The final set of sensors for which outputs
+// are generated is determined by sequentially:
+// 1. Start with the set of all sensors defined in the scenario
+// 2. Remove sensors that do not make sense.  For example, 2D bounding boxes only
+//    describe objects in images, so lidars would be removed for a sensor
+//    specific 2DBoundingBoxRequest.
+// 3. If `only_sensors` is populated, remove sensors that do not appear
+//    in `only_sensors`.
+// 4. If `never_sensors` is populated, remove sensors that appear in
+//    `never_sensors`.
+// Note that this field is ignored for disparity labels, as they already specify
+// the sensors to which they apply.
+message SensorSpecificRequest {
+  repeated string only_sensors = 1;
+  repeated string never_sensors = 2;
+}
+
+enum ObjectType {
+  UNSPECIFIED = 0;
+  // ALL_ACTORS describes the ground truth of all obstacles placed by a Simian
+  // scenario in the world.
+  ALL_ACTORS = 1;
+  // TRAFFIC_SIGN_FACES describes the painted portion of a traffic sign without
+  // the pole it is mounted on.
+  TRAFFIC_SIGN_FACES = 2;
+}
+
+enum VehicleComponentTypes {
+  VEHICLE_COMPONENT_TYPES_UNSET = 0;
+  VEHICLE_COMPONENT_TYPES_LEFT_SIDE_VIEW_MIRROR = 1;
+  VEHICLE_COMPONENT_TYPES_RIGHT_SIDE_VIEW_MIRROR = 2;
+  VEHICLE_COMPONENT_TYPES_PASSENGER_1 = 3;
+}
+
+// WorldFrame may in the future be parameterized to customize how it is to be
+// described in output (e.g. the coordinate system convention).
+message WorldFrame {}
+
+// EgoFrame may in the future be parameterized to customize how it is to be
+// described in output (e.g. the coordinate system convention).
+message EgoFrame {}
+
+// SensorFrame may in the future be parameterized to customize how it is to be
+// described in output (e.g. the coordinate system convention).
+message SensorFrame {}
+
+// FrameDescription describes a sensor frame semantically.
+message FrameDescription {
+  oneof frame {
+    // `world_frame` is the root of all reference frames and the default output frame
+    // when no frame is specified.
+    WorldFrame world_frame = 2;
+    EgoFrame ego_frame = 3;
+    // `sensor_frame` indicates that the output should be in the reference frame of
+    // sensor we find the label output associated with.
+    SensorFrame sensor_frame = 4;
+  }
+}
+
+// LabelSnapshot is the top level container for all labels returned to the
+// customer interface at a given tick.
+message LabelSnapshot {
+  repeated LabelOutput labels = 1;
+
+  // reserved 2;
+}
+
+// LabelOutput holds the labels returned for a particular LabelRequest.
+message LabelOutput {
+  // `request_name` identifies the LabelRequest that created this LabelOutput.
+  string request_name = 1;
+  oneof label {
+    BoundingBox2DOutputList bounding_box_2ds = 3;
+    BoundingBox3DOutputList bounding_box_3ds = 4;
+    ImageOutput semantic_image = 5;
+    ImageOutput depth_image = 6;
+    ActorOutputList actor_outputs = 7;
+    LaneMarkings2DOutput lane_markings_2d = 8;
+    FreeSpaceOutput free_space = 9;
+    DecalBoundingBox2DOutputList decal_bounding_box_2ds = 10;
+    ImageOutput decal_image = 11;
+    DisparityMap disparity_map = 12;
+    CurbwallPolygons curbwall_polygons = 13;
+    ParkingSpaceOutput parking_space = 14;
+    RoadMarkingsOutput road_markings = 15;
+  }
+  // reserved 16 to 99;  // For more members of the label oneof
+  string image_mapping_name = 100;
+
+  message BoundingBox2DOutputList {
+    repeated BoundingBox2DOutput boxes = 1;
+  }
+  message BoundingBox3DOutputList {
+    repeated BoundingBox3DOutput boxes = 1;
+  }
+  message ActorOutputList {
+    repeated ActorOutput actors = 1;
+  }
+  message DecalBoundingBox2DOutputList {
+    repeated DecalBoundingBox2DOutput decals = 1;
+  }
+}
+
+message DecalCharacterBoundingBox2DOutput {
+  // 0-based index of the character within the decal text.
+  int32 character_index = 1;
+  simian_public.sensor_sim.basic_types.ImageBoundingBox visible_bounds = 2;
+}
+
+message DecalBoundingBox2DOutput {
+  string text = 1;
+  // 0-based unique index of the decal.
+  int32 decal_index = 2;
+  simian_public.sensor_sim.basic_types.ImageBoundingBox full_decal_visible_bounds = 3;
+  repeated DecalCharacterBoundingBox2DOutput character_bounding_boxes = 4;
+}
+
+// BoundingBox2DOutput describes a rectangular region of an image.
+message BoundingBox2DOutput {
+  // `actor_id` is the ID of the corresponding Simian actor.
+  int32 actor_id = 1;
+  // Note that some actors may be totally occluded by other objects in the image, and will
+  // not have visible_bounds populated
+  simian_public.sensor_sim.basic_types.ImageBoundingBox visible_bounds = 2;
+  uint32 num_visible_pixels = 3;
+  simian_public.sensor_sim.basic_types.ImageBoundingBox bounds_ignoring_occlusion = 4;
+  uint32 num_pixels_ignoring_occlusion = 5;
+  float fraction_occluded = 6;  // The percent occlusion of the actor [0, 1.0]
+  // The enum value of the SpectralModel of the corresponding Simian actor.
+  simian_public.sensor_sim.models.SpectralModel.SpectralModelEnum spectral_model = 7;
+  // Component ID of the corresponding object. Used if multiple components correspond to the same
+  // Simian actor ID (i.e. for traffic sign faces).
+  int32 component_id = 8;
+  bool traffic_light_bulb_active = 9;
+}
+
+// BoundingBox3DOutput  describes a 3D bounding box of an object of interest.
+message BoundingBox3DOutput {
+  // `actor_id` is the ID of the corresponding Simian actor, when that makes sense for the requested
+  // bounding box.
+  int32 actor_id = 1;
+  // `pose` encodes the position and orientation of the bounding box.
+  // This is a reference point to the pivot/origin of the actor.
+  spatial.Pose pose = 3;
+  // `extent` encodes the extent of the bounding box, in meters, in Simian's
+  // coordinate system.  So for instance, the length of the bounding box, front to back,
+  // in meters, is `extent.x`.
+  spatial.Point extent = 4;
+  // `centroid` encodes the position and orientation of the geometric center of the bounding box.
+  // This may differ from the pose if the actor's origin/pivot is not the center.
+  spatial.Pose centroid = 8;
+  // `points_in_image` holds the list of corners of this bounding box projected
+  // into the sensor's image output. This will be populated when all of:
+  // - the point is expressed in the coordinate system of a particular sensor
+  // - that sensor is a camera
+  // - enable_image_projection is true in the corresponding request
+  // - all 3D points are in front of the camera and in the image
+  // Points will be in a fixed order from the perspective of an observer inside the
+  // box, facing forward:
+  // - the front of the box (top left, top right, bottom right, bottom left)
+  // - the back of the box (top left, top right, bottom right, bottom left)
+  repeated simian_public.sensor_sim.basic_types.ImagePoint points_in_image = 5;
+  // Note that when a LabelRequest requests multiple reference frames, the returned
+  // bounding boxes will come in the same LabelOutput, and each bounding box describes
+  // the frame that it is in.
+  FrameDescription reference_frame = 6;
+
+  // The enum value of the SpectralModel of the corresponding Simian actor.
+  simian_public.sensor_sim.models.SpectralModel.SpectralModelEnum spectral_model = 7;
+
+  // reserved 2;
+}
+
+message ImageOutput {
+  simian_public.sensor_sim.basic_types.ImagePoint resolution = 1;
+  // `original_sensor_name` identifies the original sensor this image output is
+  // related to.  For semantic and depth images, this is the original
+  // VISIBLE_LIGHT sensor the output describes.
+  string original_sensor_name = 2;
+  simian_public.sensor_sim.basic_types.SensorDataOutput output = 3;
+}
+
+message DisparityMap {
+  // Contains a serialized array of 16-bit values, in row-major order with the dimensions of the
+  // primary camera. Each value is a fixed-point (10+6 bit) number representing the Euclidean
+  // distance from that pixel in the primary-camera image to the pixel in the secondary-camera
+  // image that images the same scene point.  If the scene point is outside the bounds of the
+  // secondary image, that's OK; we still give the distance to where it would go.  If a location
+  // cannot be calculated for the point in the secondary image (behind the plane of a pinhole
+  // camera, or outside the limits imposed by radial distortion) we set the disparity to the maximum
+  // possible value for a 10+6-bit fixed-point unsigned (1023.984375).
+  simian_public.sensor_sim.basic_types.SensorDataOutput disparity = 1;
+}
+
+message LaneSegment2D {
+  string name = 1;
+  repeated simian_public.sensor_sim.basic_types.ImagePoint polygon_points = 2;
+  oneof road_marking {
+    hdmap.LaneBoundaryType marking_type = 3;
+    hdmap.RoadMarkingTypeEnum.RoadMarkingType road_marking_type = 4;
+  }
+}
+
+message LaneMarkings2DOutput {
+  repeated LaneSegment2D segments = 1;
+  bool trace_perimeter = 2;
+}
+
+message FreeSpaceBoundary {
+  // Polygon is implicitly closed -- that is, there is an implicit edge from the last element of
+  // polygon_points to the first element, but the first element is not copied to the end of
+  // polygon_points.
+  // Non-"hole" contours are traced counterclockwise; that is, with the road surface to the left of
+  // the direction of travel.  Holes are traced clockwise, with the hole to the right of the
+  // direction of travel, and therefore still with road surface to the left.
+  repeated simian_public.sensor_sim.basic_types.ImagePoint polygon_points = 1;
+  bool is_hole = 2;
+}
+
+message FreeSpaceOutput {
+  repeated FreeSpaceBoundary boundary = 1;
+}
+
+message CurbwallPolygon {
+  // Polygon is implicitly closed -- that is, there is an implicit edge from the last element of
+  // polygon_points to the first element, but the first element is not copied to the end of
+  // polygon_points.
+  repeated simian_public.sensor_sim.basic_types.ImagePoint polygon_points = 1;
+}
+
+message CurbwallPolygons {
+  repeated CurbwallPolygon polygons = 1;
+}
+
+message ParkingPolygon {
+  string id = 1;
+  // Points that can be projected into image space, but not within image *bounds*, are still
+  // included in polygon_points. Points that cannot be meaningfully projected into image space at
+  // all (for example, points behind the plane of a pinhole camera) are *not* included in
+  // polygon_points, but are still included in polygon_points_3d. However, if there are fewer than
+  // two successfully projected polygon_points, then no ParkingPolygon is added to the label.
+  repeated simian_public.sensor_sim.basic_types.ImagePoint polygon_points = 2;
+  // Points in world frame.
+  repeated spatial.Point polygon_points_3d = 4;
+  simian_public.hdmap.ParkingSpaceDetails details = 3;
+}
+
+message ParkingSpaceOutput {
+  repeated ParkingPolygon parking_polygons = 1;
+  // reserved 2, 3, 4, 5;
+}
+
+message SingleRoadMarkingOutput {
+  simian_public.spectral.SpectralRoadMarking.RoadMarkingType spectral_asset_type = 1;
+  repeated BoundingBox3D bounding_boxes_3d = 2;
+
+  message BoundingBox3D {
+    // The centroid of the road marking's bounding cuboid, relative to the given reference_frame.
+    spatial.Pose centroid = 1;
+    spatial.Point extent = 2;
+    FrameDescription reference_frame = 3;
+  }
+}
+
+message RoadMarkingsOutput {
+  repeated SingleRoadMarkingOutput markings = 2;
+}
+
+message TrafficLightBulbDescription {
+  bool traffic_light_bulb_active = 1;
+  simian_public.common.RGBA traffic_light_bulb_color = 2;
+  simian_public.spectral.LightIcon.LightIconEnum traffic_light_bulb_icon = 3;
+  float traffic_light_bulb_intensity = 4;
+  TrafficLightBulbBoxType.TrafficLightBulbBoxTypeEnum traffic_light_bulb_box_type = 5;
+  int32 traffic_light_bulb_id = 6;
+}
+
+message TrafficLightDescription {
+  int32 bulb_count = 1;
+}
+
+message ActorOutput {
+  // `id` is the ID of the corresponding Simian actor.
+  int32 id = 1;
+  // `spectral_model` describes which 3D spectral model an actor has (e.g. GENERIC_SEDAN).
+  simian_public.sensor_sim.models.SpectralModel.SpectralModelEnum spectral_model = 2;
+
+  // `reference_frame` describes the semantic frame of reference from which this actor's data is
+  // viewed. Can be either world_frame, ego_frame, or sensor_frame
+  FrameDescription reference_frame = 3;
+
+  // `actor_keypoints` is a list of points of interest (e.g. HUMAN_HEAD_TOP or VEHICLE_FRONT_PLATE)
+  // for this actor
+  repeated simian_public.sensor_sim.keypoints.ActorKeypoint actor_keypoints = 4;
+
+  repeated BoundingBox2D bboxes_2d = 5;
+  repeated BoundingBox3D bboxes_3d = 6;
+
+  simian_public.sensor_sim.models.SpectralModelOutput model_description = 7;
+
+  // This field contains attributes about the actor or the individual component that is not
+  // necessarily a bounding box. For example, this could contain the color of a traffic light bulb.
+  message ComponentDescription {
+    oneof desc_type {
+      simian_public.spectral.SpectralSign.Board.SignMesh sign_type = 1;
+      simian_public.spectral.SpectralUSSign.SignType us_sign_type = 2;
+      VehicleComponentTypes vehicle_type = 3;
+      TrafficLightBulbDescription traffic_light_bulb_description = 4;
+      TrafficLightDescription traffic_light_description = 5;
+    }
+  }
+
+  // BoundingBox2D describes a rectangular region of an image.
+  message BoundingBox2D {
+    // Note that some actors may be totally occluded by other objects in the image, and will
+    // not have visible_bounds populated
+    simian_public.sensor_sim.basic_types.ImageBoundingBox visible_bounds = 1;
+    uint32 num_visible_pixels = 2;
+    simian_public.sensor_sim.basic_types.ImageBoundingBox bounds_ignoring_occlusion = 3;
+    uint32 num_pixels_ignoring_occlusion = 4;
+    float fraction_occluded = 5;  // The percent occlusion of the actor [0, 1.0]
+
+    // `component_desc` is only set when the bounding box describes a portion of the actor.
+    // `component_desc` describes what that portion is semantically. For example, a traffic sign
+    // actor can have multiple sign faces; each sign face is a component. This component description
+    // also contains attributes about the component, e.g. the traffic light bulb icon type.
+    ComponentDescription component_desc = 6;
+
+    // This field applies only to traffic-light bulbs. We are deprecating this field in favor of
+    // putting the active state inside of the component description proto.
+    bool traffic_light_bulb_active = 7;
+
+    // Measure of difficulty in seeing the sign contents, from 0 (no degradation) to 1 (invisible).
+    float visual_degradation = 8;
+
+    // The percent truncation of the actor [0, 1.0]. Truncation is defined as the fraction of
+    // the actor that is outside the image bounds. It won't be populated unless explicitly
+    // requested in the ActorRequest.fields as TRUNCATION_SCORE.
+    float fraction_truncated = 9;
+  }
+
+  // BoundingBox3D describes a 3D bounding box of an object of interest.
+  message BoundingBox3D {
+    // `pose` encodes Simian's description of "where this actor is."  That reference pose
+    // moves around inside the bounding box depending on what is being described.
+    // Please use `centroid` instead, which is a well defined field.
+    spatial.Pose pose = 1;
+    // `extent` encodes the extent of the bounding box, in meters, in Simian's
+    // coordinate system.  So for instance, the length of the bounding box, front to back,
+    // in meters, is `extent.x`.
+    spatial.Point extent = 2;
+    // `centroid` encodes the position and orientation of the geometric center of the bounding box.
+    spatial.Pose centroid = 3;
+    // `component_desc` is only set when the bounding box describes a component of the actor.
+    ComponentDescription component_desc = 4;
+  }
+}

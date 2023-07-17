@@ -1,0 +1,1861 @@
+// Copyright (C) 2018 Applied Intuition, Inc. All rights reserved.
+// This source code file is distributed under and subject to the LICENSE in license.txt
+
+syntax = "proto3";
+
+package simian_public.sensor_model;
+
+import "google/protobuf/any.proto";
+import "google/protobuf/struct.proto";
+import "google/protobuf/timestamp.proto";
+import "applied/simian/public/proto/common.proto";
+import "applied/simian/public/proto/field_options.proto";
+import "applied/simian/public/proto/sensor_sim/basic_types.proto";
+import "applied/simian/public/proto/sensor_sim/camera_model.proto";
+import "applied/simian/public/proto/sensor_sim/labels.proto";
+import "applied/simian/public/proto/sensor_sim/sensor_behavior.proto";
+import "applied/simian/public/proto/spatial.proto";
+
+// Sensor model descriptions. These models give low level raw
+// outputs from each sensor type. They are meant to specifically
+// model real world sensors.
+
+// Each follow the general layout of:
+
+// Sensor Model Type --> Vendor --> Specific Sensor --> Config --> Noise
+
+// Sensor Models.
+message Description {
+  oneof sensor_model_type {
+    LidarModel lidar_model = 1;
+    RadarModel radar_model = 2;
+    CameraModel camera_model = 3;
+    UltrasoundModel ultrasound_model = 5;
+    Empty external_model = 4;
+  }
+
+  message AdditionalParams {
+    oneof message_type {
+      common.DataPoint data_point = 1;
+      common.Message message = 2;
+    }
+  }
+
+  // Generic lidar sensor.
+  message LidarModel {
+    message SensorFidelity {
+      message PhysicsModel {
+        enum MaterialSource {
+          VISIBLE = 0;  // default
+          NIR = 1;
+          SWIR = 2;
+        }
+        // reflectivity_coefficient: Scales the base reflectivity of all materials during
+        // calculation of laser cross section. Units: norm
+        double reflectivity_coefficient = 1;
+        // source_material_type: Sets the source wavelength channel to be used for this lidar model.
+        //   VISIBLE: Use red channel of visible light material properties.
+        //   NIR: Use NIR channel of material properties.
+        //   SWIR: Use SWIR channel of material properties.
+        // Units: None
+        MaterialSource source_material_type = 2;
+      }
+      message RaytracingConfig {
+        enum RayTracingMode {
+          // Currently defaults to SOFTWARE
+          DEFAULT = 0;
+          // Use fallback software-based methods for multipath and other RT functions.
+          SOFTWARE = 1;
+          // Use hardware raytracing for this sensor model.
+          // Requires an Nvidia RTX enabled graphics card.
+          HARDWARE = 2;
+        }
+        // Maximum number of bounces/impacts to be considered
+        // Default (0) which means primary return only
+        uint32 bounces = 1;
+        // max_segment_distance: Sets the maximum distance from the first impact point which
+        // subsequent rays will traverse. The default value is 10 meters. Units: meters
+        double max_segment_distance = 2;
+        // resolution: Secondary ray distance sampling resolution, decrease to improve reflection
+        // fidelity. The default value is 0.5 meter steps. Units: meters
+        double resolution = 3;
+        // roughness_threshold: Maximum material surface roughness for which secondary rays will be
+        // generated. The default value is 0.1 material roughness. Units: None
+        double roughness_threshold = 4;
+        // Enable raytracing to be used as default mode for all aspects of this Lidar model.
+        // Units: None
+        RayTracingMode mode = 5;
+      }
+      enum Level {
+        HIGH = 0;  // default
+        MEDIUM = 1;
+        LOW = 2;
+      }
+      // <!-- Next ID: 12 -->
+      Level level = 1;
+      // extinction_coefficient_scale: Additional multiplier for the attenuation due to fog, default
+      // value is 0.05. Units: norm
+      float extinction_coefficient_scale = 2;
+      // disable_shot_noise: Disables consideration of shot noise in signal path model.
+      // Units: None
+      bool disable_shot_noise = 3;
+      // enable_ambient: Enables consideration of ambient sunlight in signal path model.
+      // (Note: enabling this feature will increase computational load)
+      // Units: None
+      bool enable_ambient = 4;
+      // disable_translucency: Disable consideration of attenutation through transparent materials
+      // in signal path model. (Note: enabling this feature will increase computational load) Units:
+      // None
+      bool disable_translucency = 11;
+      PhysicsModel physics_model = 5;
+      // subsample_count: How many sub-samples are taken within the transmit-receive beam solid
+      // angle. Units: None
+      uint32 subsample_count = 6;
+      // subsample_randomization: Randomly (uniform distribution) sample within transmit-receive
+      // beam solid angle. Units: None
+      bool subsample_randomization = 7;
+      // allow_sharing_resources: Whether to allow the sensor to share resources with other lidars
+      // within the same spectral instance in order to reduce GPU memory usage. Units: None
+      bool allow_sharing_resources = 8;
+      // near_clipping_distance: Sets minimum distance to which scene will be rendered for lidar
+      // model, any geometry within this distance will not be considered. The default value is 0
+      // Units: meters
+      double near_clipping_distance = 9;
+      // Configuration settings for multipath configuration
+      RaytracingConfig raytracing = 10;
+      // Resolution of each dimension for each face of the cubemap
+      uint32 cubemap_resolution = 13;
+      // Experimetal feature subject to change
+      // Dynamically sample scene to improve sampling quality
+      bool experimental_sampling_filter = 12;
+      // Configure sensor to return all points hitting an object, bypassing signal chain models.
+      // Detection noise and other non-idealities will not be included in point clouds.
+      bool enable_ideal_returns = 14;
+    }
+    string name = 4;
+    // library ... vendor, model: Vendor and model of the sensor.
+    // Units: None
+    Library library = 8;
+    oneof relative_pose {
+      spatial.PoseSpec mount = 5;
+      // Use this alternative to place the sensor in an existing `TransformForest`.
+      spatial.TransformNode mount_in_frame = 14;
+    }
+    StandardLidarParams standard_params = 6;
+    google.protobuf.Any advanced_params = 10 [deprecated = true];
+    SensorLatency latency = 7;
+    LidarDataFormat format = 9;
+    SensorFidelity fidelity = 11;
+    repeated AdditionalParams unique_params = 12;
+    LidarSupportedFeatures supported_features = 13;
+    // List of sensor behaviors that modify sensor parameters during a simulation run.
+    // Currently, only the first behavior will be applied during a simulation run.
+    repeated sensor_behavior.SensorBehaviors behaviors = 15;
+  }
+
+  message RadarModel {
+    message SensorFidelity {
+      // <!-- Next ID: 9 -->
+      message RaytracingConfig {
+        // <!-- Next ID: 2 -->
+        enum RayTracingMode {
+          // Currently defaults to SOFTWARE
+          DEFAULT = 0;
+          // Use fallback software-based methods for multipath and other RT functions.
+          SOFTWARE = 1;
+          // Use hardware raytracing for this sensor model.
+          // Requires an Nvidia RTX enabled graphics card.
+          HARDWARE = 2;
+        }
+        // Ray tracing mode (sw or hw)
+        // Units: None
+        RayTracingMode mode = 1;
+      }
+      enum Level {
+        // Fidelity tradeoff in mesh re-sampling resolution for radar cross section computation
+        //      LOW: 0.5 degree (default)
+        //   MEDIUM: 0.3 degree
+        //     HIGH: 0.2 degree
+        // VERYHIGH: User-specified
+        LOW = 0;
+        MEDIUM = 1;
+        HIGH = 2;
+        VERYHIGH = 3;
+      }
+      Level level = 1;
+      // enable or disable multipath returns
+      bool multipath = 2;
+      // maximum number of bounces for a multipath ray
+      int32 multipath_bounces = 4;
+      // override for sub-ray angular resolution of each beam
+      double sub_ray_angular_resolution = 3;
+      // override for maximum number of ray hits
+      uint32 max_ray_hits = 5;
+      // enable or disable incoherent scattering
+      bool incoherent_scattering = 6;
+      // slider for reducing incoherent scattered power (1.0: no power)
+      float coherence_factor = 7;
+      // Ray tracing settings
+      RaytracingConfig raytracing = 8 [(field_options.ignore_in_autocomplete) = true];
+    }
+    string name = 4;
+    // library ... vendor, model: Vendor and model of the sensor.
+    // Units: None
+    Library library = 8;
+    oneof relative_pose {
+      spatial.PoseSpec mount = 5;
+      // Use this alternative to place the sensor in an existing `TransformForest`.
+      spatial.TransformNode mount_in_frame = 12;
+    }
+    StandardRadarParams standard_params = 6;
+    google.protobuf.Any advanced_params = 10;
+    SensorLatency latency = 7;
+    RadarDataFormat format = 9;
+    SensorFidelity fidelity = 11;
+    // List of sensor behaviors that modify sensor parameters during a simulation run.
+    // Currently, only the first behavior will be applied during a simulation run.
+    repeated sensor_behavior.SensorBehaviors behaviors = 13;
+  }
+
+  message UltrasoundModel {
+    string name = 4;
+    // library ... vendor, model: Vendor and model of the sensor.
+    // Units: None
+    Library library = 8;
+    oneof relative_pose {
+      spatial.PoseSpec mount = 5;
+      // Use this alternative to place the sensor in an existing `TransformForest`.
+      spatial.TransformNode mount_in_frame = 11;
+    }
+    StandardUltrasoundParams standard_params = 6;
+    google.protobuf.Any advanced_params = 10;
+    SensorLatency latency = 7;
+    SensorDataFormat format = 9;
+  }
+
+  message CameraModel {
+    // <!-- Next ID: 18 -->
+    message SensorFidelity {
+      message BloomFidelity {
+        enum BloomQuality {
+          INVALID = 0;
+          LOW = 1;
+          HIGH = 2;
+        }
+        // disable: Disables all blooming effects. See Bloom
+        // Units: None
+        bool disable = 1;
+        // level:   LOW: Gaussian based bloom.
+        //   HIGH: Convolutional bloom.
+        // Units: None
+        BloomQuality level = 2;
+      }
+      // <!-- Next ID: 20 -->
+      bool disable_bloom = 1 [deprecated = true];
+      // disable_lighting: Disable all scene lighting.
+      // Units: None
+      bool disable_lighting = 2;
+      // disable_motion_blur: Disable [motion blur](https://en.wikipedia.org/wiki/Motion_blur).
+      // Units: None
+      bool disable_motion_blur = 3;
+      // disable_shadows: Disable all shadows.
+      // Units: None
+      bool disable_shadows = 5;
+      // enable_temporal_antialiasing: Enable [temporal
+      // anti-aliasing](https://en.wikipedia.org/wiki/Temporal_anti-aliasing). Units: None
+      bool enable_temporal_antialiasing = 6;
+      // view_distance: Do not render objects beyond this value.
+      // Units: meters
+      float view_distance = 4;
+      // super_sampling: Scalar multiplier to oversample the rendered image.
+      // Units: norm
+      double super_sampling = 7;
+      BloomFidelity bloom = 8;
+      // disable_tonemapper: Disable [color tonemapper](https://en.wikipedia.org/wiki/Tone_mapping).
+      // Units: None
+      bool disable_tonemapper = 9;
+      // disable_models: Disable shroud, lens, and filter models.
+      // Units: None
+      bool disable_models = 10;
+      // luminance_use_scene_color: Configure sensor to output underlying luminance buffer when in
+      // type is LUMINANCEMETER. Units: None
+      bool luminance_use_scene_color = 11;
+      // disable_ambient_occlusion: Disable [ambient
+      // occlusion](https://en.wikipedia.org/wiki/Ambient_occlusion). Units: None
+      bool disable_ambient_occlusion = 12;
+      // enable_cubemap: If enabled, the scene will be first rendered to a cubemap, then reprojected
+      // into a 2D image. Used for rendering wide angles. See Cubemap Fisheye Units: None
+      bool enable_cubemap = 13;
+      // disable_depth_of_field: Disable depth of field effects. See Depth of Field
+      // Units: None
+      bool disable_depth_of_field = 15;
+      // near_clipping_distance: Clip everything within this distance from the camera.
+      // Units: meters
+      float near_clipping_distance = 16;
+      // cubemap_filtered_sampling: Use bilinear filter when sampling from a cubemap.
+      // Units: None
+      bool cubemap_filtered_sampling = 17;
+      // show_only_actors_with_ids: List of actor IDs to show. Nothing else will be rendered.
+      // Units: None
+      repeated int32 show_only_actors_with_ids = 14;
+      // disable_shot_noise: Disable shot noise in time of flight mode.
+      // Units: None
+      bool disable_shot_noise = 18;
+      // random_seed: Seed for all noise sources in this camera model.
+      // Units: None
+      uint32 random_seed = 19;
+    }
+    string name = 4;
+    // library ... vendor, model: Vendor and model of the sensor.
+    // Units: None
+    Library library = 8;
+    oneof relative_pose {
+      spatial.PoseSpec mount = 5;
+      // Use this alternative to place the sensor in an existing `TransformForest`.
+      spatial.TransformNode mount_in_frame = 13;
+    }
+    StandardCameraParams standard_params = 6;
+    google.protobuf.Any advanced_params = 10;
+    SensorLatency latency = 7;
+    CameraDataFormat format = 12;
+    SensorFidelity fidelity = 11;
+    // List of sensor behaviors that modify sensor parameters during a simulation run.
+    // Currently, only the first behavior will be applied during a simulation run.
+    repeated sensor_behavior.SensorBehaviors behaviors = 14;
+  }
+
+  // Placeholder for external sensors.
+  message Empty {}
+
+  // reserved "metadata_model";
+  // reserved 6;
+}
+
+// Generic sensors are the easiest to setup if ther is not
+// an existing drivers for reading in raw sensor data.
+// The raw data output as proto messages makes these sensors
+// an easy first step to feeding raw sensor data to an AV stack.
+
+/*************************/
+/* Multi-Sensor Messages */
+/*************************/
+
+// Sensor model latency.
+message SensorLatency {
+  double average_time = 1;  // Delay time ms
+  double noise = 2;         // Noise magnitude for delay (0 for no noise)
+}
+
+// Generic sensor model output data formats.
+message SensorDataFormat {
+  enum Data {
+    ROS_TOPIC = 0;   // Legacy flag being deprecated
+    RAW_STREAM = 1;  // Only allowed for vendor sensor types.
+    PROTO_MSG = 2;
+  }
+  Data data = 1;
+}
+
+message GenericAtmosphere {
+  float temperature = 1;
+  float humidity = 2;
+  float propagation_velocity = 3;
+}
+
+// <!-- Next ID: 17 -->
+message EstimatorParams {
+  enum ReturnMode {
+    // Determines the sorting order for point reporting, in order of highest SNR or range.
+    STRONGEST = 0;
+    FIRST = 1;
+    LAST = 2;
+  }
+  message SaturationBehavior {
+    // rate: Sets the reported depth rate of bias for every dB over saturation limit.
+    // Units: meters / dB
+    float rate = 1;
+    // max: Maximum bias than can be introduced due to saturation.
+    // Units: meters
+    float max = 2;
+  }
+  // precision ... min/max: Set the minimum/maximum bound for standard deviation of depth estimation
+  // noise in unit meters. This field acts as a clamp on the noise applied to each point's ground
+  // truth position. Units: meters
+  common.Range precision = 1;
+  // bandwidth: The mean square bandwidth of the signal chain.
+  // Typical values in the range of 100 MHz - 10 GHza
+  // Units: Hz
+  float bandwidth = 2;
+  // dynamic_range: Maximum dynamic range of the receive signal chain.
+  // Units: dB
+  float dynamic_range = 3;
+  // noise_floor: RMS noise floor referred to the input.
+  // Changes to the noise floor will impact the Signal-to-Noise (ratio) mainly in two ways: shorter
+  // range of visibility and less confidence in perceived depth of obstacles. Units: dBW
+  float noise_floor = 4;
+  // minimum_snr: Minimum signal to noise ratio before point is considered valid (threshold)
+  // Units: linear
+  float minimum_snr = 5;
+  // saturation: This field contains a set of parameters which influence the lidar model signal path
+  // saturation characteristics.
+  SaturationBehavior saturation = 6;
+  // return_mode: This field configures the priority for selecting returns within a detection
+  // channel.
+  //   STRONGEST: Sort returns by highest signal-to-noise ratio.
+  //   FIRST: Sort returns by ascending range.
+  //   LAST: Sort returns by descending range.
+  // Units: None
+  ReturnMode return_mode = 7;
+  // return_count: Maximum number of points that are returned per each beam.
+  // Units: None
+  int32 return_count = 8;
+  // Parameter accuracy ranges in std. deviation multiples
+  message AccuracyRange {
+    // Parameter will be within (-max_deviation, +max_deviation)
+    float max_deviation = 1;
+    // Number of std. deviations in max_deviation
+    float num_sigma = 2;
+    // Parameter value at which this accuracy applies
+    float at = 3;
+  }
+  // Range accuracy (single region)
+  // max_deviation units: m
+  AccuracyRange range_accuracy = 9;
+  // Range accuracy (multiple regions)
+  // max_deviation units: m
+  repeated AccuracyRange range_accuracy_regions = 13;
+  // Velocity accuracy (single region)
+  // max_deviation units: m/s
+  AccuracyRange velocity_accuracy = 10;
+  // Velocity accuracy (multiple regions)
+  // max_deviation units: m/s
+  repeated AccuracyRange velocity_accuracy_regions = 14;
+  // Azimuth accuracy (single region)
+  // max_deviation units: rad
+  AccuracyRange azimuth_accuracy = 11;
+  // Azimuth accuracy (multiple regions)
+  // max_deviation units: rad
+  repeated AccuracyRange azimuth_accuracy_regions = 15;
+  // Elevation accuracy (single region)
+  // max_deviation units: rad
+  AccuracyRange elevation_accuracy = 12;
+  // Elevation accuracy (multiple regions)
+  // max_deviation units: rad
+  repeated AccuracyRange elevation_accuracy_regions = 16;
+}
+
+message UDPConfiguration {
+  // port: Destination port for udp stream. The default value is 2368
+  // Units: None
+  uint32 port = 1;
+  // endpoint: Specifies the destination of the udp stream
+  //   LOCALHOST: Publish data to local host (Default)
+  //   VEHICLE_STACK: Publish data to interface container
+  // Units: None
+  UDPEndpointType endpoint = 2;
+  enum UDPEndpointType {
+    // Host machine
+    LOCALHOST = 0;
+    // Customer interface address
+    VEHICLE_STACK = 1;
+  }
+}
+
+/************************/
+/*    RADAR Messages    */
+/************************/
+
+// Generic radar sensor.
+message StandardRadarParams {
+  float frame_rate = 1;
+  common.Range range = 2 [deprecated = true];
+  spatial.AZEL field_of_view = 3;
+  spatial.AZEL angular_resolution = 6;
+  RadarSystemParams system_params = 4;
+  RadarPostProcessingParams post_processing_params = 5;
+}
+
+message RadarPostProcessingParams {
+  RadarTrackingParams tracking_params = 1;
+  EstimatorParams estimator_params = 2;
+  RadarDetectorParams detector_params = 3;
+}
+
+message RadarDetectorParams {
+  // Variance of the Gaussian additive noise
+  // Units: dBW
+  float noise_variance_dbw = 1;
+  // Minimum signal-power to noise-variance ratio before point is considered valid
+  // Units: dB
+  float minimum_snr_db = 2;
+  message NoisePerformance {
+    // Probability of false alarm
+    double probability_false_alarm = 1;
+    message TargetDetectability {
+      message TargetProperties {
+        // Target range [m]
+        float range = 1;
+        // RCS of the target [dBsqm]
+        float radar_cross_section = 2;
+      }
+      TargetProperties target = 1;
+      // Probability of detection
+      double probability_detection = 2;
+    }
+    TargetDetectability target_detectability = 2;
+  }
+  NoisePerformance noise_performance = 3;
+  // Flag for disabling additive noise altogether
+  bool no_additive_noise = 4;
+}
+
+// <!-- Next ID: 22 -->
+message RadarSystemParams {
+  /*** Deprecated fields ***/
+  // reserved 2, 3, 4, 9, 10, 13, 14, 15, 16;
+  // reserved "scan_path", "scan_beam_width", "scan_loss";
+  // reserved "transmit_antenna_gain", "receive_antenna_gain";
+  // reserved "array_spacing_horizontal", "array_spacing_vertical";
+  // reserved "num_array_elements_horizontal", "num_array_elements_vertical";
+  /*** Deprecated fields ***/
+
+  float transmit_power = 1;
+  common.Range range = 5;
+  float range_resolution = 6;
+  common.Range velocity = 7;
+  float velocity_resolution = 8;
+  float center_frequency = 11;
+  float rf_bandwidth = 12;
+  // Antenna parameters
+  AntennaParams antenna_params = 17;
+  // Number of ADC samples
+  int32 num_adc_samples = 18;
+  // Number of chirps in the chirp-sequence (CS) FMCW waveform
+  int32 num_chirps = 19;
+  // Pulse-repetition interval
+  float pulse_repetition_interval = 20;
+  // Radiometric calibration factor
+  // Units: dB
+  float radiometric_calibration_factor = 21;
+}
+
+message AntennaParams {
+  // Antenna definitions
+  repeated AntennaDefinition antenna_definitions = 1;
+  // Transmit array
+  repeated ArrayElement transmit_array = 2;
+  // Receive array
+  repeated ArrayElement receive_array = 3;
+}
+
+message AntennaDefinition {
+  /*** Deprecated fields ***/
+  // reserved 3;
+  // reserved "orientation";
+  /*** Deprecated fields ***/
+
+  string name = 1;
+  enum Type {
+    INVALID_TYPE = 0;
+    ISOTROPIC = 1;
+    HERTZIAN = 2;
+    PARAMETRIC_BEAM = 3;
+    FROM_ANSYS_FFD_FILE = 4;
+    FROM_DIRECTIVITY_TABLE = 5;
+  }
+  Type type = 2;
+  message BeamParams {
+    // Half-power beamwidth in elevation
+    float hpbw_el = 1;
+    // Half-power beamwidth in azimuth
+    float hpbw_az = 2;
+  }
+  message AnsysFFDParams {
+    // Ansys ffd file name
+    string filename = 1;
+    // disable normalization to directivity scale
+    bool do_not_normalize = 2;
+  }
+  message DirectivityTable {
+    // frequency values (Hz)
+    repeated float frequency = 1;
+    // theta values (radians)
+    repeated float theta = 2;
+    // phi values (radians)
+    repeated float phi = 3;
+    // vertically-polarized E-field component
+    repeated float v_pol = 4;
+    // horizontally-polarized E-field component
+    repeated float h_pol = 5;
+    // disable normalization to directivity scale
+    bool do_not_normalize = 6;
+  }
+  oneof antenna_definition_params {
+    BeamParams beam_params = 4;
+    AnsysFFDParams ansys_ffd_params = 5;
+    DirectivityTable directivity_table = 6;
+  }
+  spatial.PoseSpec.RollPitchYaw rpy = 7;
+}
+
+message ArrayElement {
+  string antenna_name = 1;
+  simian_public.common.Vector3 relative_position = 2;
+  // For performance reasons, we require that
+  // all antennas in a given array be identical
+  // and oriented the same way. This is why
+  // `rpy` is in AntennaDefinition and not in
+  // ArrayElement. A different rotation
+  // implies a different antenna.
+}
+
+message RadarTrackingParams {
+  /*** Deprecated fields ***/
+  // reserved 3;
+  // reserved "discrimination";
+  /*** Deprecated fields ***/
+
+  enum TrackingTypes {
+    PROXIMITY = 0;
+    GROUND_TRUTH = 1;
+  }
+  int32 max_targets = 1;
+  TrackingTypes tracking_method = 2;
+}
+message RadarDataFormat {
+  enum OutputType {
+    // Radar model configured to return detections
+    DETECTIONS = 0;
+    // Radar model configured to return polarimetric electric-fields
+    POLARIMETRIC = 1;
+    // Radar model configured to return a raw radar signal array
+    RAW_RESPONSE = 2;
+  }
+  enum Data {
+    ROS_TOPIC = 0;  // Legacy flag being deprecated
+    PROTO_MSG = 1;
+    DISK = 2;  // Only supports the RAW_RESPONSE mode
+  }
+  Data data = 1;
+  bool tracks = 2;
+  bool images = 3;
+  bool semantic_segmentation = 4;
+  bool buffer_full_frame = 5;
+  // Configure the mode for Radar data generation
+  OutputType output_type = 6;
+  // Save directory for raw signal output mode
+  string save_directory = 7;
+
+  // Enables SensorOutputList protobuf messages through the PERCEPTION_SENSORS channel.
+  repeated SensorOutputRequest sensor_output_list = 11;
+
+  message SensorOutputRequest {
+    // User-defined name for this output.
+    string output_name = 1;
+
+    oneof output_type {
+      // Enables generating raw response data from the radar model,
+      // written either to sensor_output.SensorOutputList.SensorOutput messages
+      // or to disk.
+      RawResponseData raw_response_data = 2;
+      // Enables generating point cloud (or track) measurements and ground truth from the radar
+      // model as sensor_output.SensorOutputList.SensorOutput messages.
+      PointCloudData point_cloud_data = 4;
+    }
+
+    message RawResponseData {
+      // Save to disk instead of proto output
+      bool save_to_disk = 1;
+      // Save directory
+      string save_directory = 2;
+      // Requested raw response data fields.
+      enum RawResponseDataFields {
+        NOT_SET = 0;
+        VOLTAGE_RE_IM = 1;  // Units: Volt/sqrt(Ohm)
+        // <!-- TODO: Add VOLTAGE_REAL_ONLY -->
+        // <!-- TODO: Add VOLTAGE_MAG_ANGLE -->
+      }
+
+      RawResponseDataFields data_fields = 3;
+
+      // output_to_ndarray: Flag to write sensor data to sensor_outputs(0).ndarray instead of
+      // sensor_outputs(0).raw_response. This field will be removed in a future release.
+      // Units: None
+      bool output_to_ndarray = 5;
+    }
+
+    message PointCloudData {
+      // Requested point cloud data fields.
+      enum PointCloudDataFields {
+        // *** Note on coordinate systems ***
+        // In the following, all spherical angles and Cartesian coordinates are
+        // in the sensor coordinate frame, which is defined relative to the ego
+        // coordinate frame via radar_model.mount.rpy or radar_model.mount.quaternion.
+
+        // Radar measurement
+        RANGE = 0;       // Units: meters  | Range (radial distance)
+        AZIMUTH = 1;     // Units: degrees | Azimuth angle
+        ELEVATION = 2;   // Units: degrees | Elevation angle
+        POSITION_X = 3;  // Units: meters  | Hit position[_X] (cartesian)
+        POSITION_Y = 4;  // Units: meters  | Hit position[_Y] (cartesian)
+        POSITION_Z = 5;  // Units: meters  | Hit position[_Z] (cartesian)
+        // The "radial velocity" is the projection of the full vector velocity of the point
+        // onto the POSITION vector of the point.
+        // Velocities perpendicular to the POSITION vector do not create any Doppler signal,
+        // and are therefore not measurable by the radar.
+        RADIAL_VELOCITY = 6;    // Units: m/s     | Scalar radial velocity
+        RADIAL_VELOCITY_X = 7;  // Units: m/s     | Vector radial velocity[_X] (cartesian)
+        RADIAL_VELOCITY_Y = 8;  // Units: m/s     | Vector radial velocity[_Y] (cartesian)
+        RADIAL_VELOCITY_Z = 9;  // Units: m/s     | Vector radial velocity[_Z] (cartesian)
+        DEPTH = 10;             // Units: meters  | Depth of the target (in track mode)
+        WIDTH = 11;             // Units: degrees | Angular width of the target (in track mode)
+        HEIGHT = 12;            // Units: degrees | Angular height of the target (in track mode)
+        POWER = 15;             // Units: Watt    | Received power (linear scale)
+        POWER_DBW = 16;         // Units: dBW     | Received power (dBW scale)
+        RCS = 13;               // Units: m^2     | Radar cross section (linear scale)
+        RCS_DBSQM = 17;         // Units: dBsqm   | Radar cross section (dBsqm scale)
+        SNR = 14;               // Units: none    | Signal-to-noise ratio (linear scale)
+        SNR_DB = 18;            // Units: dB      | Signal-to-noise ratio (dB scale)
+        // reserved 19 to 99;      // Reserved for future radar-specific measurement fields
+        // Ground truth
+        GROUND_TRUTH_SEMANTIC_CLASS =
+            100;  // Units: none   | Semantic class ID of object type this point has hit
+        GROUND_TRUTH_ACTOR_ID = 101;  // Units: none   | Actor instance ID of which actor in the
+        // scene this point has hit
+        // reserved 102 to 199;  // Reserved for future ground truth fields
+      }
+      // data_fields: Specifies which per-point fields should be included in the
+      // output data.
+      // Units: None
+      repeated PointCloudDataFields data_fields = 1;
+      // handedness: Specifies which coordinate system handedness to use for positional and vector
+      // data fields. (e.g. right-hand rule vs left-hand rule). Units: None
+      spatial.CoordinateSystemHandedness handedness = 2;
+    }
+  }
+}
+
+/************************/
+/* Ultrasound Messages  */
+/************************/
+
+// Generic ultrasound sensor.
+
+message StandardUltrasoundParams {
+  bool debug = 1;
+  float frame_rate = 4;
+  UltrasoundSensorParams sensor_params = 2;
+  EstimatorParams estimator_params = 3;
+}
+
+message UltrasoundSensorParams {
+  spatial.AZEL field_of_view = 1;
+  common.Range range = 4;
+  float range_resolution = 5;
+  float center_frequency = 6;
+  // Specify the effective aperture area of the ultrasonic transducer in unit meters
+  double aperture_area = 7;
+  // Sub-sample beam angular resolution in unit radians
+  double field_of_view_resolution = 8;
+}
+
+/************************/
+/*    LIDAR Messages    */
+/************************/
+
+// Sensor model parameters.
+message StandardLidarParams {
+  // frame_rate: Frames per second (in simulation time)
+  // Units: Hz
+  float frame_rate = 1;
+  // points_per_second: Specify the number of points per second to be generated (in simulation
+  // time). Units: point/second
+  float points_per_second = 5;
+  LidarEmitterParams emitter_params = 2;
+  LidarDetectorParams detector_params = 3;
+  EstimatorParams estimator_params = 4;
+}
+
+message LidarEmitterParams {
+  // reserved 5;
+  enum ScanTypes {
+    // SPIN represents rotating lidar, a scan_path will automatically be generated
+    SPIN = 0;
+    // CUSTOM is for user-configured scan_path behavior
+    CUSTOM = 1;
+    // FLASH populates a static forward-facing scan
+    FLASH = 2;
+  }
+  // Direction for rotation if type is SPIN
+  enum SpinDirections {
+    INVALID = 0;
+    CW = 1;
+    CCW = 2;
+  }
+  message LidarScanPath {
+    message ScanPathDrift {
+      // Specify a deterministic scan path drift and displacement over time.
+      // where: offset(time) = constant_rate * time + sinusoidal_magnitude *
+      // sin(sinusoidal_frequency * time) Units: radians / second
+      spatial.AZEL constant_rate = 1;
+      // Units: radians
+      spatial.AZEL sinusoidal_magnitude = 2;
+      // Units: radians / second
+      spatial.AZEL sinusoidal_frequency = 3;
+    }
+    // scan_path ... az: Vector of azimuth angles over which the lidar model will scan.
+    // Units: deg
+    repeated double az = 1;
+    // scan_path ... el: Vector of elevation angles over which the lidar model will scan.
+    // Units: deg
+    repeated double el = 2;
+    // scan_path ... time: Vector of times indicating the relative completion time at which the scan
+    // position at az[i]/el[i] is captured. Units: seconds
+    repeated double time = 3;
+    // scan_path ... loss: Vector of loss value applied to the lidar range equation for each
+    // position in the scan_path. Units: dB
+    repeated double loss = 4;
+    // scan_path ... drift: Specify the rate at which the scan path drifts in azimuth/elevation.
+    ScanPathDrift drift = 5;
+  }
+  // <!-- Next ID: 20 -->
+  // Deprecated field
+  simian_public.common.Vector2 sources = 3;
+  // source_divergence: Sets the asymmetric beam divergence (azimuth, elevation) for each laser
+  // beam. Units: rad
+  simian_public.spatial.AZEL source_divergence = 11;
+  // peak_power: Overrides the peak power of the specified system.
+  // Units: watt
+  float peak_power = 7;
+  // source_variance: Add angular errors to beam angles transmitted.
+  // Noise is modeled as a Gaussian distribution with mean zero and provided variance in azimuth and
+  // elevation directions. Units: norm
+  spatial.AZEL source_variance = 6;
+  // source_angles: Configure the azimuth and elevation angles for each channel of the channel
+  // assembly. Units: deg
+  spatial.AZELArray source_angles = 4;
+  // Loss applied to each index in source_angles, must have the same shape as "sources"
+  // Each index in the array corresponds to a "CHANNEL" index into "sources"
+  // Units: dB
+  repeated double source_losses = 17;
+  // total_source_loss: Additional loss factor that applies to all sources/transmit channels.
+  // Units: dB
+  double global_source_loss = 18;
+  // scan_field: Region over which lidar is set to scan starting at 0.0 radians and extending to the
+  // value specified. The field el has no effect when scan_type is set to SPIN. Units: rad
+  spatial.AZEL scan_field = 8;
+  // scan_type: Configure the lidar models scan_path generation method.
+  // Units: None
+  ScanTypes scan_type = 9;
+  // Deprecated field
+  string custom_scan_function = 10;
+  LidarScanPath scan_path = 12;
+  // multi_scan_path: Repeated message of scan_paths representing individual "heads" of a lidar
+  // system. Definition is same the as the root message type for a single scan_path. Units: None
+  repeated LidarScanPath multi_scan_path = 16;
+  // scan_path_file_uri: Path to a JSON or YAML file containing a scan_path or multi_scan_path
+  // definition. Units: None
+  string scan_path_file_uri = 19;
+  // Center wavelength of optical system in unit meters
+  double center_wavelength = 13;
+  // scan_field_offset: Offset applied to scan path, applied in left-hand rotation frame. (field el
+  // has no effect when scan_type is SPIN) Units: rad
+  spatial.AZEL scan_field_offset = 14;
+  // spin_direction: This field is only considered if scan_type is SPIN.
+  // Units: None
+  SpinDirections spin_direction = 15;
+}
+
+message LidarDetectorParams {
+  message OpticalLoss {
+    // Pairs of range -> loss values
+    double range = 1;
+    double loss = 2;
+  }
+  // resolution: Grid representation of detectors with one to one correspondence with the
+  // source_angles field. The total number of elements must match the number of angles in
+  // source_angles. Units: px
+  common.Vector2 resolution = 3;
+  // Deprecated field
+  spatial.AZEL field_of_view = 4;
+  // range: Minimum and maximum range of the sensor.
+  // Units: meters
+  common.Range range = 5;
+  // range_resolution: Minimum range resolution reported by the lidar.
+  // Units: meters
+  float range_resolution = 6;
+  // aperture_area: Effective aperture area of optical receiver
+  // Units: m^2
+  float aperture_area = 7;
+  // optical_passband ... min/max: Configure the minimum and maximum wavelengths for which this
+  // lidar model can detect. Units: nm
+  common.Range optical_passband = 8;
+  // ambient_rejection: Normalized coefficient scaling how much in-band ambient power contributes
+  // towards saturation. Units: norm
+  float ambient_rejection = 9;
+  // saturation_limit: The input-referred upper limit of in-band ambient power before measurement
+  // becomes saturated. Units: dBW
+  float saturation_limit = 10;
+  // range_discrimination: Minimum distance required to discriminate between targets in a beam solid
+  // angle. Units: meters
+  float range_discrimination = 11;
+  // optical_loss: List of range-loss points which will apply additional loss to lidar range
+  // equation. Units: {range: meters, loss: dB}
+  repeated OpticalLoss optical_loss = 12;
+}
+
+message LidarDataFormat {
+  enum Data {
+    ROS_TOPIC = 0;  // Legacy flag being deprecated
+    RAW_STREAM = 1;
+    PROTO_MSG = 2;
+  }
+  // data: This field specifies the output format of the Lidar data.
+  //   ROS_TOPIC: Legacy flag, deprecated.
+  //   RAW_STREAM: Publish data in its native format, as it would be in a real sensor.
+  //   PROTO_MSG: Output as Protobuf message.
+  Data data = 1;
+
+  // Dictates format and scale for any intensity outputs generated.
+  IntensityFormat intensity = 2;
+
+  // Transmits the point cloud projected into an image format.
+  bool point_cloud_images = 5;
+
+  // semantic_segmentation: Enable publishing of semantic segmentation labels for lidar points.
+  // Units: None
+  bool semantic_segmentation = 6;
+
+  // buffer_full_frame: Configure the lidar system to capture a full frame of data before sending
+  // message. Units: None
+  bool buffer_full_frame = 7;
+
+  // include_groundtruth_points: If set to true, the lidar points will include the "groundtruth"
+  // position (that is, where the point would have been if not for the addition of noise). Customers
+  // who wish to use this feature should inform Applied Intuition and we can advise on how to update
+  // their customer interfaces to support it. Units: None
+  bool include_groundtruth_points = 8;
+
+  // Dictates the network port and destination for UDP raw packet streams generated in RAW_STREAM
+  // mode.
+  UDPConfiguration udp_configuration = 9;
+
+  // Optionally include scan path in model metadata fields.
+  // Note: Enabling this can cause significant performance loss for sensors with large scan paths.
+  bool include_scan_path_metadata = 10;
+
+  // Enables SensorOutputList protobuf messages through the PERCEPTION_SENSORS channel.
+  repeated SensorOutputRequest sensor_output_list = 11;
+
+  message SensorOutputRequest {
+    // User-defined name for this output.
+    string output_name = 1;
+
+    oneof output_type {
+      // Enables generating point cloud measurements and ground truth from the lidar model as
+      // sensor_output.SensorOutputList.SensorOutput messages.
+      PointCloudData point_cloud_data = 2;
+
+      // Enables transmitting raw network packets from the lidar model as
+      // sensor_output.SensorOutputList.SensorOutput messages.
+      RawPacketStream raw_packet_stream = 3;
+    }
+
+    message PointCloudData {
+      // Requested point cloud data fields.
+      enum PointCloudDataFields {
+        // *** Note on coordinate systems ***
+        // In the following, all spherical angles and Cartesian coordinates are
+        // in the sensor coordinate frame, which is defined relative to the ego
+        // coordinate frame via lidar_model.mount.rpy or lidar_model.mount.quaternion.
+
+        // Lidar measurement
+        POSITION_X = 0;  // Units: meters | Reported hit position[_X] (cartesian)
+        POSITION_Y = 1;  // Units: meters | Reported hit position[_Y] (cartesian)
+        POSITION_Z = 2;  // Units: meters | Reported hit position[_Z] (cartesian)
+        INTENSITY = 3;   // Units: none   | see IntensityFormat for details
+        CHANNEL_ID = 4;  // Units: none   | ID/index for the laser channel which produced this data
+        AMBIENT = 5;     // Units: dBW    | Background power of a given beam
+        SIGNAL_PHOTONS = 6;   // Units: count  | Detected photon count from returned signal
+        AMBIENT_PHOTONS = 7;  // Units: count  | Detected photon count from background sources
+        TIMESTAMP = 8;        // Units: ms     | Time since start of the simulation
+        FRAME_ID = 9;         // Units: none   | Frame number that the sample was captured at
+        RETURN_ID = 10;       // Units: none   | Id for this return for multiple returns per channel
+        STATUS = 11;          // Units: none   | Context specific interpretation
+        RED = 12;             // Units: none   |
+        GREEN = 13;           // Units: none   |
+        BLUE = 14;            // Units: none   |
+        NIR = 15;             // Units: none   |
+        RANGE = 16;           // Units: meters |
+        RADIAL_VELOCITY = 17;  // Units: m/s    | Scalar radial velocity
+        // reserved 18 to 99;     // Reserved for future lidar-specific measurement fields
+        // Ground truth
+        GROUND_TRUTH_POSITION_X =
+            101;  // Units: meters | True hit position[_X] not considering noise (cartesian)
+        GROUND_TRUTH_POSITION_Y =
+            102;  // Units: meters | True hit position[_Y] not considering noise (cartesian)
+        GROUND_TRUTH_POSITION_Z =
+            103;  // Units: meters | True hit position[_Z] not considering noise (cartesian)
+        GROUND_TRUTH_SEMANTIC_CLASS =
+            104;  // Units: none   | Semantic class ID of object type this point has hit
+        GROUND_TRUTH_ACTOR_ID = 105;  // Units: none   | Actor instance ID of which actor in the
+        // scene this point has hit
+        HIT_NORMAL_X = 106;  // Units: none   | Unit normal at hit position[_X]
+        HIT_NORMAL_Y = 107;  // Units: none   | Unit normal at hit position[_Y]
+        HIT_NORMAL_Z = 108;  // Units: none   | Unit normal at hit position[_Z]
+        HIT_INDEX = 109;     // Units: none   | Raytracing hit index, starting with the first as "0"
+        GROUND_TRUTH_MATERIAL_ID = 110;  // Units: none   | Produce material ID hit for each point
+        // reserved 111 to 199;             // Reserved for future ground truth fields
+      }
+      // data_fields: Specifies which per-point fields should be included in the
+      // output data.
+      // Units: None
+      repeated PointCloudDataFields data_fields = 1;
+      // handedness: Specifies which coordinate system handedness to use for positional data fields.
+      // (e.g. right-hand rule vs left-hand rule).
+      // Units: None
+      spatial.CoordinateSystemHandedness handedness = 2;
+      // save_to_disk: Enables saving point clouds to disk as PCD files, use
+      // save_directory to specify the output folder.
+      // Units: None
+      bool save_to_disk = 3;
+      // save_directory: Specifies the output directory where PCD files are
+      // saved, it has no effect if save_to_disk is disabled. If the directory
+      // tree does not exist, it will attempt to create it. Note that the
+      // folder needs to be accessible by the Spectral docker, we recommend to
+      // select a subfolder of "/tmp/spectral".
+      // Units: None
+      string save_directory = 4;
+      // output_to_ndarray: Flag to write sensor data to sensor_outputs(0).ndarray instead of
+      // sensor_outputs(0).point_cloud. This field will be removed in a future release.
+      // Units: None
+      bool output_to_ndarray = 5;
+    }
+  }
+
+  message RawPacketStream {
+    /* No config options for this feature */
+  }
+}
+
+// Display properties (read-only) for Spectral lidar models to communicate if a specific
+// SensorOutput feature is supported or not.
+message LidarSupportedFeatures {
+  // Read only field, true if lidar vendor/model supports generating raw network packets.
+  bool raw_stream = 1;
+}
+
+message IntensityFormat {
+  // reserved 2;
+  enum Units {
+    INVALID_UNIT = 0;
+    SNR_SCALED = 1;
+    SNR = 2;
+    REFLECTIVITY = 3;
+    REFLECTIVITY_SCALED = 4;
+    POWER = 5;
+    LASER_CROSS_SECTION = 6;
+    GROUND_TRUTH_REFLECTIVITY = 7;
+  }
+  message InOutField {
+    // Input sample, namely REFLECTIVITY or SNR
+    double input = 1;
+    // Associated output sample point
+    double output = 2;
+  }
+  // range: Specify the minimum and maximum of the range for the scaled value. Only applied if units
+  // are SNR_SCALED or REFLECTIVITY_SCALED Units: None
+
+  common.Range range = 1;
+  // scale: Specifies the output range of intensity values (e.g. {min: 0, max: 255}). Only applied
+  // if units are SNR_SCALED or REFLECTIVITY_SCALED Units: None
+  common.Range scale = 6;
+  // units: Configures the source for the intensity field in the lidar point cloud.
+  //   SNR: Signal to noise ratio.
+  //   SNR_SCALED: Signal to noise ratio as scaled value.
+  //   REFLECTIVITY: Inferred reflectivity of return.
+  //   REFLECTIVITY_SCALED: Inferred reflectivity as scaled value.
+  //   POWER: Peak power at detector.
+  //   LASER_CROSS_SECTION: Output the LCS of a point as denoted by sigma in lidar equation.
+  //   GROUND_TRUTH_REFLECTIVITY: ground truth reflectivity for the location hit.
+  // Units: None
+  Units units = 5;
+  // log_scale: Scale the intensity values as log. [10 log10(n)]
+  // Units: None
+  bool log_scale = 4;
+  // intensity ... quantization: How many bits results are to be quantized to. (2^n)
+  // Units: bits
+  float quantization = 3;
+  // range_scale_map: List of input-output points which are  used to map source units (SNR or
+  // reflectivity) to output scale. Only applied if units are SNR_SCALED or REFLECTIVITY_SCALED
+  // Units: {input: see units, output: unitless}
+  repeated InOutField range_scale_map = 7;
+}
+
+/************************/
+/*    Camera Messages   */
+/************************/
+
+message StandardCameraParams {
+  // frame_rate
+  // Number of frames per second generated by this sensor.
+  // Units: Hz
+  float frame_rate = 4;
+  // field_of_view: Override the field of view of the camera system, if specified ignores
+  // focal_length & size. Units: rad
+  spatial.AZEL field_of_view = 1;
+  CameraLensParams lens_params = 2;
+  CameraSensorParams sensor_params = 3;
+  CameraSystemParams system_params = 5;
+  CameraShroudParams shroud_params = 6;
+  CameraMountParams mount_params = 7;
+
+  oneof rendered_field_of_view_override {
+    // Automatically expands the camera rendered field of view to fill final image after shifting of
+    // the image plane and distortion Units: None
+    bool auto_fill = 9;
+    // rendered_field_of_view: Override the rendered field of view of the camera system.
+    // Units: rad
+    double rendered_field_of_view = 8;
+  }
+}
+
+// Locking a degree of freedom will force that DoF to be the same as
+// its initial global value. For example, locking z will cause the
+// camera to stay at the same height even if the ego moves up and down.
+message CameraMountParams {
+  // lock_roll: Lock roll to its initial rotation.
+  // Units: None
+  bool lock_roll = 1;
+  // lock_pitch: Lock pitch to its initial rotation.
+  // Units: None
+  bool lock_pitch = 2;
+  // lock_yaw: Lock yaw to its initial rotation.
+  // Units: None
+  bool lock_yaw = 3;
+  // lock_x: Lock the x-coordinate to its initial position.
+  // Units: None
+  bool lock_x = 4;
+  // lock_y: Lock the y-coordinate to its initial position.
+  // Units: None
+  bool lock_y = 5;
+  // lock_z: Lock the z-coordinate to its initial position.
+  // Units: None
+  bool lock_z = 6;
+  bool experimental_global_frame = 7;
+}
+
+message CameraShroudParams {
+  message ShroudEffect {
+    float intensity = 1;
+  }
+  // dirt ... intensity: Strength of dirt effect on shroud.
+  // Units: norm
+  ShroudEffect dirt = 1;
+  // fog ...  intensity: Strength of fog effect on shroud.
+  // Units: norm
+  ShroudEffect fog = 2;
+  // rain ... intensity: Strength of rain effect on shroud.
+  // Units: norm
+  ShroudEffect rain = 3;
+}
+
+message CameraSystemParams {
+  message ToFParams {
+    message ToFEmitterParams {
+      // peak_power: Peak transmit power.
+      // Units: dBW
+      double peak_power = 1;
+      // exposure_time: Exposure/pulse width time.
+      // Units: seconds
+      double exposure_time = 2;
+      // center_wavelength: Center light wavelength.
+      // Units: nm
+      double center_wavelength = 3;
+      // optical_passband: Optical passband min/max.
+      // Units: nm
+      common.Range optical_passband = 4;
+    }
+    message ToFDetectorParams {
+      // lens_area: Effective aperature area.
+      // Units: meter^2
+      double lens_area = 1;
+      // ambient_rejection: Normalized percentage of ambient light rejection (0: no rejection, 1:
+      // full rejection). Units: norm
+      double ambient_rejection = 2;
+      // saturation_limit: Maximum ambient energy before saturation.
+      // Units: dBW
+      double saturation_limit = 3;
+      // dynamic_range: System dynamic range.
+      // Units: dB
+      double dynamic_range = 4;
+      // noise_floor: Input referred noise floor.
+      // Units: dBW
+      double noise_floor = 5;
+      // precision: Bounds for min & max depth estimation variance/precision.
+      // Units: meters
+      common.Range precision = 6;
+      // bandwidth: Estimation bandwidth.
+      // Units: Hz
+      double bandwidth = 7;
+      // minimum_snr: Minimum detectable target SNR.
+      // Units: dB
+      double minimum_snr = 8;
+    }
+    ToFEmitterParams emitter_params = 1;
+    ToFDetectorParams detector_params = 2;
+  }
+  message DepthParams {
+    enum Mode {
+      INVALID = 0;
+      LOG = 1;
+      LINEAR = 2;
+      HYP_SPLINE = 3;
+      RAW = 4;
+    }
+    // type:
+    //   LOG: Log scaling of depth image.
+    //   LINEAR: Linear scaling of depth image.
+    // Units: None
+    Mode type = 1;
+    // min: Minimum for reported range values in depth image. See also Depth Sensor
+    // Units: meters
+    float min = 2;
+    // max: Maximum for reported range values in depth image. See also Depth Sensor
+    // Units: meters
+    float max = 3;
+    // log_base: Base of log if depth mode is LOG. See also Depth Sensor
+    // Units: None
+    float log_base = 4;
+    // bit_depth: By default, labelled depth images inherit their bit depth from the corresponding
+    // color image. Instead, bit_depth allows you to override this value for the returned depth
+    // images. Units: bits
+    uint32 bit_depth = 5;
+    // In HYP_SPLINE mode, the pixel value at depth z is M * (1 - b / (b + z) ), where M is the
+    // maximum pixel value and b is the value given by hyp_offset. Units: meters.
+    float hyp_offset = 6;
+  }
+  message CameraExposure {
+    // range: Exposure offset as $10^{range}$. See Exposure
+    // Units: None
+    float range = 1;
+    // dynamic_range: Set upper and lower bounds for auto exposure EV values. See Exposure
+    // Units: EV
+    common.Range dynamic_range = 2;
+    // auto_exposure: Set to true to enable auto exposure. See Exposure
+    // Units: None
+    bool auto_exposure = 5;
+    // speed: Gain applied to rate at which auto exposure converges. See Exposure
+    // Units: None
+    float speed = 4;
+  }
+  enum ColorSpace {
+    INVALID_CS = 0;
+    RGB = 1;
+    LABd65 = 2;
+    XYZd65 = 3;
+    MONO = 4;
+    RAINBOW = 5;
+  }
+  enum DataType {
+    UINT = 0;
+    FLOAT = 1;
+  }
+  CameraExposure exposure = 1;
+  // color_space:   RGB: standard color space.
+  //   LABd65: CIELAB with d65 white point.
+  //   XYZd65: CIEXYZ with d65 white point.
+  //   MONO: Monochromatic mode, each channel duplicates.
+  //   RAINBOW: Blue-to-red heatmap.
+  // Units: None
+  ColorSpace color_space = 2;
+  // gain:  Gain applied after quantization. See Gain, Gamma, and White Balance
+  // Units: norm
+  float gain = 3;
+  // gamma:  Gamma applied to image. See Gain, Gamma, and White Balance
+  // Units: norm
+  float gamma = 4;
+  // white_balance: White balance tone shifting camera system. See Gain, Gamma, and White Balance
+  // Units: None
+  float white_balance = 5;
+  // data_type:
+  //   UINT: Unsigned Integer.
+  //   FLOAT: Floating Point.
+  // Units: None
+  DataType data_type = 6;
+  DepthParams depth_params = 7;
+  // saturation ... R G B A: Normalized saturation value packed in RGBA where A corresponds to
+  // luminance. Units: norm
+  simian_public.common.RGBA saturation = 8;
+  ToFParams time_of_flight_params = 9;
+  // Adds image overlay to camera. Can be used for HUDs or other post processors
+  camera_model.ImageOverlay overlay = 10;
+}
+
+message CameraLensParams {
+  enum Projection {
+    INVALID = 0;
+    RECTILINEAR = 1;
+    EQUIDISTANT = 2;
+  }
+
+  message Vignette {
+    // vignetting ... intensity: Amplitude scalar for vignetting. See Vignette
+    // Units: norm
+    float intensity = 1;
+    // vignetting ... alpha: Alpha scalar for vignetting. See Vignette
+    // Units: norm
+    float alpha = 2;
+    // vignetting ... radius: Radius scalar for vignetting. See Vignette
+    // Units: norm
+    float radius = 3;
+  }
+  message RadialDistortion {
+    message RadialCoefficients {
+      double a_0 = 1;
+      double a_1 = 2;
+      double a_2 = 3;
+      double a_3 = 4;
+      double a_4 = 5;
+      double a_5 = 6;
+      double a_6 = 7;
+      double a_7 = 8;
+      double a_8 = 9;
+      double a_9 = 10;
+      double a_10 = 11;
+      double a_11 = 12;
+      double a_12 = 13;
+      double a_13 = 14;
+      double a_14 = 15;
+    }
+    enum RadialUnits {
+      INVALID = 0;
+      NORMALIZED = 1;
+      PIXELS = 2;
+      RADIANS = 3;
+    }
+    // radial_distortion_params ... units: Supported units:
+    //   NORMALIZED: Coefficients provided relative to max image dimension.
+    //   PIXELS: Coefficients provided in unit of pixels.
+    //   RADIANS: Coefficients provided in units of radians (for EQUIDISTANT cameras with cubemap
+    //   enabled).
+    // Units: None
+    RadialUnits units = 1;
+    // radial_distortion_params ... coefficients ... a_0-a_14: Coefficient values formatted as {a_0:
+    // #, a_1: #, ..., a_14: #} to the 14th power. Units: norm
+    RadialCoefficients coefficients = 2;
+    // radial_distortion_params ... auto_fill: Enables automatically expanding the camera field of
+    // view to fill final radially distorted image. Units: None
+    bool auto_fill = 3 [deprecated = true];
+  }
+  // library ... vendor, model: Vendor and model of the sensor.
+  // Units: None
+  Library library = 1;
+  // focal_length: Specify the [focal length](https://en.wikipedia.org/wiki/Focal_length) of the
+  // lens. Units: mm
+  float focal_length = 2;
+  // center_position: Lens center position relative to image sensor center position.
+  // Units: norm
+  common.Vector2 center_position = 3;
+  // f_number: [F-number](https://en.wikipedia.org/wiki/F-number) of the lens.
+  // Units: None
+  float f_number = 4;
+  repeated float radial_distortion = 5 [deprecated = true];
+  // tangential_distortion: Tangential distortion values in a 2 element array. See Tangential
+  // Distortion Units: norm
+  repeated float tangential_distortion = 6;
+  // affine_scaling: Affine scaling factor in 4 element array. See also Affine Transformation
+  // Units: norm
+  repeated float affine_scaling = 7;
+  // chromatic_aberration: Amount of chromatic dispersion at edge of image. See also Chromatic
+  // Aberration Units: mm
+  float chromatic_aberration = 8;
+  // lens_flare: Intensity of [lens flare](https://en.wikipedia.org/wiki/Lens_flare) due to bright
+  // light sources. Units: norm
+  float lens_flare = 9;
+  Vignette vignetting = 10;
+  // spot_size: Specifies the RMS spot size. See also Spot Size
+  // Units: norm
+  float spot_size = 11;
+  // projection:  Image projection
+  //   RECTILINEAR: Pinhole
+  //   EQUIDISTANT: Fisheye/F-Theta
+  // See also Lens Projection
+  // Units: None
+  Projection projection = 12;
+  // cropping: Optical cropping factor for image on focal plane. See Cropping
+  // Units: norm
+  double cropping = 13;
+  // radial_distortion_params: A collection of parameters to configure the radial distortion of the
+  // lens. See Radial Distortion
+  oneof distortion_type {
+    camera_model.OpenCVDistortionParams opencv_distortion_params = 17;
+    RadialDistortion radial_distortion_params = 14;
+  }
+  // aspect_ratio: Sets the aspect ratio of the lens for projection EQUIDISTANT. The default value
+  // is 1.0. To recover the legacy behavior (pre-1.22 release), set explicitly to the ratio of image
+  // width to image height. Units: norm
+  float aspect_ratio = 15;
+  // focusing_distance: Distance in which the lens achieves best focus. See also Depth of Field
+  // Units: meters
+  float focusing_distance = 16;
+
+  camera_model.CameraIntrinsicParams camera_intrinsic_params = 18;
+  camera_model.LensProjectionField lens_projection_field = 20;
+}
+
+message CameraSensorParams {
+  message FPN {
+    // fixed_pattern_noise ... prnu: Photo response non-uniformity (offset) normalized to saturation
+    // level. See Noise Units: norm
+    float prnu = 1;
+    // fixed_pattern_noise ... dsnu: Dark signal non-uniformity (offset) normalized to saturation
+    // level. See Noise Units: norm
+    float dsnu = 2;
+  }
+  message CFA {
+    message Layout2x2 {
+      oneof pixel1_filter {
+        PixelFilter P1 = 1;
+        WavelengthFilter W1 = 5;
+        WavelengthVectorFilter WV1 = 9;
+      }
+      oneof pixel2_filter {
+        PixelFilter P2 = 2;
+        WavelengthFilter W2 = 6;
+        WavelengthVectorFilter WV2 = 10;
+      }
+      oneof pixel3_filter {
+        PixelFilter P3 = 3;
+        WavelengthFilter W3 = 7;
+        WavelengthVectorFilter WV3 = 11;
+      }
+      oneof pixel4_filter {
+        PixelFilter P4 = 4;
+        WavelengthFilter W4 = 8;
+        WavelengthVectorFilter WV4 = 12;
+      }
+    }
+    message Transmittance2x2 {
+      // Effective filter transmittance.
+      // Units: norm
+      float P1 = 1;
+      // Effective filter transmittance.
+      // Units: norm
+      float P2 = 2;
+      // Effective filter transmittance.
+      // Units: norm
+      float P3 = 3;
+      // Effective filter transmittance.
+      // Units: norm
+      float P4 = 4;
+    }
+    message WavelengthVectorFilter {
+      // transmittance: Transmittance waveform of the filter normalized to 1.0.
+      // Units: norm
+      repeated double transmittance = 1;
+      // start: Start (lower) wavelength for the provided transmittance data.
+      // Units: nm
+      double start = 2;
+      // stop: Stop (upper) wavelength for the provided transmittance data.
+      // Units: nm
+      double stop = 3;
+      // step: Step between samples of the transmittance data.
+      // Units: nm
+      double step = 4;
+    }
+    message WavelengthFilter {
+      // cwl: Center wavelength of the filter.
+      // Units: nm
+      float cwl = 1;
+      // fwhm: Full width half max bandwidth of the filter. See also Spectral Response
+      // Units: nm
+      float fwhm = 2;
+    }
+    enum PixelFilter {
+      INVALID_PF = 0;
+      R = 1;
+      G = 2;
+      B = 3;
+      Y = 4;
+      C = 5;
+      M = 6;
+      W = 7;
+    }
+    enum Demosaic {
+      INVALID_DM = 0;
+      IDEAL = 1;
+      BILINEAR = 2;
+      NONE = 3;
+    }
+    // layout ... WV1 WV2 WV3 WV4: Define filters based on transmittance data.
+    // Units: None
+    Layout2x2 layout = 1;
+    // demosaic:   NONE: No demosaicing applied, raw CFA pattern out.
+    //   IDEAL: Perfect interpolation (no artifacts).
+    //   BILINEAR: Bilinear interpolation.
+    // Units: None
+    Demosaic demosaic = 2;
+    // transmittance ... P1 P2 P3 P4: Effective filter transmittance.
+    // Units: norm
+    Transmittance2x2 transmittance = 3;
+  }
+  enum CameraType {
+    INVALID_CT = 0;
+    VISIBLE = 1;  // Default
+    DEPTH = 2;
+    SEMANTIC_SEGMENTATION = 3;
+    LUMINANCEMETER = 4;
+    LWIR = 5;
+    // ACTOR_CAMERA is a special camera type that returns information about actors in a camera
+    // image ignoring occlusions.  This camera type only supports PROTO_MSG output format,
+    // and the data is a serialized ActorMasks instance.
+    ACTOR_CAMERA = 6;
+    TIME_OF_FLIGHT = 7;
+    // The DECAL_CAMERA type returns pixels that code whether or not that pixel is in a decal, the
+    // unique_index_ of the decal if so, and the index of the character within the decal text.
+    DECAL_CAMERA = 8;
+    OPTICAL_FLOW_2D = 9;
+    RGB_IR = 10;
+    NIR = 11;
+    RIGID_BODY_DISPLACEMENT = 12;
+    RIGID_BODY_ANGULAR_DISPLACEMENT = 13;
+    // The INTERNAL_CURBWALL_CAMERA type returns a SensorOutputList with fields
+    // GROUND_TRUTH_SEMANTIC_CLASS and WORLD_NORMAL_Z, allowing detection of curbwalls.
+    // Note:  This type of camera is generated internally and its behavior may change
+    // from release to release.  It is not intended to be specified directly.
+    INTERNAL_CURBWALL_CAMERA = 14;
+  }
+  enum ColorSpace {
+    RGB = 0;  // Default
+    CIELAB = 1;
+    CIEXYZ = 2;
+    LUMINANCE = 3;
+  }
+  enum Technologies {
+    INVALID_T = 0;
+    CMOS = 1;
+    CCD = 2;
+  }
+  // <!-- Next ID: 23 -->
+  // library ... vendor, model: Vendor and model of the sensor.
+  // Units: None
+  Library library = 1;
+  // size: Physical extent of the image sensor, height and width.
+  // Units: mm
+  common.Vector2 size = 2;
+  // pixel_size: Physical size of one pixel in the image sensor, height and width.
+  // Units: µm
+  common.Vector2 pixel_size = 20;
+  // resolution: Horizontal and Vertical pixel count of image sensor.
+  // Units: px
+  common.Vector2 resolution = 3;
+  // type: Available types:
+  //   VISIBLE: Visible light camera.
+  //   DEPTH: Depth camera.
+  //   SEMANTIC_SEGMENTATION: Semantic segmentation camera.
+  //   LUMINANCEMETER: Outputs scene luminance in cd/m^2.
+  //   LWIR: Long-wave infrared camera (BETA).
+  // Units: None
+  CameraType type = 7;
+  ColorSpace color_space = 8 [deprecated = true];
+  // bloom: Intensity of the blooming effect. See Bloom
+  // Units: norm
+  float bloom = 9;
+  // color_depth: Number of bits per color channel. See Color Depth
+  // Units: bits
+  float color_depth = 10;
+  // color_filter_array: A collection of parameters defining the sensor's color filter array. See
+  // Color Filter Array
+  CFA color_filter_array = 11;
+  FPN fixed_pattern_noise = 12;
+  // readout_noise: WGN due to readout normalized saturation level (FWC). See Noise
+  // Units: norm
+  float readout_noise = 13;
+  // iso: Digital ISO value for manual exposure. See Exposure
+  // Units: None
+  float iso = 14;
+  // quantum_effeciency: QE of sensor material.
+  // Units: norm
+  oneof qe {
+    float quantum_effeciency = 15 [deprecated = true];
+    float quantum_efficiency = 22;
+  }
+  // shutter_speed: Shutter speed of underlying capture. See Shutter Speed
+  // Units: Hz
+  float shutter_speed = 16;
+  // dynamic_range: Range of sensor before saturation.
+  // Units: dB
+  float dynamic_range = 17;
+  // technology:
+  //   CMOS: [Complementary Metal-Oxide-Semiconductor](https://en.wikipedia.org/wiki/CMOS).
+  //   CCD: [Charge Coupled Device](https://en.wikipedia.org/wiki/Charge-coupled_device).
+  // Units: None
+  Technologies technology = 18;
+  // full_well_capacity: Maximum number of electons per-pixel before the image sensor saturates.
+  // Units: None
+  double full_well_capacity = 19;
+
+  // rolling_shutter: Parameters affecting the readout time of specific pixels
+  camera_model.RollingShutter rolling_shutter = 21;
+}
+
+// Camera model output data formats.
+message CameraDataFormat {
+  enum Data {
+    ROS_TOPIC = 0;  // Legacy flag being deprecated
+    RAW_STREAM = 1;
+    PROTO_MSG = 2;
+    DISK = 3;
+    DISPLAY = 4;
+  }
+  // data: Output format: RAW_STREAM, PROTO_MSG, DISK, or DISPLAY.
+  // Units: None
+  Data data = 1;
+  // save_directory: Full path to an existing directory. Only applicable if data is set to DISK.
+  // Units: None
+  string save_directory = 2;
+  // For internal use only.  Applied may remove or alter this field without notice.
+  bool enable_semantic_description = 4;
+  // Display Options for the DISPLAY mode
+  DisplayOptions display_options = 5;
+  // For internal use only.  Applied may remove or alter this field without notice.
+  repeated string semantic_description_image_mappings = 6;
+
+  message DisplayOptions {
+    // is_fullscreen: Specifies to render a camera to an entire screen. Only applicable if data is
+    // set to DISPLAY. Units: None
+    bool is_fullscreen = 1;
+    // position: Pixel coordinates of the top left of the window to render this camera to. Only
+    // applicable if data is set to DISPLAY. Units: px
+    common.Vector2 position = 2;
+    // override_resolution: Resolution of the window to render this camera to <br /><br />Default is
+    // the resolution of the camera. Only applicable if data is set to DISPLAY. Units: px
+    common.Vector2 override_resolution = 3;
+    // has_title_bar: Signals to show the title bar, which can be used to move the window, minimize,
+    // or maximize. Only applicable if data is set to DISPLAY. Units: None
+    bool has_title_bar = 4;
+    // send_empty_messages: By default, the display type will not send any data to your stack
+    // directly. With this enabled, images will be rendered to the display still, but your stack
+    // will receive an EMPTY message when the camera renders a new image. Only applicable if data is
+    // set to DISPLAY. Units: None
+    bool send_empty_messages = 5;
+  }
+
+  // Enables SensorOutputList protobuf messages through the PERCEPTION_SENSORS channel.
+  repeated SensorOutputRequest sensor_output_list = 7;
+
+  message SensorOutputRequest {
+    // User-defined name for this output.
+    string output_name = 1;
+
+    oneof output_type {
+      // Enables generating images and ground truth data from the camera model
+      // as sensor_output.SensorOutputList.SensorOutput messages.
+      ImageData image_data = 2;
+    }
+
+    message ImageData {
+      // Requested image data fields.
+      enum ImageDataFields {
+        BLUE = 0;       // FLOAT32  | Units: ~ | Blue channel of a camera sensor
+        GREEN = 1;      // FLOAT32  | Units: ~ | Green channel of a camera sensor
+        RED = 2;        // FLOAT32  | Units: ~ | Red channel of a camera sensor
+        NIR = 3;        // FLOAT32  | Units: ~ | Near-infrared channel of a camera sensor
+        LWIR = 4;       // FLOAT32  | Units: ~ | Long-wave infrared channel of a camera sensor
+        ELECTRONS = 5;  // FLOAT32  | Units: ~ | Per-pixel electrons at the sensor before debayering
+        // reserved 6 to 99;  // Reserved for future camera-specific measurement fields
+        // Ground truth
+        GROUND_TRUTH_SEMANTIC_CLASS =
+            100;  // Units: none   | Semantic class ID of object type this point has hit
+        GROUND_TRUTH_ACTOR_ID = 101;  // Units: none   | Actor instance ID of which actor in the
+        // scene this point has hit
+        GROUND_TRUTH_MATERIAL_ID = 102;  // Units: none   | Produce material ID hit for each point
+        WORLD_NORMAL_X = 103;  // Units: none   | x-component of unit normal in world frame
+        WORLD_NORMAL_Y = 104;  // Units: none   | y-component of unit normal in world frame
+        WORLD_NORMAL_Z = 105;  // Units: none   | z-component of unit normal in world frame
+        // reserved 106 to 199;   // Reserved for future ground truth fields
+      }
+
+      // data_fields: Specifies which per-pixel fields should be included in the
+      // output data.
+      // Units: None
+      repeated ImageDataFields data_fields = 1;
+    }
+  }
+}
+
+//////////////////////////////////////////////////////////////////
+// Legacy Sensor Model Outputs                                  //
+// Replacement: sensor_output.SensorOutputList (beta 1.31)      //
+//////////////////////////////////////////////////////////////////
+
+message SensorOutput {
+  oneof output_type {
+    CameraImage camera_output = 1;
+    LidarCloud lidar_output = 2;
+    RadarTrack radar_output = 3;
+    Range ultrasound_output = 4;
+  }
+
+  // Camera sensor image output.
+  message CameraImage {
+    Metadata metadata = 6;
+    int32 id = 1;
+    spatial.Pose pose = 2;
+    ImageShape image_shape = 3;
+    Image image = 4;
+    string name = 5;  // name/title/label of the image content
+    ColorSpace color_space = 7;
+    enum ColorSpace {
+      RGB = 0;     // Default
+      CIELAB = 1;  // Deprecate
+      CIEXYZ = 2;  // Deprecate
+      LABd65 = 3;
+      XYZd65 = 4;
+      LUMINANCE = 5;
+      MONO = 6;
+      BGR = 7;
+    }
+    simian_public.sensor_sim.labels.LabelSnapshot label_snapshot = 8;
+    camera_model.CameraIntrinsicParams camera_intrinsic_params = 9;
+  }
+
+  message TimestampedCameraImage {
+    CameraImage camera_image = 1;
+    google.protobuf.Timestamp sim_time = 2;
+  }
+
+  // Bytes for lidar.
+  message LidarCloud {
+    Metadata metadata = 4;
+    int32 id = 1;
+    spatial.Pose pose = 2;
+    simian_public.sensor_sim.labels.LabelSnapshot label_snapshot = 5;
+
+    // By default, Simian will send lidar point data via |points|. Using
+    // --sensor_shared_memory will signal Simian to send this data via
+    // |shared_memory_pointer| which contains a pointer to the contents of
+    // what would be the |points| field.
+    // Points are relative to the sensor origin coordinate frame.
+    oneof points_data {
+      bytes points = 3;
+      simian_public.sensor_sim.basic_types.SharedMemoryPointer shared_memory_pointer = 6;
+    }
+  }
+
+  // Bytes for radar.
+  message RadarTrack {
+    /*** Deprecated fields ***/
+    // reserved 6;
+    // reserved "polarimetric_fields";
+    /*** Deprecated fields ***/
+
+    Metadata metadata = 4;
+    int32 id = 1;
+    spatial.Pose pose = 2;
+
+    // By default, Simian will send radar point data via |tracks|. Using
+    // --sensor_shared_memory will signal Simian to send this data via
+    // |shared_memory_pointer| which contains a pointer to the contents of
+    // what would be the |tracks| field.
+    oneof tracks_data {
+      bytes tracks = 3;
+      simian_public.sensor_sim.basic_types.SharedMemoryPointer shared_memory_pointer = 7;
+    }
+    simian_public.sensor_sim.labels.LabelSnapshot label_snapshot = 5;
+  }
+
+  // <!-- TODO(spectral): Once customer interfaces and sensor output data structures can be
+  // migrated, the bytes fields should be an option in a oneof, a wrapper of BytesBuffer should be
+  // the other option. For the time being, bytes fields will be converted somewhere else for the
+  // frontend renderer to consume. -->
+  message BytesBuffer {
+    enum Format {
+      uint8 = 0;  // Default
+      uint16 = 1;
+      float16 = 2;
+    }
+    string name = 1;
+    bytes data = 2;
+    Format format = 3;
+  }
+
+  // float range scalar for ultrasound.
+  message Range {
+    Metadata metadata = 6;
+    int32 id = 1;
+    spatial.Pose pose = 2;
+    float range = 3;
+    spatial.AZEL field_of_view = 4;
+    common.Range operational_range = 5;
+    simian_public.sensor_sim.labels.LabelSnapshot label_snapshot = 7;
+  }
+
+  // reserved "metadata_output";
+  // reserved 5;
+}
+
+message Library {
+  string vendor = 1;
+  string model = 2;
+}
+
+// Image Protos.
+// Image shape.
+message ImageShape {
+  int32 height = 1;
+  int32 width = 2;
+  int32 channels = 3;
+}
+
+// Image message.
+message Image {
+  enum Format {
+    JPEG = 0;
+    PNG = 1;
+    RAW = 2;
+    // used for visualization; fills out a timecode referring to a video
+    VIDEO_TIMECODE = 3;
+    // only supported with the --separate_video_file simulation flag
+    H264 = 4;
+    HEVC = 5;
+  }
+  bytes image_bytes = 1;
+  Format format = 2;
+
+  // DEPRECATED
+  // This field is being replaced by |shared_memory_pointer|, and will be removed by release 1.29
+  SharedMemoryPointer data_pointer = 3 [deprecated = true];
+
+  // Using --sensor_shared_memory will signal
+  // Simian to send a SharedMemoryPointer pointing to the
+  // raw image bytes of the image.
+  simian_public.sensor_sim.basic_types.SharedMemoryPointer shared_memory_pointer = 7;
+
+  float color_depth = 4;
+  CameraSystemParams.DataType data_type = 5;
+  float video_timecode = 6;
+}
+
+message Metadata {
+  string sensor_name = 2;
+  string sensor_uuid = 3;
+  spatial.Pose sensor_pose = 4;
+  google.protobuf.Value sensor_model = 5;
+  Description sensor_description = 6;
+  // Simulation tick timestamp
+  google.protobuf.Timestamp sensor_timestamp = 8;
+  spatial.Pose world_t_sensor = 9;
+
+  // reserved 7;
+}
+
+// DEPRECATED
+// This message is replaced by simian_public.sensor_sim.basic_types.SharedMemoryPointer and will be
+// removed in 1.29
+message SharedMemoryPointer {
+  string filename = 1;
+  uint32 offset = 2;
+  uint32 size = 3;
+}

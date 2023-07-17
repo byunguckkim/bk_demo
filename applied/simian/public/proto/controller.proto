@@ -1,0 +1,65 @@
+// Copyright (C) 2021 Applied Intuition, Inc. All rights reserved.
+// This source code file is distributed under and subject to the LICENSE in license.txt
+
+syntax = "proto3";
+
+package simian_public.controller;
+
+message ControllerSpec {
+  oneof controller_type {
+    // PID houses specs relevant to classical proportional-integral-derivative control with
+    // saturation limits.
+    PID pid = 1;
+
+    // BangBang houses specs relevant to a bang-bang (ON-OFF) controller.
+    BangBang bang_bang = 2;
+  }
+}
+
+message PID {
+  double proportional_gain = 1;  // [X] X = SI unit of (controller_output / controller_input)
+  double integral_gain =
+      2;  // [X] X = SI unit of (controller_output / controller_input) / s, where s denotes seconds
+  double derivative_gain =
+      3;  // [X] X = SI unit of (controller_output / controller_input) * s, where s denotes seconds
+
+  // Here X is the SI unit of controller_output; for example if this PID controls
+  // motor angular velocity by supplying torque, X would equal N*m.
+  // The upper output of the controller gets clamped at this value.
+  double upper_saturation_limit = 4;  // [X]
+
+  // Here X is the SI unit of controller_output; for example if this PID controls
+  // motor angular velocity by supplying torque, X would equal N*m.
+  // The lower output of the controller gets clamped at this value.
+  double lower_saturation_limit = 5;  // [X]
+
+  // Here X is the SI unit of (controller_input * s), where s denotes seconds.
+  // The upper output of the integral contribution gets clamped at this value.
+  double upper_integral_limit = 6;  // [X]
+
+  // Here X is the SI unit of (controller_input * s), where s denotes seconds.
+  // The lower output of the integral contribution gets clamped at this value.
+  double lower_integral_limit = 7;  // [X]
+}
+
+message BangBang {
+  // This controller has 3 possible outputs:
+  // 1) upper output
+  // 2) lower output
+  // 3) zero output
+
+  // If the error (i.e., set_point - current_state) lies within the dead band, the output is zero.
+  // If the error falls on the left hand side of this dead band it generates an upper output and
+  // If the error falls on the right hand side of the dead band it generates a lower output.
+
+  // Here X is the SI unit of controller_output; for example if this controller controls
+  // motor angular velocity by supplying torque, X would equal N*m.
+  double upper_output = 1;  // [X]
+
+  // Here X is the SI unit of controller_output; for example if this controller controls
+  // motor angular velocity by supplying torque, X would equal N*m.
+  double lower_output = 2;  // [X]
+
+  // Here X is the SI unit of the controller_input.
+  double dead_band_width = 3;  // [X]
+}

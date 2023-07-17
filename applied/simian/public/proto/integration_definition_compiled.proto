@@ -1,0 +1,143 @@
+syntax = "proto3";
+
+package simian_public.integration_definition;
+
+// IntegrationDefinitionCompiled: Defines the compiled version of an integration created using the
+// Integration Editor.
+message IntegrationDefinitionCompiled {
+  string name = 1;        // Name of the integration.
+  repeated FMU fmus = 2;  // FMUs used by this integration.
+  repeated ChannelMapping channel_mappings =
+      3;  // Mappings between ADP channels and stack messages.
+  repeated ConstantMapping constant_mappings =
+      4;  // Mapping between stack fields and constant values.
+  repeated OutputDatapoint output_datapoints =
+      5;  // Customer fields that will send data points to ADP.
+  repeated CustomMapping custom_mappings =
+      6;  // Customer fields that will be implemented in the interface.
+
+  /**
+   * FMU: Defines an uploaded FMU.
+   */
+  message FMU {
+    string name = 1;          // Name given to this FMU.
+    string path = 2;          // Path to the FMU file relative to the workspace.
+    double step_size = 3;     // Size of the time interval to step the FMU forward by at each tick.
+    string path_on_host = 4;  // Absolute path to the FMU file as given on host.
+  }
+
+  message AppliedFieldInfo {
+    string name = 1;
+  }
+
+  message FMUFieldInfo {
+    string name = 1;
+  }
+
+  message FieldValue {
+    oneof type {
+      int32 int_value = 1;
+      string string_value = 2;
+      double double_value = 3;
+      bool boolean_value = 4;
+    }
+  }
+
+  /**
+   * ConstantMapping: Defines the constants that customer stack fields are set to.
+   */
+  message ConstantMapping {
+    FieldValue constant = 1;
+    oneof customer_field {
+      FMUFieldInfo fmu_field = 2;
+    }
+  }
+
+  /**
+   * OutputDatapoint: Defines which customer stack fields send data points to ADP.
+   */
+  message OutputDatapoint {
+    oneof customer_field {
+      FMUFieldInfo fmu_field = 1;
+    }
+  }
+
+  /**
+   * CustomMapping: Defines which customer stack fields will be set up in the interface.
+   */
+  message CustomMapping {
+    oneof customer_field {
+      FMUFieldInfo fmu_field = 1;
+    }
+  }
+
+  /**
+   * ChannelMapping: Defines a set of mappings between an ADP channel and a customer message.
+   */
+  message ChannelMapping {
+    string applied_channel_name = 1;           // Name of ADP channel.AppliedFieldInfo
+    repeated FieldMapping field_mappings = 2;  // All field mappings that involve this ADP channel.
+
+    message FieldMapping {
+      FieldInfo field_information = 1;
+      oneof transformation {
+        DirectMapping direct_mapping = 2;
+        ValueMapping value_mapping = 3;
+        MathMapping math_mapping = 4;
+      }
+    }
+
+    /**
+     * DirectMapping: Defines a direct mapping between an ADP field and a stack field.
+     */
+    message DirectMapping {
+      bool accept_hmi = 1;
+    }
+
+    /**
+     * ValueMapping: Defines a mapping between an ADP enum-like field and a stack enum-like field.
+     */
+    message ValueMapping {
+      repeated IndividualValueMapping values = 1;
+
+      /**
+       * IndividualValueMapping: Defines a correspondence between a value in an ADP enum-like
+       * field and a value in a stack enum-like field.
+       */
+      message IndividualValueMapping {
+        FieldValue applied_field_value = 1;
+        FieldValue stack_field_value = 2;
+      }
+    }
+
+    /**
+     * MathMapping: Defines a mathematical transformation that defines the mapping between an
+     * ADP field and a stack field.
+     */
+    message MathMapping {
+      oneof math_operation {
+        ApplyGainBias apply_gain_bias = 1;
+      }
+
+      /**
+       * ApplyGainBias: Defines a way to apply gain and bias when mapping between ADP
+       * and stack fields.
+       */
+      message ApplyGainBias {
+        float gain = 1;
+        float bias = 2;
+      }
+    }
+
+    /**
+     * FieldInfo: Captures information about an ADP field and a stack field that have a mapping
+     * between them.
+     */
+    message FieldInfo {
+      AppliedFieldInfo applied_field = 1;
+      oneof customer_field {
+        FMUFieldInfo fmu_field = 2;
+      }
+    }
+  }
+}

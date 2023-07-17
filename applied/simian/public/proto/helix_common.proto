@@ -1,0 +1,389 @@
+// Copyright (C) 2020 Applied Intuition, Inc. All rights reserved.
+// This source code file is distributed under and subject to the LICENSE in license.txt
+
+syntax = "proto3";
+
+package simian_public.helix_common;
+
+import "google/protobuf/duration.proto";
+import "applied/simian/public/proto/actor.proto";
+import "applied/simian/public/proto/geometry.proto";
+import "applied/simian/public/proto/map/map_lane.proto";
+import "applied/simian/public/proto/scenario/common.proto";
+
+message HelixFields {
+  // Configuration for the HIL Rig Machines Helix will be supporting
+  HilRigConfig hil_rig = 1;
+  // Configuration on how helix automator will run with the HIL Rig
+  HelixAutomatorConfig helix_automator = 2;
+
+  enum TransportProtocol {
+    UNKNOWN_TRANSPORT_PROTOCOL = 0;
+    UDP = 1;
+    TCP = 2;
+  }
+
+  // Specifies how communication between Helix Bridge and Helix Real Time Interface (RTI) will occur
+  TransportProtocol transport_protocol = 3;
+  // Configuration for Sensor HIL
+  SensorHilConfig sensor_hil = 4;
+  // Configuration for Camera HIL
+  CameraHilConfig camera_hil = 5;
+
+  enum HelixMode {
+    UNKNOWN_HELIX_MODE = 0;
+    OBJECT_HIL = 1;
+    CAMERA_HIL = 2;
+    SENSOR_HIL = 3;
+  }
+
+  // Specifies which use case of Helix is being used
+  HelixMode helix_mode = 6;
+  // Specifies behaviro configuration used for interfacing with simulink signals
+  repeated SimulinkBehaviorControlConfig simulink_behavior_controls = 7;
+  // CarSim paths to be used during simrun as specified by ego behaviors
+  CarSimEgoBehaviorConfig carsim_ego_behavior = 8;
+}
+
+message HelixCommunication {
+  // Copy the VehicleSim Terrain file into the customer container on sim startup,
+  // if it doesn't already exist there.
+  bool copy_vs_terrain = 1;
+}
+
+message HilRigConfig {
+  message ScalexioConfig {
+    // IP Address of the Scalexio as seen by the Linux computer
+    string scalexio_addr = 1;
+    string scalexio_host_interface_addr = 2;
+    string platform_name = 3;
+    string dspace_version = 4;
+  }
+
+  // Configuration for dSPACE Scalexio machines
+  ScalexioConfig scalexio = 1;
+
+  message PXIConfig {
+    // IP Address of the PXI as seen by the Linux computer
+    string pxi_addr = 1;
+  }
+
+  // Configuration for NI PXI machines
+  PXIConfig pxi = 2;
+}
+
+message HelixAutomatorConfig {
+  // Path to the Build Results folder for the vehicle model that will be loaded to the HIL rig
+  string workspace = 1;
+  // IP Address of the Windows computer as seen by the Linux computer
+  string helix_automator_ip = 2;
+  // Port on which Helix Automator is serving
+  uint32 helix_automator_port = 3;
+
+  // Next ID: 8
+  message VariableMapping {
+    // Abstract name of the variable
+    string variable_name = 1;
+    // Full path to the variable in the model
+    string path = 2;
+    // Variable will be continuously read during the sim.
+    bool poll_from_helix = 6;
+    // Variable will be captured in the given task and all values will be transmitted during
+    // finalization of the sim.
+    string capture_task = 7;
+
+    // reserved 3, 4, 5;
+    // reserved "unit", "min", "max";
+  }
+
+  // Helix Automator uses variable mappings from simple variable names (a.k.a. "abstract variables")
+  // to full variable paths (a.k.a. "concrete variables")
+  repeated VariableMapping variable_mappings = 4;
+
+  message InitialConditions {
+    // Timeout for the variables to attain the values specified by Helix Automator
+    double timeout = 1;
+
+    message Conditions {
+      // Vehicle model variable
+      string variable_name = 1;
+      // Value for the vehicle model variable
+      oneof value {
+        double number_value = 2;
+        string text_value = 3;
+      }
+    }
+
+    // The conditions for the vehicle model
+    repeated Conditions conditions = 2;
+  }
+
+  // Specifies initial conditions for variables in the vehicle model on the HIL rig
+  InitialConditions initial_conditions = 5;
+
+  enum FinalizingBehavior {
+    UNKNOWN = 0;
+    FINALIZE = 1;
+    SKIP_FINALIZE = 2;
+  }
+
+  // Determines whether automator tears down
+  FinalizingBehavior finalizing_behavior = 6;
+
+  message CarSimConfig {
+    // '#FullDataName' on top-level Parsfile in CarSim
+    string full_data_name = 1;
+    // Arbitrary VS Commands to be written in the miscellaneous yellow box on the home page prior to
+    // sim start
+    repeated string vs_commands = 2;
+    // Path to CarSim database
+    string database_path = 3;
+
+    message VSVisualizerConfig {
+      bool automate = 1;
+    }
+
+    // Specifies configuration for the Vehicle Sim Visualizer (VSV)
+    VSVisualizerConfig vs_visualizer = 4;
+
+    message Offset {
+      double x = 1;
+      double y = 2;
+      double z = 3;
+
+      enum Specification {
+        UNKNOWN = 0;
+        MAP_CONFIG = 1;
+        CUSTOM = 2;
+      }
+
+      Specification specification = 4;
+    }
+
+    // The CarSim Solver is 32-bit and cannot handle very large numbers well.
+    // This field allows users to offset Simian's coordinate system to numbers closer to the origin.
+    Offset offset = 5;
+  }
+
+  // Specifies configuration for CarSim
+  CarSimConfig carsim = 7;
+
+  message ControlDeskConfig {
+    message TimeoutConfig {
+      google.protobuf.Duration start_controldesk_timeout = 1;
+      google.protobuf.Duration stop_controldesk_timeout = 2;
+    }
+    // Path to Control Desk Project to automate ControlDesk Calibration and Measurement
+    string project_path = 1;
+    TimeoutConfig timeout = 2;
+  }
+
+  // Specifies configuration for Control Desk
+  ControlDeskConfig control_desk = 8;
+
+  message MAPortConfig {
+    message TimeoutConfig {
+      google.protobuf.Duration read_variables_timeout = 1;
+      google.protobuf.Duration write_variables_timeout = 2;
+      google.protobuf.Duration start_carsim_timeout = 3;
+      google.protobuf.Duration ping_timeout = 4;
+      google.protobuf.Duration heartbeat_timeout = 5;
+      google.protobuf.Duration initialize_timeout = 6;
+      google.protobuf.Duration finalize_timeout = 7;
+    }
+
+    TimeoutConfig timeout = 1;
+  }
+
+  // Model Access port exposes the XIL API on the HIL Rig. Essentialy we use this to configure
+  // aspects of the HIL Rig for simulation runs.
+  MAPortConfig ma_port = 9;
+
+  message RTAConfig {
+    // Overrides reload avoidance workflow for Helix Automator
+    bool force_reload = 1;
+    // Sets vs_state_channel from pause to stop after sim run
+    bool stop_application_after_simrun = 2;
+    // Use VS Events for Model Reload Avoidance
+    bool vs_events_reload = 3;
+  }
+
+  // Configuration releated to the Real Time Application (RTA)
+  RTAConfig real_time_application = 10;
+
+  // Configuration of Helix Automator service passed from Bridge
+  HelixAutomatorServiceConfig service = 11;
+}
+
+message HelixAutomatorPluginsConfig {
+  bool carsim = 1;
+  bool xil = 2;
+  bool controldesk = 3;
+  bool teststand = 4;
+}
+
+message HelixAutomatorServiceConfig {
+  message Script {
+    enum ExecutionMode {
+      UNKNOWN = 0;
+      SHELL = 1;
+      TESTSTAND = 2;
+    }
+    ExecutionMode exec_mode = 1;
+    string script = 2;
+  }
+  string file_path = 1;
+  HelixAutomatorPluginsConfig plugins_config = 2;
+  repeated Script init_scripts = 3;
+  repeated Script finalize_scripts = 4;
+}
+
+message SensorHilConfig {
+  enum ReplayMode {
+    UNKNOWN_REPLAY_MODE = 0;
+    OPEN_LOOP = 1;
+    CLOSED_LOOP = 2;
+  }
+
+  // Mode in which Sensor Replay HIL will run
+  ReplayMode mode = 1;
+
+  message LidarConfig {
+    string ip_addr = 1;
+    uint32 port = 2;
+  }
+
+  // Lidar settings for RTI or NI PXI Ingest Plugins
+  LidarConfig lidar = 2;
+
+  message RadarConfig {
+    string ip_addr = 1;
+    uint32 port = 2;
+  }
+
+  // Radar settings for RTI or NI PXI Ingest Plugins
+  RadarConfig radar = 3;
+}
+
+message CameraHilConfig {
+  repeated simian_public.actor.Actor static_actors = 1;
+
+  message StaticActorMapping {
+    simian_public.actor.Actor.SpectralStaticModel spectral_static_model = 1;
+    string carsim_obj_file = 2;
+  }
+
+  repeated StaticActorMapping static_actor_mappings = 3;
+
+  message CarSimMapConfig {
+    enum CarSimMapType {
+      UNKNOWN_CARSIM_MAP_TYPE = 0;
+      OSG = 1;
+      SCENE_BUILDER = 2;
+    }
+
+    CarSimMapType carsim_map_type = 1;
+    repeated string osg_files = 2;
+    repeated string vs_scene_files = 3;
+    repeated string vs_terrain_files = 4;
+  }
+
+  CarSimMapConfig carsim_map = 4;
+
+  // reserved 2;
+  // reserved "map_key";
+}
+
+message CarSimRuntimeControl {
+  enum HelixVehicleSimEventStates {
+    VS_EVENT_DEFAULT_STATE = 0;
+    VS_EVENT_STOP_CAR = 1;
+    VS_EVENT_REINITIALIZE = 2;
+  }
+
+  enum HelixVehicleSimEventStateValidity {
+    // Used to indicate that the VS state has gone into an uninitialized state
+    VS_EVENT_STATE_NOT_INITIALIZED = 0;
+
+    // Used to indicate that we have a valid VS event state that can be used by Helix bridge/RTI
+    VS_EVENT_STATE_VALID = 1;
+  }
+
+  enum HelixVehicleSimStates {
+    VS_STATE_STOP = 0;
+    VS_STATE_PAUSE = 1;
+    VS_STATE_RUN = 2;
+  }
+
+  // Vehicle Sim state (stop, pause or run)
+  HelixVehicleSimStates vs_sim_state = 1;
+  // Vehicle Sim event states (used to initialize CarSim without reloading the model)
+  HelixVehicleSimEventStates vs_event_state = 2;
+  // Used to signal whether we have valid states in this runtime control message
+  HelixVehicleSimEventStateValidity vs_event_state_validity = 3;
+}
+
+message SimulinkBehaviorControlConfig {
+  uint32 behavior_id = 1;
+  string behavior_sim_command = 2;
+}
+
+message CarSimEgoBehaviorConfig {
+  message CarSimPath {
+    uint32 path_id = 1;
+    simian_public.hdmap.Lane lane = 2;
+    repeated simian_public.common.PointENU path = 3;
+  }
+
+  repeated CarSimPath carsim_paths = 1;
+
+  // LightWeight Version of Obstacle Behaviors to describe basic motion parameters and completion
+  // criteria to CarSim
+  message Behavior {
+    enum BehaviorType {
+      UNSET = 0;
+      LANE_KEEP = 1;
+      LANE_CHANGE = 2;
+      PATH_FOLLOWING = 3;
+      WAIT = 4;
+      STOP = 5;
+    }
+
+    BehaviorType behavior_type = 1;
+
+    message MotionParam {
+      // CarSim expects a target velocity to be specified at a station or time. In the Helix Bridge
+      // the notion of station is behavior specific and in CarSim it is path specific. The Helix
+      // Bridge will take care of this translation. As such, motion params will contain velocity
+      // targets for a cumulative station and time with respect to the start of the behavior.
+      double velocity = 1;
+      double duration = 2;
+      double distance = 3;
+    }
+
+    repeated MotionParam motion_params = 2;
+
+    message CompletionCriteria {
+      double duration = 1;
+      double distance = 2;
+    }
+
+    CompletionCriteria completion_criteria = 3;
+
+    message LaneChangeParams {
+      int32 num_lanes = 1;
+      simian_public.scenario.RelativeLaneChangeDirection.Direction change_direction = 2;
+    }
+
+    message PathFollowingParams {
+      uint32 path_id = 1;
+    }
+
+    oneof behavior_params {
+      LaneChangeParams lane_change_params = 4;
+      PathFollowingParams path_following_params = 5;
+    }
+  }
+
+  repeated Behavior behaviors = 2;
+}

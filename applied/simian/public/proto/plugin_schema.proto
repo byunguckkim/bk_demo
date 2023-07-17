@@ -1,0 +1,44 @@
+// Copyright (C) 2020 Applied Intuition, Inc. All rights reserved.
+// This source code file is distributed under and subject to the LICENSE in license.txt
+
+syntax = "proto3";
+
+package simian_public.plugin_schema;
+
+message MultiSelect {
+  repeated string multiselect_options = 1;
+}
+
+// This allows customers to specify the different ways a plugin can be customized.
+message PluginOption {
+  // String describing what this option is controlling.
+  string option_name = 1;
+
+  oneof option_value {
+    // In the plugin that specifies the schema, this should be
+    // set to options that should be selectable from the frontend via a multi-select
+    // dropdown. In the plugin that implements options from the schema, this will
+    // be set to the specific values selected on the frontend or via the CLI and the
+    // plugin should use this value to customize the behavior.
+    MultiSelect multi_select = 2;
+
+    // In the plugin that specifies the schema, this should be
+    // set to the default value you want the modal to be pre-populated with in the
+    // frontend textbox.
+    // In the plugin that implements options from the schema, this will be set to the
+    // value selected on the frontend or via the CLI and the plugin should use this value to
+    // customize the behavior.
+    string string_value = 3;
+
+    // This field works similarly to the string_value field.
+    float float_value = 4;
+  }
+}
+
+// This creation schema allows users to specify a customization when creating dataset
+// items via the CreateDatasetItems plugin. The GetDatasetItemCreationSchema plugin
+// returns the customized schema that the CreateDatasetItem plugin supports. This allows the
+// frontend to display the possible options that the plugin accepts.
+message DatasetItemCreationSchema {
+  repeated PluginOption options = 1;
+}

@@ -1,0 +1,41 @@
+// Copyright (C) 2019 Applied Intuition, Inc. All rights reserved.
+// This source code file is distributed under and subject to the LICENSE in license.txt
+
+syntax = "proto3";
+
+package simian_public.transfer_function;
+
+message TransferFunctionSpec {
+  oneof transfer_function_type {
+    ContinuousSISOSpec continuous_siso = 1;
+  }
+}
+
+message ContinuousSISOSpec {
+  // Numerator and denominator are highest-order first. E.g. 6*x^2 - 3 is [6, 0, -3]. Note that
+  // the numerator must have order less than or equal to the denominator to be properly formed.
+  repeated double numerator_polynomial = 1;
+  repeated double denominator_polynomial = 2;
+  // Initial state should have as many entries as the order of the transfer function. E.g. a third-
+  // order transfer function would have initial_state = [init_x_dot_dot, init_x_dot, init_x].
+  repeated double initial_state = 3;
+  // The previous command is the command that resulted in the initial state, i.e. the command that
+  // took the state from t = -tick_duration to t = 0.0.
+  // At init time, this command is used to fill the input buffer if previous_command_handling is set
+  // to HOLD_FOR_DELAY_DURATION_AT_SIM_START as required and time_delay is greater than 0.0.
+  double previous_command = 4;
+  // Time delay is the number of seconds between input and output. It is sometimes called dead time,
+  // input delay, or transport delay. For SISO systems, it is also synonymous with output delay.
+  double time_delay = 5;  // [s]
+
+  PreviousCommandHandling previous_command_handling = 6;
+
+  enum PreviousCommandHandling {
+    // Default: hold previous command for the first t = time_delay seconds of the simulation.
+    HOLD_FOR_DELAY_DURATION_AT_SIM_START = 0;
+    // Original transfer function behavior.
+    // Transfer function will receive 0.0 as input during the first t = time_delay seconds of the
+    // simulation.
+    POPULATE_DELAY_DURATION_AT_SIM_START_WITH_ZERO = 1;
+  }
+}

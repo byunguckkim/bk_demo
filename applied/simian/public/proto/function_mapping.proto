@@ -1,0 +1,56 @@
+// Copyright (C) 2021 Applied Intuition, Inc. All rights reserved.
+// This source code file is distributed under and subject to the LICENSE in license.txt
+
+syntax = "proto3";
+
+package simian_public.function_mapping;
+
+import "applied/simian/public/proto/transfer_function.proto";
+
+message FunctionMapping {
+  oneof function_type {
+    // Implements a polynomial mapping
+    // See ref: https://en.wikipedia.org/wiki/Polynomial
+    Polynomial polynomial = 1;
+    // Implements a transfer function
+    transfer_function.TransferFunctionSpec transfer_function = 2;
+    // Implements a lookup table
+    LookupTable lookup_table = 3;
+  }
+}
+message Polynomial {
+  // Computes sum(coefficient[i] * x^(exponent[i])) ∀ i ∈ {1, ... len(terms)}
+  repeated PolynomialCoefficients terms = 1;
+}
+
+message PolynomialCoefficients {
+  double coefficient = 1;
+  // Exponents must be non-negative.
+  uint32 exponent = 2;
+}
+
+message LookupTable {
+  oneof lookup_table_type {
+    // See here for information on ruled surfaces:
+    // https://en.wikipedia.org/wiki/Ruled_surface#:~:text=A%20ruled%20surface%20can%20be,that%20lie%20on%20the%20surface.
+    RuledSteeringTorqueAndVelocityToTireAngle ruled_steering_torque_and_velocity_to_tire_angle = 1;
+  }
+}
+
+message RuledSteeringTorqueAndVelocityToTireAngle {
+  // Users must enter atleast 2 elements. No two elements should have the same longitudinal
+  // velocity.
+  repeated Element elements = 1;
+
+  message Element {
+    // Steering torque here doesn't necessarily have to be the torque applied at the steering wheel.
+    // It can be the torque applied at any point along the steering chain. i.e. from the steering
+    // wheel all the way to the steering tie rod.
+    double steering_torque = 1;  // [N*m]
+    // Longitudinal (+x) velocity of the vehicle observed in the world frame and expressed in the
+    // vehicle frame.
+    double longitudinal_velocity = 2;  // [m/s]
+    // (+CCW) rotation of the tire in the vehicle frame.
+    double tire_angle = 3;  // [rad]
+  }
+}

@@ -1,0 +1,151 @@
+// Copyright (C) 2020 Applied Intuition, Inc. All rights reserved.
+// This source code file is distributed under and subject to the LICENSE in license.txt
+
+// This file contains all the messages that are common between description and compiled proto
+syntax = "proto3";
+
+package simian_public.scenario;
+
+import "applied/simian/public/proto/actor.proto";
+import "applied/simian/public/proto/common.proto";
+import "applied/simian/public/proto/spatial.proto";
+
+message AllObstacles {
+  repeated int32 exclude_ids = 1;
+}
+
+// <!-- TODO(#14403) -->
+message NewObstacleIdent {
+  oneof obstacle {
+    int32 obstacle_id = 1;
+    Empty ego = 2;
+    simian_public.actor.Actor.ObstacleType obstacle_type = 3;
+    Region region = 4;
+    AllObstacles all_obstacles = 5;
+  }
+  string source_channel = 6;
+
+  // If this flag is set to true, this identifier can be used to refer to
+  // "hidden" Simian actors i.e. actors that have been removed from the
+  // simulation with a hide behavior.
+  bool include_hidden_actors = 7;
+}
+
+message Empty {}
+
+message LaneId {
+  int64 id = 1;
+}
+
+message LaneSplitPreference {
+  enum SplitPreference {
+    NONE = 0;
+    FORWARD = 1;
+    RIGHT = 2;
+    LEFT = 3;
+  }
+}
+
+message RelativeLaneChangeDirection {
+  enum Direction {
+    NONE = 0;  // No lane change specified.
+    LEFT = 1;
+    RIGHT = 2;
+  }
+}
+
+// Options for visualizations of rendered drawings
+message VisualizationOptions {
+  // Modes for visualizing rendered drawings
+  enum VisualizationMode {
+    UNKNOWN = 0;
+    DISABLED = 1;      // Default; no visualization shown or calculated.
+    ENABLED_LIVE = 2;  // Visualizations calculated and shown during runtime (live simulation).
+  }
+  VisualizationMode visualization_mode = 1;
+}
+
+// Polygon with global points
+message PolygonGlobal {
+  repeated simian_public.common.Point point = 1;
+}
+
+// Spline with global points
+message SplineGlobal {
+  repeated simian_public.common.Point point = 1;
+}
+
+// Polygon with local xyz points.
+message PolygonLocal {
+  repeated simian_public.common.Vector3 local_point = 1;
+  NewObstacleIdent reference_object = 2;
+}
+
+// Point radius
+message PointRadius {
+  simian_public.common.Point point = 1;
+  double radius = 2;
+}
+
+// A sector of a concentric ring with inner and outer radius.
+message RingSectorLocal {
+  double distance_near = 1;
+  double distance_far = 2;
+  double yaw_start = 3;
+  double yaw_length = 4;
+  NewObstacleIdent reference_object = 5;
+}
+
+message PointList {
+  repeated simian_public.common.Point point = 1;
+}
+
+message Region {
+  oneof region {
+    LaneId lane = 1;
+    PolygonGlobal polygon_global = 2;
+    PolygonLocal polygon_local = 3;
+    PointRadius point_radius = 4;
+    Empty on_driveable_surface = 5;
+    SplineGlobal spline_global = 6;
+    simian_public.common.Point point = 7;
+    RingSectorLocal ring_sector_local = 8;
+    PointList point_list = 9;
+  }
+}
+
+message WheelConfig {
+  string name = 1;
+  oneof relative_pose {
+    // mount is the pose of the wheel center with respect to ego section 0's frame.
+    // i.e., the main ego section's center of rear axle.
+    simian_public.spatial.PoseSpec mount = 2;
+    // You will have to use this option if you wish to mount wheels on section 1,
+    // most often used to represent a trailer.
+    // Common use-case: Mount wheels on trailers to allow terrain sensor to look underneath an
+    // articulated trailer.
+    simian_public.spatial.TransformNode mount_in_frame = 8;
+  }
+  double radius = 3;  // [m]
+  string mesh_name = 4;
+  double mass = 5;        // [kg]
+  double moment_Iyy = 6;  // [kg*m^2] about the rotating axis of the wheel
+  double width = 7;       // [m]
+}
+
+// If the scenario comes from a parameter sweep, this represents the
+// sample point. For every parameter it gives the parameter name, at
+// which step in the sweep it is, and what value that corresponds to.
+message ParameterSweep {
+  message Sample {
+    string slot = 1;
+    int32 step = 2;
+    string value = 3;
+    string name = 4;
+  }
+  repeated Sample samples = 1;
+
+  // The variation number in the parent scenario corresponding to the
+  // sample values.  Note that the variation starts at 1.
+  int32 variation = 2;
+}

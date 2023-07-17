@@ -1,0 +1,657 @@
+// Copyright (C) 2018 Applied Intuition, Inc. All rights reserved.
+// This source code file is distributed under and subject to the LICENSE in license.txt
+
+syntax = "proto3";
+
+package simian_public.perception;
+
+import "google/protobuf/duration.proto";
+import "google/protobuf/empty.proto";
+import "google/protobuf/struct.proto";
+import "google/protobuf/timestamp.proto";
+import "applied/simian/public/osi3/osi_lane.proto";
+import "applied/simian/public/osi3/osi_trafficlight.proto";
+import "applied/simian/public/osi3/osi_trafficsign.proto";
+import "applied/simian/public/proto/actor.proto";
+import "applied/simian/public/proto/common.proto";
+import "applied/simian/public/proto/geometry.proto";
+import "applied/simian/public/proto/map/map.proto";
+import "applied/simian/public/proto/planar.proto";
+import "applied/simian/public/proto/scenario/sensor_config.proto";
+import "applied/simian/public/proto/spatial.proto";
+
+// Perception channels contain Simian's sensor-related output. They
+// can be used to receive the kind of data that a perception stack
+// would produce, such as lane detections (which in reality would
+// typically come from a camera, but in Simian are looked up in the
+// underlying map). This is different from the higher-fidelity sensor
+// simulation available from Spectral.
+//
+// See "Object-level Sensors" in the Simian manual for more
+// details.
+//
+// <!--Next ID: 23-->
+message PerceptionChannel {
+  // The name of the "sensor" as specified in the scenario yaml. Note that the
+  // order in which the perception channels make it into the
+  // SimulatorOutput.ego.perception_channels list is NOT guaranteed to
+  // follow the order of specification in the scenario.
+  string name = 1;
+
+  // The type of the perception channel depends on the
+  // configuration of the "sensor" in the scenario.
+  oneof perception_data {
+    // Returns information about lane boundary lines and centerlines.
+    LaneSensor lane_sensor = 2;
+    // Returns information about traffic lights in the scene.
+    TrafficLightSensor traffic_light_sensor = 3;
+    // Returns information about agents in the scene.
+    ActorSensor actor_sensor = 4;
+    // Returns 2D bounding boxes of actors in a camera image (NOT in the XY plane of the world or
+    // ego).
+    Actor2DSensor actor2d_sensor = 22;
+    // Returns information about the ego's pose, potentially with noise injected.
+    LocalizationSensor localization_sensor = 5;
+    // Returns the intersection between rays emitted from the sensor in the XY plane and agents in
+    // the scene.
+    PlanarLidarSensor planar_lidar_sensor = 6;
+    // Returns a 2D discrete grid representation of the XY plane whose cell values indicate whether
+    // the cell is occupied by an agent.
+    PlanarOccupancyGridSensor planar_occupancy_grid_sensor = 7;
+    // Returns polygons representing free and obstructed regions in the scene.
+    FreeSpaceSensor free_space_sensor = 8;
+    // Returns information about traffic light blocks in the scene.
+    TrafficLightBlockSensor traffic_light_block_sensor = 9;
+    // Returns information about traffic signs in the scene.
+    TrafficSignSensor traffic_sign_sensor = 12;
+    // Models an Inertial Measurement Unit (IMU); returns linear acceleration and angular velocity
+    // of a point on an ego vehicle. Please use localization_sensors instead.
+    IMUSensor imu_sensor = 13;
+    // Returns rotational wheel speed for an ego vehicle.
+    WheelSpeedSensor wheel_speed_sensor = 14;
+    // Returns a 2D discrete grid representation of the XY plane whose cell values are the lowest
+    // height at which actors are visible from the sensor original.
+    OcclusionGridSensor occlusion_grid_sensor = 15;
+    // Returns information about map objects such as lanes, regions, and traffic control devices.
+    MapSensor map_sensor = 17;
+    // Returns information about the height at locations in the scene as specified by the terrain.
+    TerrainSensor terrain_sensor = 18;
+    // Returns information about wind speeds in the scene.
+    WindSensor wind_sensor = 19;
+    // Similar to the planar lidar sensor, this sensor returns information about agents or road
+    // edges in the scene that are hit by rays emitted from the sensor's origin. Specifically, this
+    // sensor reports the Cartesian intersection point between a ray and an agent or road edge, and
+    // the ID and type of agent that was hit (if any). Additionally, rays can pass through multiple
+    // road edges.
+    PolarObstacleSensor polar_obstacle_sensor = 20;
+    // Returns the planned path for agents in the scene.
+    AgentTrajectorySensor agent_trajectory_sensor = 21;
+  }
+
+  // reserved "message_sensor";
+  // reserved 10;
+
+  // The simulation time at which the data was sensed.
+  // This may be behind (less than) the sim_timestamp for sensors
+  // whose output is delayed.
+  google.protobuf.Timestamp sensor_timestamp = 16;
+
+  // <!-- Next ID: 4. -->
+  message Metadata {
+    // SensorView and SensorOutputConfig are used by ADP's frontend to visualize sensor output.
+    simian_public.scenario.SensorView sensor_view = 1;
+    simian_public.scenario.SensorOutputConfig sensor_output = 2;
+
+    // Custom metadata that can be attached to any sensor channel that goes from the Stack or Log ->
+    // ADP.
+    google.protobuf.Struct custom_metadata = 3;
+  }
+
+  // Returns information about lane boundary lines and centerlines.
+  message LaneSensor {
+    // The list of lanes (in OSI3 format) returned by the lane sensor.
+    repeated osi3.Lane lanes = 1;
+    // The list of lane boundaries (in OSI3 format) returned by the lane sensor.
+    repeated osi3.LaneBoundary lane_boundaries = 2;
+
+    // <!-- SensorView and SensorOutputConfig are used to draw 2D fov -->
+    // The sensor view specified in the scenario.
+    simian_public.scenario.SensorView sensor_view = 3;
+    // The sensor output config specified in the scenario.
+    simian_public.scenario.SensorOutputConfig sensor_output = 4;
+
+    // This is the underlying simulated ego pose that served as input to
+    // the lane sensor when it was computing the reported
+    // lane data (i.e., the ego pose associated with sensor_timestamp).
+    // If the sensor configuration contained deferred_parallel_processing as true,
+    // this pose is delayed by one lane sensor update.
+    // Note: if the sensor was mounted on an actor, this field is not populated.
+    // Please use input_agent_pose instead.
+    spatial.Pose input_ego_pose = 5;
+
+    // The underlying simulated agent pose that served as input to
+    // the lane sensor when it was computing the reported
+    // lane data (i.e., the agent pose associated with sensor_timestamp).
+    // If the sensor configuration contained deferred_parallel_processing as true,
+    // this pose is delayed by one lane sensor update.
+    spatial.Pose input_agent_pose = 6;
+
+    // The unique ID of the agent onto which the sensor is mounted.
+    int64 agent_id = 7;
+  }
+
+  // Reports information about traffic lights in the field of view of the traffic light sensor, as
+  // defined in the scenario.
+  message TrafficLightSensor {
+    // The list of traffic lights reported by the traffic light sensor.
+    repeated osi3.TrafficLight traffic_lights = 1;
+    // Contains information about the mount, field of view, and reporting frame of the sensor.
+    Metadata metadata = 2;
+  }
+
+  // Reports information about traffic light blocks in the field of view of the traffic light block
+  // sensor, as defined in the scenario.
+  message TrafficLightBlockSensor {
+    // The list of traffic light blocks reported by the traffic light block sensor.
+    repeated TrafficLightBlock traffic_light_blocks = 1;
+    // Contains information about the mount, field of view, and reporting frame of the sensor.
+    Metadata metadata = 2;
+
+    message TrafficLightBlock {
+      string block_name = 1;
+      repeated osi3.TrafficLight traffic_lights = 2;
+    }
+  }
+
+  // Reports information about traffic signs in the field of view of the traffic sign sensor, as
+  // defined in the scenario.
+  message TrafficSignSensor {
+    // The list of traffic signs reported by the traffic sign sensor.
+    repeated osi3.TrafficSign traffic_signs = 1;
+    // Contains information about the mount, field of view, and reporting frame of the sensor.
+    Metadata metadata = 2;
+  }
+
+  // Returns information about agents in the scene.
+  // <!-- Next id: 5. -->
+  message ActorSensor {
+    // This field contains an entry for each agent in the sensor's field of view. The order of
+    // entries is affected by the `actor_output_order` integration option.
+    repeated actor.Actor actors = 1;
+
+    // If this sensor is mounted to the ego, the oneof is unset.
+    // If this sensor is mounted to an actor, the oneof is set to experimental_actor_id.
+    // Mounting a sensor to an actor is an experimental feature.
+    oneof experimental_mount_agent {
+      int64 experimental_actor_id = 2;
+    }
+
+    // Contains information about the mount, field of view, and reporting frame of the sensor.
+    Metadata metadata = 4;
+
+    // Used for holding perceived output from the actor sensor.
+    // This field stores data acted upon by the agent points occlusion filter and is only populated
+    // when running the agent_points_occlusion sensor filter. The actors field on the other hand
+    // stores pristine data, i.e data reported in `actors` is not passed through the agent points
+    // occlusion filter.
+    repeated AgentOutput agents = 3;
+    message AgentOutput {
+      oneof id_type {
+        int32 id = 1;     // id of actor
+        string name = 2;  // If this is an ego.
+      }
+      repeated Section sections = 3;
+      message Section {
+        spatial.State world_state = 1;
+        repeated spatial.Point world_polygon_points = 2;
+        AgentSensorFilterSectionOutputs filter_outputs = 3;
+
+        message AgentSensorFilterSectionOutputs {
+          AgentPointsOcclusionOutput agent_points_occlusion_output = 1;
+          message AgentPointsOcclusionOutput {
+            // Each agent may be represented by multiple polygons due to occlusion
+            // (consider a long truck behind a pedestrian: the long truck will be split into two
+            // polygons).
+            repeated Polygon polygons = 1;
+            message PolygonPoint {
+              spatial.Point point = 1;
+              bool visible_from_sensor = 2;
+            }
+            message Polygon {
+              repeated PolygonPoint points = 1;
+            }
+          }
+          MapPropertyFilterSectionOutput map_property_filter_output = 2;
+          message MapPropertyFilterSectionOutput {
+            LaneOccupancyRatioOutput lane_occupancy_ratio_output = 1;
+            message LaneOccupancyRatioOutput {
+              repeated LaneOccupancyRatio lane_occupancy_ratio = 1;
+              message LaneOccupancyRatio {
+                string lane_id = 1;
+                float ratio = 2;
+                repeated spatial.Point world_polygon_points = 3;
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+
+  // Returns 2D bounding boxes of actors in a camera image (NOT in the XY plane of the world or
+  // ego).
+  // <!-- Next ID: 4 -->
+  message Actor2DSensor {
+    // Provides information for each actor detected by this sensor. Do not rely on the order of the
+    // items in this list.
+    repeated actor.Actor2D actors2d = 1;
+    // The name of the camera sensor to which the bounding boxes correspond.
+    string camera_sensor_name = 2;
+    // Contains information about the mount, field of view, and reporting frame of the sensor.
+    Metadata metadata = 3;
+  }
+
+  // Reports information about wind velocity (observed in the world frame) at the sensor's location,
+  // as defined in the scenario.
+  message WindSensor {
+    // Wind velocity is expressed in the reporting frame specified in the scenario. [m/s].
+    simian_public.common.Vector3 wind_velocity = 1;
+    // Contains information about the mount, field of view, and reporting frame of the sensor.
+    Metadata metadata = 2;
+
+    message Metadata {
+      simian_public.scenario.SensorOutputConfig sensor_output = 1;
+      simian_public.spatial.PoseSpec mount = 2;
+    }
+  }
+
+  // Returns the pose, velocity, and acceleration measured by a localization sensor.
+  //
+  // LocalizationSensor channels support both of the following cases:
+  // - ADP -> Stack: for the stack to receive measurements from ego-mounted localization sensors
+  //     (see
+  //     https://home.applied.co/manual/simian/latest/#/object-level_sensors/sensing_ego_state/sensing_ego_state?id=localization-sensor)
+  // - Stack/Log -> ADP: for the interface to send localization outputs to ADP for visualization and
+  // debugging
+  //
+  // For ego-mounted localization sensors only:
+  // ADP reports the pose, velocity, and acceleration fields possibly
+  // with a pure delay of a (fixed) number of ticks. The
+  // pose can be different from the simulated ground truth pose at
+  // the tick when it was read by the localization sensor
+  // implementation. The pose that was used as input for the one
+  // reported here is in the input_pose field.
+  //
+  // All these differences depend on the configuration of the
+  // localization sensor in the scenario description. For example:
+  //
+  // setting `differentiation: FIRST_ORDER_BACKWARDS_DIFFERENCE`
+  // --> no reporting delay
+  //     pose identical to input_pose
+  //
+  // setting `differentiation: FIVE_POINT_STENCIL`
+  // --> two tick reporting delay
+  //     pose identical to input_pose
+  //
+  // setting `least_squares_fit: { window_size: 10, ... }`
+  // --> 9 ticks delay (window_size - 1)
+  //     pose will differ from but smoothly tend to input_pose
+  //
+  // The pose, velocity, and acceleration are all expressed in the sensor's reporting_frame.
+  // If the reporting_frame is SENSOR, then the pose is nearly identity.
+  // The velocity and acceleration are *observed* in the map frame,
+  // regardless of the reporting_frame.
+  //
+  // <!-- TODO(rami): The formatting for these comments differs from what's in the docs file because
+  // it contains Markdown/HTML formatting that doesn't look good here. -->
+  //
+  // <!-- Next id: 6. -->
+  message LocalizationSensor {
+    // The position and orientation of the sensor in the sensor's reporting frame. Translational
+    // units: [m].
+    spatial.Pose pose = 1;
+    // The linear and angular velocity of the sensor origin expressed in the reporting frame and
+    // observed in the world frame. Translational units: [m/s] Rotational units: [rad/s].
+    spatial.Screw velocity = 2;
+    // The linear and angular acceleration of the sensor origin expressed in the reporting frame and
+    // observed in the world frame. Translational units: [m/s^2] Rotational units: [rad/s^2].
+    spatial.Screw acceleration = 3;
+
+    // (For ego-mounted sensors only)
+    // input_pose is the underlying simulated pose that served as input to
+    // the localization sensor when it was computing the reported
+    // pose, velocity, and acceleration. So, depending on the sensor
+    // configuration, it can be delayed by a fixed number of ticks
+    // with respect to the current simulated pose that is in
+    // ego.sections[0].state.pose.
+    // This pose is expressed in the reporting_frame.
+    // Therefore, if the reporting_frame is SENSOR, this pose is the error
+    // introduced by the smoothing.
+    spatial.Pose input_pose = 4;
+
+    // (For ego-mounted sensors only)
+    // Contains information about the mount, field of view, and reporting frame of the sensor.
+    Metadata metadata = 5;
+    message Metadata {
+      // This sensor has no notion of sensor views.
+      simian_public.scenario.SensorOutputConfig sensor_output = 1;
+    }
+  }
+
+  // Reports distances of actors to the ego with equally spaced rays within the defined sector field
+  // of view. Actors are projected down to a global 2D plane for this sensor.
+  message PlanarLidarSensor {
+    // The list of points reported by the sensor, including distance, intensity, and detection type.
+    repeated LidarPoint points = 1;
+    // Contains information about the mount, field of view, and reporting frame of the sensor.
+    Metadata metadata = 2;
+    message Metadata {
+      // Sensor field of view.
+      simian_public.scenario.PlanarLidarSensorSpec.SectorFieldOfView sector_fov = 1;
+      // 2D sensor mount pose.
+      planar.Pose2d mount = 2;
+    }
+  }
+
+  // Outputs an array of cells of size = grid_dimension_x * grid_dimension_y.
+  // Below is an example for a (4 x 3) grid.
+  // The example grid below contains an integer in each cell; these are indices
+  // into the `cells` repeated field (e.g., cells[0] is the cell with the
+  // lowest x and y coordinates).
+  //            ^  y, sensor frame
+  //            |
+  // #---#---#---#---#
+  // # 2 | 5 | 8 |11 |
+  // #---#---#---#---#
+  // # 1 | 4 | 7 |10 |  -->  x, sensor frame
+  // #---#---#---#---#
+  // # 0 | 3 | 6 | 9 |
+  // #---#---#---#---#"
+  // <!-- Next id: 7. -->
+  message PlanarOccupancyGridSensor {
+    // Probability of existence, between 0 and 1, inclusive, in each cell.
+    repeated float cells = 1;
+    // Cell length, as specified in the scenario.
+    double cell_length = 2;
+    // Grid dimension in the x-direction, as specified in the scenario.
+    uint32 grid_dimension_x = 3;
+    // Grid dimension in the y-direction, as specified in the scenario.
+    uint32 grid_dimension_y = 4;
+    // The scenario description of this sensor.
+    simian_public.scenario.PlanarOccupancyGridSensorSpec sensor_config = 5;
+    // This is the underlying simulated ego pose that served as input to
+    // the occupancy grid sensor when it was computing the reported
+    // occupied squares (i.e., the ego pose associated with sensor_timestamp).
+    spatial.Pose input_ego_pose = 6;
+  }
+
+  // Outputs an array of cells of size = grid_dimension_x * grid_dimension_y.
+  // Below is an example for a (3 x 3) grid.
+  //       ^  y, sensor frame
+  //       |
+  // #---#---#---#
+  // # 2 | 5 | 8 |
+  // #---#---#---#
+  // # 1 | 4 | 7 | -->  x, sensor frame
+  // #---#---#---#
+  // # 0 | 3 | 6 |
+  // #---#---#---#
+  message OcclusionGridSensor {
+    // Height value representing maximum occlusion.
+    repeated float height = 1;
+    // The scenario description of this sensor.
+    simian_public.scenario.OcclusionGridSensorSpec sensor_config = 2;
+    // This is the underlying simulated ego pose that served as input to the occlusion grid sensor
+    // when it was computing the reported occluded squares (i.e., the ego pose associated with
+    // sensor_timestamp).
+    spatial.Pose input_ego_pose = 3;
+  }
+
+  // Returns polygons representing free and obstructed regions in the scene.
+  message FreeSpaceSensor {
+    // A list of polygons that represent free or obstructed regions. The size of the list may vary
+    // over time.
+    repeated FreeSpaceBoundary boundaries = 1;
+    // Contains information about the mount, field of view, and reporting frame of the sensor.
+    Metadata metadata = 2;
+
+    message FreeSpaceBoundary {
+      repeated common.Vector2 points = 1;
+      oneof boundary_type {
+        bool exterior = 2;
+        bool interior = 3;
+      }
+    }
+  }
+
+  // Models an Inertial Measurement Unit (IMU); returns linear acceleration and angular velocity of
+  // a point on an ego vehicle. Please use localization_sensors instead.
+  message IMUSensor {
+    // Linear acceleration of the sensor origin expressed in the sensor frame. Units: m/s^2.
+    spatial.Point acceleration = 1;
+    // Angular velocity of the sensor frame expressed in the sensor frame. Units: radians/s.
+    spatial.Point angular_velocity = 2;
+    // Contains information about the mount, field of view, and reporting frame of the sensor.
+    Metadata metadata = 3;
+    message Metadata {
+      simian_public.spatial.PoseSpec mount = 1;
+    }
+  }
+
+  // Reports information about the wheel speeds of the ego.
+  // This sensor uses the longitudinal velocity of the ego and the wheel configuration to report
+  // wheel states. The reported wheel speeds assume no tire slip.
+  message WheelSpeedSensor {
+    // Information about each of the wheel states on the ego, including the wheel's name and rpm.
+    repeated WheelState wheel_states = 1;
+  }
+
+  message WheelState {
+    string name = 1;
+    double rpm = 2;
+  }
+
+  // Reports features of the base map within the sensor's field of view.
+  message MapSensor {
+    // The subset of the map reported by the map sensor.
+    simian_public.hdmap.Map map = 1;
+    // Contains information about the mount, field of view, and reporting frame of the sensor.
+    Metadata metadata = 2;
+  }
+
+  // Reports information about the terrain underneath and around the ego.
+  message TerrainSensor {
+    oneof terrain_sensor_output {
+      // Reports the terrain intersection's postition in the world frame, the normal vector to the
+      // terrain in the world frame, and the longitudinal and lateral slopes of the terrain in the
+      // 2-dimensional ego frame (ignoring the roll and pitch of the ego). If the sensor did not
+      // find terrain at a wheel the value will instead be an empty message named
+      // no_intersection_found.
+      TerrainIntersections intersections = 1;
+      // Reports terrain elevation and normals in a grid centered around a mount point fixed to the
+      // ego vehicle.
+      GridMap grid_map = 2;
+    }
+    message TerrainIntersections {
+      // key: query point (i.e., wheel name)
+      map<string, MaybeIntersection> intersection = 1;
+    }
+    message MaybeIntersection {
+      oneof result {
+        // The sensor found no terrain near the query point.
+        google.protobuf.Empty no_intersection_found = 1;
+        // The sensor found terrain near the query point.
+        Intersection intersection = 2;
+      }
+    }
+    // <!-- Next ID: 6 -->
+    message Intersection {
+      // The position of the terrain intersection point, expressed in the world frame.
+      // The x and y values match those of the query point.
+      // Terrain elevation is contained in the z value.
+      simian_public.common.PointENU world_position = 2;
+      // The unit normal to the terrain at the intersection, expressed in the world frame.
+      simian_public.common.Vector3 world_normal = 3;
+      // The component of the gradient to the terrain surface along the
+      // vehicle’s longitudinal direction. I.e. the pitch of the road
+      // underneath the query point. Computed from the normal.
+      double longitudinal_slope = 4;
+      // The component of the gradient to the terrain surface along the
+      // vehicle’s lateral direction (leftward). I.e. the roll of the road
+      // underneath the query point. Computed from the normal.
+      double lateral_slope = 5;
+    }
+
+    message GridMapCell {
+      oneof result {
+        // The sensor found no terrain near the grid cell center.
+        google.protobuf.Empty no_intersection_found = 1;
+        // The sensor found terrain near the grid cell center.
+        Intersection intersection = 2;
+      }
+      message Intersection {
+        // This Intersection uses single-precision floating point numbers to
+        // match the precision of the GridMap ROS message (wiki.ros.org/grid_map).
+        // The elevation of the terrain above the world frame origin.
+        float world_elevation = 1;
+        // The unit normal to the terrain at the intersection, expressed in the world frame.
+        simian_public.common.Vector3f world_normal = 2;
+      }
+    }
+    /**
+       Outputs an array of cells of size = grid_dimension_x * grid_dimension_y.
+       Below is an example for a (4 x 3) grid.
+       The example grid below contains an integer in each cell; these are indices
+       into the `cells` repeated field (e.g., cells[0] is the cell with the
+       lowest x and y coordinates).
+
+               ^  y, sensor frame
+               |
+       #---#---#---#---#
+       # 2 | 5 | 8 |11 |
+       #---#---#---#---#
+       # 1 | 4 | 7 |10 |  -->  x, sensor frame
+       #---#---#---#---#
+       # 0 | 3 | 6 | 9 |
+       #---#---#---#---#
+    */
+    // <!-- Next ID: 6. -->
+    message GridMap {
+      repeated GridMapCell cells = 1;
+      // cell_length, grid_dimension_x, and grid_dimension_y are copied from the scenario.
+      double cell_length = 2;
+      uint32 grid_dimension_x = 3;
+      uint32 grid_dimension_y = 4;
+      Metadata metadata = 5;
+      message Metadata {
+        simian_public.spatial.Point mount_point = 1;
+      }
+    }
+  }
+
+  // Reports actors and road edges around the ego at a fixed angular resolution.
+  // Each detection shows the detected obstacle's type, as well as its 3-dimensional Cartesian
+  // position.
+  // <!-- Next id: 3. -->
+  message PolarObstacleSensor {
+    // Contains information for all detections along a single ray. Starts with the ray
+    // located at yaw_start and moves counter-clockwise.
+    repeated RayDetections rays = 1;
+    // Contains information about the mount, field of view, and reporting frame of the sensor.
+    Metadata metadata = 2;
+    message Metadata {
+      planar.Pose2d mount = 1;
+      simian_public.scenario.PolarObstacleSensorSpec.SectorFieldOfView sector_fov = 2;
+      simian_public.scenario.SensorOutputConfig sensor_output = 3;
+    }
+
+    message RayDetections {
+      // Contains information for a single detection point. Starts with the point located
+      // closest to the ego and moves outward.
+      repeated PointDetection detections = 1;
+    }
+
+    message PointDetection {
+      // Reports the x and y position of each detection, as well as a z value.
+      // For actors this is the z value of the bottom of the actor's bounding
+      // box at the detection (x, y) position.
+      // For road edges this is the z height of the road.
+      simian_public.spatial.Point point = 1;
+      // The type of obstacle detected at this point.
+      oneof detection_type {
+        // The sensor detected an actor.
+        // The value of obstacle will match the actor’s ObstacleType if it has one.
+        simian_public.actor.Actor.ObstacleType obstacle = 2;
+        // The sensor detected the edge of the road surface.
+        google.protobuf.Empty road = 3;
+      }
+      // If detection is an actor, this is the actor id of the detected point.
+      // Can be used to query for more detailed data about which object
+      // intersected with the ray.
+      string reference_id = 4;
+    }
+  }
+
+  // Returns the planned path for agents in the scene.
+  message AgentTrajectorySensor {
+    message AgentTrajectoryOutput {
+      // State of the ground truth trajectory.
+      oneof trajectory_state_type {
+        // 2d trajectory state found.
+        planar.State2d trajectory_state = 1;
+      }
+      // Curvature of the ground truth path in [rad/m].
+      double path_curvature = 5;
+      // Corresponding lookahead duration of this trajectory state.
+      google.protobuf.Duration lookahead_duration = 3;
+      // State of the false, perceived trajectory. Currently supports a single perceived trajectory.
+      repeated PerceivedTrajectoryPoint perceived_trajectory = 4;
+      // Current behavior index in the agent's behavior list.
+      oneof behavior_index_type {
+        // Specifies the sequential behavior index starting from 0.
+        int64 sequential_behavior_index = 6;
+      }
+    }
+
+    message PerceivedTrajectoryPoint {
+      oneof perceived_trajectory_state_type {
+        // 2d perceived trajectory state found, specified through perceived behaviors.
+        planar.State2d perceived_trajectory_state = 1;
+      }
+      // Confidence of the perceived behavior ranging from 0 to 1.
+      double confidence_score = 2;
+    }
+
+    message AgentTrajectory {
+      repeated AgentTrajectoryOutput agent_trajectory = 1;
+    }
+
+    // Map of actor ID (integer) to actor trajectory.
+    map<int32, AgentTrajectory> actor_trajectories = 1;
+
+    // The trajectory of the ego that this sensor is attached to.
+    AgentTrajectory ego_trajectory = 2;
+  }
+
+  // reserved "localization_object_sensor";
+  // reserved 11;
+}
+
+// Information about a single lidar ray.
+message LidarPoint {
+  // The distance in the XY plane between the sensor origin and detection. Units: meters.
+  double distance = 1;
+  // If the lidar ray did not hit anything within the field of view, this is 0.0; otherwise, this
+  // is 1.0.
+  double intensity = 2;
+  // If the lidar ray detected nothing, then no detection_type is populated.
+  oneof detection_type {
+    // The lidar ray detected an actor.
+    // The value of obstacle, if it's set, is UNKNOWN.
+    // This sensor does not yet report the specific type of the actor.
+    simian_public.actor.Actor.ObstacleType obstacle = 3;
+    // The lidar ray detected the edge of the road.
+    // This is only possible if using `filter_free_space: true`.
+    google.protobuf.Empty road = 4;
+  }
+}

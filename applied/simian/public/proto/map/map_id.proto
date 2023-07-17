@@ -1,0 +1,15 @@
+// Copyright (C) 2019 Applied Intuition, Inc. All rights reserved.
+// This source code file is distributed under and subject to the LICENSE in
+// license.txt
+
+syntax = "proto2";
+
+package simian_public.hdmap;
+
+// Global unique ids for all objects (include lanes, junctions, overlaps, etc).
+message Id {
+  // DisplayType: HideName.
+  // DisplayType: Editable.
+  // <!-- String representing the id of the object. -->
+  optional string id = 1;
+}

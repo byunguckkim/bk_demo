@@ -1,0 +1,40 @@
+// Copyright (C) 2020 Applied Intuition, Inc. All rights reserved.
+// This source code file is distributed under and subject to the LICENSE in license.txt
+
+syntax = "proto3";
+
+package simian_public.sensor_sim.basic_types;
+
+// SensorDataOutput contains the raw output data of a sensor, either directly
+// in |data| or indirectly in |shmem_pointer|.
+message SensorDataOutput {
+  oneof output {
+    bytes data = 1;
+    SharedMemoryPointer shmem_pointer = 2;
+  }
+}
+
+// SharedMemoryPointer describes a buffer of bytes in a file.  Information
+// about how to interpret the bytes must come from the wrapping protobuf.
+// Note that in order to use shared memory, your container needs to
+// mount /tmp/spectral as a volume with read only access.
+message SharedMemoryPointer {
+  string filename = 1;
+  uint32 offset = 2;
+  uint32 size = 3;
+}
+
+// ImagePoint encodes a point in an image in the OpenCV sense:
+// - row is the offset from the top of the image, in pixels
+// - col is the offset from the left of the image, in pixels
+message ImagePoint {
+  double row = 1;
+  double col = 2;
+}
+
+// ImageBoundingBox encodes a 2D bounding box in an image in terms of
+// its upper left and lower right coordinates.
+message ImageBoundingBox {
+  ImagePoint min = 1;
+  ImagePoint max = 2;
+}

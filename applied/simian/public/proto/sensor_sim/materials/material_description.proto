@@ -1,0 +1,42 @@
+// Copyright (C) 2023 Applied Intuition, Inc. All rights reserved.
+// This source code file is distributed under and subject to the LICENSE in license.txt
+
+syntax = "proto3";
+
+import "applied/simian/public/proto/sensor_sim/materials/surface_material.proto";
+import "applied/simian/public/proto/sensor_sim/materials/object_material.proto";
+import "applied/simian/public/proto/sensor_sim/materials/lane_line_material.proto";
+
+package simian_public.sensor_sim.materials.material_description;
+
+// Method of creating new materials to assign to various objects.
+// A material description can be one of several material_types which are defined by the objects they
+// can be applied to
+message MaterialDescription {
+  oneof material_type {
+    simian_public.sensor_sim.materials.object_material.ObjectMaterial object_material = 1;
+    simian_public.sensor_sim.materials.surface_material.SurfaceMaterial surface_material = 2;
+    simian_public.sensor_sim.materials.lane_line_material.LaneLineMaterial lane_line_material = 3;
+  }
+}
+
+// Global material descriptions affect all environment objects of the specified type in the map.
+// Users can edit specific parameters such as roughness and color, as well as choose between
+// material presets to swap between.
+message GlobalMaterialDescriptions {
+  // Road surface
+  simian_public.sensor_sim.materials.material_description.MaterialDescription
+      road_surface_description = 1;
+  // Gutter and curb surfaces
+  simian_public.sensor_sim.materials.material_description.MaterialDescription gutter_description =
+      2;
+  simian_public.sensor_sim.materials.material_description.MaterialDescription curb_description = 3;
+  // Sidewalk surfaces
+  simian_public.sensor_sim.materials.material_description.MaterialDescription
+      sidewalk_tile_description = 4;
+  simian_public.sensor_sim.materials.material_description.MaterialDescription
+      sidewalk_extension_description = 5;
+  // Lane lines
+  simian_public.sensor_sim.materials.material_description.MaterialDescription
+      lane_lines_all_description = 6;
+}

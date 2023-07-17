@@ -1,0 +1,84 @@
+// Copyright (C) 2018 Applied Intuition, Inc. All rights reserved.
+// This source code file is distributed under and subject to the LICENSE in license.txt
+
+// These proto message types are used to represent purely planar
+// quantities. They are used for example in commands for some of the
+// motion models that simplify the representation to 2D.
+
+syntax = "proto3";
+
+package simian_public.planar;
+
+message Point2d {
+  // position X component [m]
+  double x = 1;
+  // position Y component [m]
+  double y = 2;
+}
+
+message Pose2d {
+  // position X component [m]
+  double x = 1;
+  // position Y component [m]
+  double y = 2;
+  // rotation in XY plane [rad]
+  double heading = 3;
+}
+
+// A 2D state reflecting the desired next state of the agent.
+// In the `external` motion model, the agent will be directly moved to the override state.
+// This can also be used as the desired state from a planner that can be given to a lower level
+// controller.
+// <!-- Currently hardcoded for ideal rolling constraints. -->
+message State2d {
+  // Position (x, y) and heading [rad].
+  Pose2d pose = 1;
+  // [m/s^2] Longitudinal (+x) acceleration of the vehicle observed in the world frame and expressed
+  // in the vehicle frame.
+  double acceleration = 2;
+  // [m/s] Longitudinal (+x) velocity of the vehicle observed in the world frame and expressed in
+  // the vehicle frame.
+  double velocity = 3;
+  // Rate of heading change [rad/s].
+  double yawrate = 4;
+  // longitudinal, lateral velocity [m/s] and yawrate [rad/s] of the vehicle observed in the world
+  // frame and expressed in the vehicle frame.
+  Screw2d velocity_screw = 5;
+  // longitudinal, lateral velocity [m/s^2] and yaw acceleration [rad/s^2] of the vehicle observed
+  // in the world frame and expressed in the vehicle frame.
+  Screw2d acceleration_screw = 6;
+}
+
+// Motion command to specify the full 2D state of the ego. Please do not use override_state2d_full.
+// It is not yet fully supported.
+message State2dFull {
+  // Position and orientation.
+  Pose2d pose = 1;
+  // Longitudinal, lateral velocity [m/s] and yawrate [rad/s] of the vehicle observed in the world
+  // frame and expressed in the vehicle frame.
+  Screw2d velocity = 2;
+  // Longitudinal, lateral velocity [m/s^2] and yaw acceleration [rad/s^2] of the vehicle observed
+  // in the world frame and expressed in the vehicle frame.
+  Screw2d acceleration = 3;
+}
+
+message Screw2d {
+  // linear X component
+  double tx = 1;
+  // linear Y component
+  double ty = 2;
+  // angular Z component
+  double rz = 3;
+}
+
+// A motion model input specifying a 2D trajectory. This trajectory is parameterized by a list of
+// (time, state) pairs.
+message Trajectory2d {
+  // A list of (time, state) pairs. Time is a double. State is a 2D state.
+  repeated Sample samples = 1;
+
+  message Sample {
+    double time = 1;
+    State2d state = 2;
+  }
+}

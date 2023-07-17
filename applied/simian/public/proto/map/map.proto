@@ -1,0 +1,123 @@
+// Copyright (C) 2019 Applied Intuition, Inc. All rights reserved.
+// This source code file is distributed under and subject to the LICENSE in
+// license.txt
+
+syntax = "proto2";
+
+package simian_public.hdmap;
+
+import "google/protobuf/timestamp.proto";
+import "applied/simian/public/proto/map/map_clear_area.proto";
+import "applied/simian/public/proto/map/map_crosswalk.proto";
+import "applied/simian/public/proto/map/map_junction.proto";
+import "applied/simian/public/proto/map/map_lane.proto";
+import "applied/simian/public/proto/map/map_line.proto";
+import "applied/simian/public/proto/map/map_parking_space.proto";
+import "applied/simian/public/proto/map/map_region.proto";
+import "applied/simian/public/proto/map/map_road.proto";
+import "applied/simian/public/proto/map/map_road_marking.proto";
+import "applied/simian/public/proto/map/map_sidewalk.proto";
+import "applied/simian/public/proto/map/map_sign.proto";
+import "applied/simian/public/proto/map/map_signal.proto";
+import "applied/simian/public/proto/map/map_signal_control_states.proto";
+import "applied/simian/public/proto/map/map_speed_bump.proto";
+import "applied/simian/public/proto/map/map_traversable_surface.proto";
+
+// This message defines how we project the ellipsoidal Earth surface to a plane.
+message Projection {
+  // PROJ.4 setting:
+  // "+proj=tmerc +lat_0={origin.lat} +lon_0={origin.lon} +k={scale_factor}
+  // +ellps=WGS84 +no_defs"
+  optional string proj = 1;
+}
+
+message Header {
+  optional bytes version = 1;
+  optional bytes date = 2;
+  optional Projection projection = 3;
+  optional bytes district = 4;
+  optional double left = 8;
+  optional double top = 9;
+  optional double right = 10;
+  optional double bottom = 11;
+  optional bytes vendor = 12;
+  optional google.protobuf.Timestamp conversion_timestamp = 13;
+
+  optional uint64 base_map_hash = 14;
+
+  // reserved 5, 6, 7;
+  // reserved "generation", "rev_major", "rev_minor";
+  // optional bytes generation = 5;
+  // optional bytes rev_major = 6;
+  // optional bytes rev_minor = 7;
+}
+
+// Main message representing an HD map in the Applied format.
+// It consists of map objects (lanes, regions, signs, signals, etc) that have
+// various geometric and semantic properties.
+// <!--Next ID: 24-->
+message Map {
+  // Unused.
+  optional Header header = 1;
+
+  // Main components of the map.
+
+  // The lanes that make up the driving surfaces of the map.
+  repeated Lane lane = 4;
+  // The dynamic traffic control devices that control traffic flow.
+  repeated Signal signal = 6;
+  // The states that the traffic lights can be in.
+  repeated SignalControlStates signal_control_state = 22;
+  // Groups of lanes that are connected together on one surface.
+  repeated Road road = 11;
+  // Static traffic control devices like stop signs, speed limits, etc.
+  repeated Sign sign = 14;
+  // Real or virtual lines that exist on the road such as stop lines, yield lines, etc.
+  repeated Line line = 16;
+  // Real or virtual areas in the world such as crosswalks, keep clear areas, etc.
+  repeated Region region = 21;
+  // Paintings on the ground that direct traffic such as turns, express lane markers, etc.
+  repeated RoadMarking road_marking = 23;
+
+  /***** LEGACY FEATURES BELOW *****/
+  // Legacy polygon feature. Use region instead and specify type.
+  repeated Crosswalk crosswalk = 2;
+  // Legacy polygon feature. Use region instead and specify type.
+  repeated Junction junction = 3;
+  // Legacy polygon feature. Use region instead and specify type.
+  repeated ClearArea clear_area = 9;
+  // Legacy polygon feature. Use region instead and specify type.
+  repeated SpeedBump speed_bump = 10;
+  // Legacy polygon feature. Use region instead and specify type.
+  repeated ParkingSpace parking_space = 12;
+  // Legacy polygon feature. Use region instead and specify type.
+  repeated Sidewalk sidewalk = 15;
+  // Legacy polygon feature. Use region instead and specify type.
+  repeated TraversableSurface traversable_surface = 19;
+
+  // Legacy line feature. Use line instead and specify type.
+  repeated Line stop_line = 17;
+  // Legacy line feature. Use line instead and specify type.
+  repeated LaneLine lane_line = 20;
+
+  // reserved 5, 7, 8, 13, 18;
+  // reserved "stop_sign", "yield", "overlap", "pnc_junction", "localization_object";
+  // repeated StopSign stop_sign = 5;
+  // repeated YieldSign yield = 7;
+  // repeated Overlap overlap = 8;
+  // repeated PNCJunction pnc_junction = 13;
+  // repeated LocalizationObject localization_object = 18;
+}
+
+// Placeholder message that can be any of the base map objects.
+message MapObject {
+  oneof object {
+    Lane lane = 1;
+    Region region = 2;
+    Signal signal = 3;
+    Sign sign = 4;
+    Line line = 5;
+    Road road = 6;
+    RoadMarking road_marking = 7;
+  }
+}

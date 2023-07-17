@@ -1,0 +1,741 @@
+// Copyright (C) 2019 Applied Intuition, Inc. All rights reserved.
+// This source code file is distributed under and subject to the LICENSE in license.txt
+
+syntax = "proto3";
+
+package simian_public.composite_vehicle;
+
+import "applied/simian/public/proto/common.proto";
+import "applied/simian/public/proto/damping_model.proto";
+import "applied/simian/public/proto/function_mapping.proto";
+import "applied/simian/public/proto/planar.proto";
+import "applied/simian/public/proto/signal_modifier.proto";
+import "applied/simian/public/proto/spatial.proto";
+import "applied/simian/public/proto/spline.proto";
+import "applied/simian/public/proto/transfer_function.proto";
+
+// A specification for a composite vehicle. The composite vehicle model uses submodels in order to
+// determine motion. It is a modular approach to vehicle modeling instead of motion modeling.
+//
+// When using the composite vehicle model, you specify submodels for the brake, powertrain,
+// steering, and tires. For all standard composite vehicle configurations, the longitudinal velocity
+// is first determined by the brake, powertrain, and tire models, and then the lateral motion is
+// determined by the steering model. This is however not true for fully-dynamic composite vehicle
+// models. As the name suggests, these fully-dynamic models work exclusively with forces and do not
+// de-couple lateral and longitudinal dynamics. You are running a fully dynamic model if you have
+// ego_dynamics_config specified in your scenario.
+message CompositeVehicleSpec {
+  // A brake submodel specification.
+  BrakeModelSpec brake = 1;
+  // A powertrain submodel specification.
+  PowertrainModelSpec powertrain = 2;
+  // A steering submodel specification.
+  SteeringModelSpec steering = 3;
+  // A tire submodel specification.
+  TireModelSpec tires = 4;
+  // A configuration for dynamic or multi-body ego dynamics.
+  EgoDynamicsConfig ego_dynamics_config = 5;
+  // A aerodynamic submodel specification.
+  AeroModelSpec aero = 6;
+}
+
+// Motion command for the composite_vehicle_command motion model.
+message CompositeVehicleCommand {
+  // Motion command consisting of either a normalized_brake or tf_input value.
+  BrakeInput brake_input = 1;
+  // Motion command consisting of one of the following: normalized_throttle, motor_torque,
+  // normalized_motor_torque, tf_input or velocity_command.
+  PowertrainInput powertrain_input = 2;
+  // Motion command consisting of one of the following: angle_rate, normalized_angle,
+  // normalized_angle_rate, angle, tf_input or steering_torque.
+  SteeringInput steering_input = 3;
+}
+
+// A feedback type that provides feedback from the brake, powertrain, and steering submodels of the
+// composite vehicle. Each of these submodels is specified by a ScalarFeedback that contains a type
+// and a scalar value of the feedback.
+message CompositeVehicleFeedback {
+  // A ScalarFeedback message containing a normalized value for the brake pedal position.
+  BrakeFeedback brake_feedback = 1;
+  // A ScalarFeedback message containing a PowertrainFeedback.
+  PowertrainFeedback powertrain_feedback = 2;
+  // A ScalarFeedback message containing a SteeringFeedback.
+  SteeringFeedback steering_feedback = 3;
+  // reserved 4;
+  // reserved "trailer_brake_feedback";
+}
+
+message AeroModelSpec {
+  oneof aero_model_type {
+    SimpleDragSpec simple_drag = 1;
+    ZeroAeroSpec zero_aero = 2;
+  }
+
+  message SimpleDragSpec {
+    double drag_coefficient = 1;
+    double frontal_area = 2;  // [m^2]
+    double air_density = 3;   // [kg/m^3]
+    double vehicle_mass = 4;  // [kg]
+  }
+
+  message ZeroAeroSpec {}
+}
+
+message BrakeModelSpec {
+  oneof brake_model_type {
+    // Accepts BrakeInput.normalized_brake
+    BrakeLinearSpec brake_linear = 1;
+    // Accepts BrakeInput.normalized_brake
+    SimpleWheelLockSpec simple_wheel_lock = 2;
+    // Accepts BrakeInput.normalized_brake
+    ForceOrAccelTransferFunction brake_transfer_function = 4;
+    // Accepts BrakeInput.normalized_brake
+    LongitudinalVelocityAndNormalizedBrakeCommandToDeceleration
+        longitudinal_velocity_and_normalized_brake_command_to_deceleration = 5;
+  }
+
+  simian_public.signal_modifier.SignalModifier input_modifier = 3;
+
+  message BrakeLinearSpec {
+    double max_brake_decel = 1;  // [m/s^2]
+  }
+
+  message SimpleWheelLockSpec {
+    double max_brake_decel = 1;  // [m/s^2]
+    // If normalized_brake >  critical_brake_cmd, then wheels lock up and vehicle begins sliding.
+    // If normalized_brake <= critical_brake_cmd, then it gets renormalized as
+    // normalized_brake / critical_brake_cmd
+    double critical_brake_cmd = 2;  // [-]
+  }
+
+  message LongitudinalVelocityAndNormalizedBrakeCommandToDeceleration {
+    simian_public.spline.BivariateSplineCoefficients bivariate_spline_coefficients = 1;
+  }
+}
+
+message BrakeInput {
+  oneof brake_input_type {
+    double normalized_brake = 1;  // [-] Should lie in the closed interval [0, 1].
+    double tf_input = 2;          // [-]
+  }
+}
+
+// Feedback from the brake model associated with this vehicle section.
+message BrakeFeedback {
+  // Note: this gets sent at every tick -- avoid large fields here.
+  // Submodels generally only fill a subset of the fields here.
+  ScalarFeedback brake_pedal_position = 1;  // [normalized]
+}
+
+message PowertrainModelSpec {
+  oneof powertrain_model_type {
+    // Accepts PowertrainInput.normalized_throttle
+    PowertrainLinearSpec powertrain_linear = 1;
+    // Accepts PowertrainInput.motor_torque or PowertrainInput.normalized_motor_torque
+    SimpleTorqueSpec simple_torque = 2;
+    // Accepts PowertrainInput.normalized_throttle
+    VFDInductionMotorSpec vfd_induction_motor = 4;
+    // Accepts PowertrainInput.normalized_throttle
+    ForceOrAccelTransferFunction powertrain_transfer_function = 5;
+    // Accepts PowertrainInput.velocity_command
+    VelocityTrackingSpec velocity_tracking = 6;
+    // Accepts PowertrainInput.normalized_throttle
+    LongitudinalVelocityAndNormalizedThrottleCommandToAcceleration
+        longitudinal_velocity_and_normalized_throttle_command_to_acceleration = 8;
+    // Accepts PowertrainInput.normalized_throttle
+    LongitudinalVelocityAndNormalizedThrottleCommandToForce
+        longitudinal_velocity_and_normalized_throttle_command_to_force = 10;
+    // Accepts PowertrainInput.velocity_command
+    CommandedVelocityToRealizedVelocityTransferFunction
+        commanded_velocity_to_realized_velocity_transfer_function = 9;
+  }
+
+  // Powertrain loss accounts for the dissipative forces/torques present in the the vehicle's
+  // drivetrain,
+  //  i.e., from source of energy (battery/engine) all the way to the wheels.
+  // Populating these correctly will allow you to capture phenomena like a gradual reduction in
+  // vehicle velocity while coasting without throttle.
+  simian_public.damping_model.DampingModelSpec powertrain_loss = 7;  // OPTIONAL
+
+  simian_public.signal_modifier.SignalModifier input_modifier = 3;
+
+  message PowertrainLinearSpec {
+    double max_acceleration = 1;  // [m/s^2]
+    double vehicle_mass = 2;      // [kg]
+  }
+
+  message SimpleTorqueSpec {
+    double max_motor_torque = 1;  // [Nm]
+    double gear_ratio = 2;        // [-]
+    double vehicle_mass = 3;      // [kg]
+    double wheel_radius = 4;      // [m]
+  }
+
+  message VFDInductionMotorSpec {
+    double max_motor_torque = 1;    // [Nm] Max torque the VFD will supply for a short period
+    double rated_motor_torque = 2;  // [Nm] Torque the VFD will supply for continuous operation
+    double rated_motor_rpm = 3;     // [rpm] Rule of thumb: rated rpm = 0.95 * synchronous speed
+    double gear_ratio = 4;          // [-] Gear ratio including transmission and differential ratios
+    double vehicle_mass = 5;        // [kg]
+    double wheel_radius = 6;        // [m]
+  }
+
+  message VelocityTrackingSpec {
+    double max_velocity = 1;           // [m/s]
+    double max_deceleration = 2;       // [m/s^2]
+    double max_acceleration = 3;       // [m/s^2]
+    double max_jerk_decel = 4;         // [m/s^3]
+    double max_jerk_accel = 5;         // [m/s^3]
+    double gear_ratio = 6;             // [-]
+    double final_drive_ratio = 7;      // [-]
+    double wheel_radius = 8;           // [m]
+    double initial_velocity = 9;       // [m/s]
+    double initial_acceleration = 10;  // [m/s^2]
+    VelocityCommandType velocity_command_type = 11;
+    enum VelocityCommandType {
+      LONGITUDINAL_VELOCITY = 0;   // [m/s]
+      MOTOR_ANGULAR_VELOCITY = 1;  // [rad/s]
+    }
+  }
+
+  message LongitudinalVelocityAndNormalizedThrottleCommandToAcceleration {
+    simian_public.spline.BivariateSplineCoefficients bivariate_spline_coefficients = 1;
+  }
+
+  message LongitudinalVelocityAndNormalizedThrottleCommandToForce {
+    // Coefficients describing the bivariate spline mapping the longitudinal velocity and normalized
+    // throttle to the motive force.
+    simian_public.spline.BivariateSplineCoefficients bivariate_spline_coefficients = 1;
+    // Vehicle mass.
+    double vehicle_mass = 2;  // [kg]
+  }
+}
+
+message PowertrainInput {
+  oneof powertrain_input_type {
+    double normalized_throttle = 1;      // [-] Should lie in the closed interval [0, 1].
+    double motor_torque = 2;             // [Nm]
+    double normalized_motor_torque = 3;  // [-] Should lie in the closed interval [0, 1].
+    double tf_input = 4;                 // [-]
+    double velocity_command = 5;         // [m/s || rad/s]
+  }
+}
+
+// Feedback from the powertrain model associated with this vehicle section.
+// Note: this gets sent at every tick -- avoid large fields here.
+// Not all submodels will fill all feedback fields.
+message PowertrainFeedback {
+  ScalarFeedback throttle_pedal_position = 1;   // [normalized]
+  ScalarFeedback motor_torque = 2;              // [Nm]
+  ScalarFeedback motor_rpm = 3;                 // [rpm]
+  ScalarFeedback commanded_velocity = 4;        // [m/s]
+  ScalarFeedback powertrain_damping_force = 5;  // [N]
+}
+
+message CommandedVelocityToRealizedVelocityTransferFunction {
+  // Only candidates[0] is used by Simian.
+  // This field was made repeated to support possible future extensions such as speed and gear based
+  // transfer functions.
+  repeated NestedTransferFunctionSpec candidates = 1;
+  // Vehicle mass only needs to be specified if you are running a fully dynamic vehicle model.
+  // You are running a fully dynamic vehicle model if you have ego_dynamics_config specified in your
+  // scenario. The mass specified here must be the mass of the vehicle used when characterizing
+  // these transfer functions.
+  double vehicle_mass = 2;  // [kg]
+}
+
+message NestedTransferFunctionSpec {
+  transfer_function.TransferFunctionSpec transfer_function = 1;
+}
+
+// <!-- Next ID: 9 -->
+message SteeringModelSpec {
+  oneof steering_model_type {
+    // Accepts SteeringInput.angle_rate or SteeringInput.normalized_angle_rate
+    // Note: inputs to this model will control the vehicle heading
+    HeadingRateSpec heading_rate = 1;
+    // Accepts SteeringInput.normalized_angle or SteeringInput.normalized_angle_rate
+    // Note: inputs to this model will control the steering wheel angle (not the tire angle)
+    BicycleLinearSpec bicycle_linear = 2;
+    // Accepts SteeringInput.normalized_angle
+    // Note: inputs to this model will control the steering wheel angle (not the tire angle)
+    SideslipLinearSpec sideslip_linear = 4;
+    // Accepts SteeringInput.normalized_angle, SteeringInput.angle, or SteeringInput.tf_input
+    // Note: inputs to this model will control the steering wheel angle (not the tire angle)
+    SteeringTransferFunction steering_transfer_function = 5;
+    // Accepts SteeringInput.normalized_angle or SteeringInput.normalized_angle_rate
+    // Note: inputs to this model will control the steering wheel angle (not the tire angle)
+    BicycleCubicSpec bicycle_cubic = 6;
+    // Accepts SteeringInput.normalized_angle
+    SideslipSpec sideslip = 7;
+    // Accepts SteeringInput.angle
+    // Note: inputs to this model control the steering wheel angle (not the tire angle)
+    // The function mapping only describes the mapping from steering wheel angle to tire angle. The
+    // geometry and configurations of the vehicle are determined by the vehicle type in
+    // ego_dynamics_config.
+    simian_public.function_mapping.FunctionMapping mapping = 8;
+  }
+
+  simian_public.signal_modifier.SignalModifier input_modifier = 3;
+
+  message HeadingRateSpec {
+    double max_heading_angle_rate = 1;  // [rad/s]
+  }
+
+  message BicycleLinearSpec {
+    double wheelbase = 1;                      // [m]
+    double steering_ratio = 2;                 // [-]
+    double max_steering_wheel_angle = 3;       // [rad]
+    double max_steering_wheel_angle_rate = 4;  // [rad/s]
+    uint32 num_integration_steps = 5;          // [-], defaults to 1
+  }
+
+  message SideslipLinearSpec {
+    double wheelbase = 1;       // [m]
+    double steering_ratio = 2;  // [-]
+    // Note: if you want to enforce a max_steering_wheel_angle_rate, use the signal_modifier feature
+    double max_steering_wheel_angle = 3;  // [rad]
+    double vehicle_mass = 4;              // [kg]
+    // Inertia properties where position is relative to center of rear axle and inertia values are
+    // relative to an axis passing through the center of mass and parallel to the vehicle z-axis.
+    // The model assumes a bicycle shape, so it only uses x position of the center of mass. It
+    // ignores the y and z center of mass locations.
+    spatial.InertiaSpec inertia = 5;
+    // The scenario should specify the cornering_stiffness in the tires submodel. The simulator will
+    // copy information into the other submodels as needed.
+    TireModelSpec.CorneringStiffnessSpecs cornering_stiffness = 6;
+    double max_accurate_sideslip_rear = 7;   // [rad]
+    double max_accurate_sideslip_front = 8;  // [rad]
+    double min_velocity_sideslip = 9;        // [m/s]
+    // The following two fields account for the number of tires on the front and rear axle of the
+    // actual vehicle.
+    uint32 num_tires_front_axle = 10;   // [-]
+    uint32 num_tires_rear_axle = 11;    // [-]
+    uint32 num_integration_steps = 12;  // [-]
+  }
+
+  message SideslipSpec {
+    double wheelbase = 1;                 // [m]
+    double steering_ratio = 2;            // [-]
+    double max_steering_wheel_angle = 3;  // [rad]
+    double vehicle_mass = 4;              // [kg]
+    // Inertia properties where position is relative to center of rear axle and inertia values are
+    // relative to an axis passing through the center of mass and parallel to the vehicle z-axis.
+    // The model assumes a bicycle shape, so it only uses x position of the center of mass. It
+    // ignores the y and z center of mass locations.
+    spatial.InertiaSpec inertia = 5;
+    double min_velocity_sideslip = 6;  // [m/s]
+    TireModelSpec tire_model = 7;      // [-]
+    // The following two fields account for the number of tires on the front and rear axle of the
+    // actual vehicle.
+    uint32 num_tires_front_axle = 8;    // [-]
+    uint32 num_tires_rear_axle = 9;     // [-]
+    uint32 num_integration_steps = 10;  // [-]
+  }
+
+  message SteeringTransferFunction {
+    transfer_function.TransferFunctionSpec sideslip_transfer_function = 1;
+    transfer_function.TransferFunctionSpec yawrate_transfer_function = 2;
+    // The model assumes that the transfer functions define motion of the center of mass. However,
+    // Simian reports the position of the center of the rear axle. As such, we need to know the
+    // location of the center of mass relative to the center of the rear axle.
+    planar.Point2d com_loc = 3;
+    // If use_kinematic_sideslip is true, sideslip is determined from the steering wheel angle and
+    // geometry instead of by the sideslip transfer function. In this case, the model must use a
+    // `tf_input` command type.
+    bool use_kinematic_sideslip = 4;
+    // If use_kinematic_sideslip is True, steering_ratio defines the ratio from steering wheel angle
+    // to tire angle. Otherwise it's ignored.
+    double steering_ratio = 5;
+    // If use_kinematic_sideslip is True, wheelbase is required to calculate kinematic sideslip.
+    // Otherwise it's ignored.
+    double wheelbase = 6;
+    // For all other composite vehicle configurations, the velocity calculation follows steps of:
+    //   1) non-steering submodels determine longitudinal velocity
+    //   2) steering submodel determines lateral velocity
+    // If overwrite_longitudinal_velocity is True, then the steps change to:
+    //   1) non-steering submodels determine longitudinal velocity
+    //   2) steering submodel interprets this longitudinal velocity as a *magnitude* of velocity
+    //   3) steering submodel updates *both* the longitudinal and lateral velocity of based on the
+    //   sideslip angle
+    // It is highly recommended to keep overwrite_longitudinal_velocity set to False, otherwise the
+    // non-steering submodels are not calculating longitudinal velocity, but instead *magnitude* of
+    // velocity. Since non-steering submodels only consider longitudinal effects, it is less
+    // accurate if overwrite_longitudinal_velocity is True.
+    double overwrite_longitudinal_velocity = 7;
+  }
+
+  message BicycleCubicSpec {
+    double wheelbase = 1;                      // [m]
+    double steering_map_bias = 2;              // [-]
+    double steering_map_linear = 3;            // [-]
+    double steering_map_quadratic = 4;         // [-]
+    double steering_map_cubic = 5;             // [-]
+    double max_steering_wheel_angle = 6;       // [rad]
+    double max_steering_wheel_angle_rate = 7;  // [rad/s]
+    uint32 num_integration_steps = 8;          // [-], defaults to 1
+  }
+}
+
+message SteeringInput {
+  oneof steering_input_type {
+    // Note: inputs are purposefully ambiguous so that multiple models can use the same command
+    // For example, in these inputs `angle` could refer to steering wheel angle or tire angle
+    // depending upon the steering model that is selected when the command is sent.
+    double angle_rate = 1;             // [rad/s]
+    double normalized_angle = 2;       // [-] Should lie in the closed interval [-1, 1].
+    double normalized_angle_rate = 3;  // [-] Should lie in the closed interval [-1, 1].
+    double angle = 4;                  // [rad]
+    SteeringTFInput tf_input = 5;      // [-]
+    double steering_torque = 6;        // [N*m]
+  }
+
+  message SteeringTFInput {
+    double sideslip_input = 1;  // [-]
+    double yawrate_input = 2;   // [-]
+  }
+}
+
+// A feedback type that provides feedback from the steering submodel of a composite vehicle.
+// Note: this gets sent at every tick -- avoid large fields here.
+// Not all submodels will fill all feedback fields.
+message SteeringFeedback {
+  ScalarFeedback steer_angle = 1;                // [rad]
+  ScalarFeedback steer_angle_rate = 2;           // [rad/s]
+  ScalarFeedback steering_wheel_angle = 3;       // [rad]
+  ScalarFeedback steering_wheel_angle_rate = 4;  // [rad/s]
+  ScalarFeedback curvature = 5;                  // [1/m]
+  ScalarFeedback rear_steer_angle = 6;           // [rad]
+}
+
+message TireModelSpec {
+  // The scenario should specify tire relevant parameters in the tires submodel. The simulator will
+  // copy information into the other submodels as needed.
+  oneof tire_model_type {
+    SimplePropertiesSpec simple_properties = 1;
+    MagicFormulaSpec magic_formula = 2;
+    TireLinearSpec tire_linear = 3;
+  }
+
+  message SimplePropertiesSpec {
+    double rolling_friction = 1;  // [-]
+    double sliding_friction = 2;  // [-]
+    CorneringStiffnessSpecs cornering_stiffness = 3;
+  }
+
+  message MagicFormulaSpec {
+    repeated MagicFormulaCoeffs magic_formula_coeff = 1;
+    double rolling_friction = 2;
+    double sliding_friction = 3;
+  }
+
+  message TireLinearSpec {
+    repeated LinearTireCoeffs linear_tire_coeff = 1;
+    double rolling_friction = 2;
+    double sliding_friction = 3;
+  }
+
+  message CorneringStiffnessSpecs {
+    enum Units {
+      NEWTONS_PER_DEGREE = 0;
+      NEWTONS_PER_RADIAN = 1;
+    }
+    Units units = 1;
+    double front = 2;
+    double rear = 3;
+  }
+
+  message LinearTireCoeffs {
+    enum Units {
+      NEWTONS_PER_DEGREE = 0;
+      NEWTONS_PER_RADIAN = 1;
+    }
+    Units units = 1;
+    double cornering_stiffness = 2;
+    double max_accurate_sideslip = 3;
+  }
+
+  message MagicFormulaCoeffs {
+    // Next tag: 46
+    // Contains union of all magic formula coefficients(across versions) relevant for pure lateral
+    // slip calculation
+    double PCY1 = 1;
+    double PDY1 = 2;
+    double PDY2 = 3;
+    double PDY3 = 4;
+    double PEY1 = 5;
+    double PEY2 = 6;
+    double PEY3 = 7;
+    double PEY4 = 8;
+    double PEY5 = 9;
+    double PKY1 = 10;
+    double PKY2 = 11;
+    double PKY3 = 12;
+    double PKY4 = 13;
+    double PKY5 = 14;
+    double PKY6 = 15;
+    double PKY7 = 16;
+    double PHY1 = 17;
+    double PHY2 = 18;
+    double PHY3 = 40;
+    double PVY1 = 19;
+    double PVY2 = 20;
+    double PVY3 = 21;
+    double PVY4 = 22;
+    double PPY1 = 23;
+    double PPY2 = 24;
+    double PPY3 = 25;
+    double PPY4 = 26;
+    double PPY5 = 27;
+    double LCY = 28;
+    double LMUY = 29;
+    double LEY = 30;
+    double LKY = 31;
+    double LKYC = 32;
+    double LKZC = 33;
+    double LHY = 34;
+    double LVY = 35;
+    double LFZO = 41;
+    // Nominal tire load
+    double FNOMIN = 36;
+    // Nominal tire pressure; supported in MF 6.0 and above
+    double NOMPRES = 37;
+    double static_camber = 38;
+    // Tire inflation pressure; supported in MF 6.0 and above
+    double INFLPRES = 39;
+    // Only used by the earliest magic formula version, independent of tire load and camber.
+    double B_lat = 42;
+    double C_lat = 43;
+    double D_lat = 44;
+    double E_lat = 45;
+  }
+}
+
+message EgoDynamicsConfig {
+  oneof vehicle_type {
+    // Legacy support for dynamic tractor-trailer; to be deprecated in future release.
+    TractorDynamicsConfig tractor_dynamics_config = 1;
+    // Updated format for dynamic vehicle configurations.
+    BiaxleBicycle biaxle_bicycle = 2;
+    // A dynamic zero-track model of a three axle vehicle with provisions for both front and rear
+    // axle steering.
+    //  Here, rear axle refers to the third / last axle on the vehicle.
+    TriaxleZeroTrack triaxle_zero_track = 3;
+  }
+}
+
+message TractorDynamicsConfig {
+  oneof tractor_type {
+    BiaxleBicycleTractor biaxle_bicycle_tractor = 1;
+  }
+
+  message BiaxleBicycleTractor {
+    double wheelbase = 1;  // [m]
+    double tractor_mass = 2;
+    double rear_axle_to_hitch = 3;
+    spatial.InertiaSpec tractor_inertia = 4;
+    double powertrain_ratio_front = 5;
+    double powertrain_ratio_rear = 6;
+    double service_brake_ratio_front = 7;
+    double service_brake_ratio_rear = 8;
+    uint32 num_integration_steps = 9;
+    // Flag to indicate that the legacy partially-kinematic state update should be used for a
+    // single-body vehicle model. If this is false and a trailer is unhitched in a multi-body
+    // dynamic model, the simulator will use a full single-body dynamics state update instead of the
+    // legacy partially-dynamic state update.
+    bool use_legacy_single_body_state_update = 10;
+
+    // Number of tires on each axle. Used to compute lateral forces on each axle.
+    uint32 num_tires_front_axle = 11;  // [-] defaults to 1
+    uint32 num_tires_rear_axle = 12;   // [-] defaults to 1
+    // Specifies the longitudinal speed below which slip angle will be clipped to zero. Sideslip (or
+    // slip angle) is determined by computing the arctangent of (vy/vx), where vy is the lateral
+    // (+y) velocity of the tire in the tire frame and vx is the longitudinal (+x) velocity of the
+    // tire in the tire frame. This setting allows Simian to avoid numerical issues when vx gets
+    // close to zero. Note: If you are using a magic formula tire, this value is referred to in the
+    // .tir files as VXLOW.
+    double min_velocity_sideslip = 13;
+
+    // The longitudinal velocity below which rates (for eg. yaw rate) are clamped to 0.0.
+    double velocity_threshold_for_zero_rates = 14;  // [m/s] defaults to 0.1
+  }
+}
+
+message BiaxleBicycle {
+  double wheelbase = 1;           // [m]
+  double mass = 2;                // [kg]
+  double rear_axle_to_hitch = 3;  // [m]
+  // Inertia properties where position is relative to center of rear axle and inertia values are
+  // relative to an axis passing through the center of mass and parallel to the vehicle z-axis.
+  // The model assumes a bicycle shape, so it only uses x position of the center of mass. It
+  // ignores the y and z center of mass locations.
+  spatial.InertiaSpec inertia = 4;
+  // Ratio of motive force between vehicle front and rear axle; powertrain_ratio_front and _rear
+  // must sum to 1.
+  double powertrain_ratio_front = 5;  // [-]
+  double powertrain_ratio_rear = 6;   // [-]
+  // Ratio of braking force between vehicle front and rear axle; service_brake_ratio_front and _rear
+  // must sum to 1.
+  double service_brake_ratio_front = 7;  // [-]
+  double service_brake_ratio_rear = 8;   // [-]
+  uint32 num_integration_steps = 9;      // [-]
+  // Flag to indicate that the legacy partially-kinematic state update should be used for a
+  // single-body vehicle model. If this is false and a trailer is unhitched in a multi-body dynamic
+  // model, the simulator will use a full single-body dynamics state update instead of the legacy
+  // partially-dynamic state update.
+  bool use_legacy_single_body_state_update = 10;  // [-]
+
+  // Number of tires on each axle. Used to compute lateral forces on each axle.
+  uint32 num_tires_front_axle = 11;  // [-] defaults to 1
+  uint32 num_tires_rear_axle = 12;   // [-] defaults to 1
+  // Specifies the longitudinal speed below which slip angle will be clipped to zero. Sideslip (or
+  // slip angle) is determined by computing the arctangent of (vy/vx), where vy is the lateral (+y)
+  // velocity of the tire in the tire frame and vx is the longitudinal (+x) velocity of the tire in
+  // the tire frame. This setting allows Simian to avoid numerical issues when vx gets close to
+  // zero. Note: If you are using a magic formula tire, this value is referred to in the .tir files
+  // as VXLOW.
+  double min_velocity_sideslip = 13;
+
+  // The longitudinal velocity below which rates (for eg. yaw rate) are clamped to 0.0.
+  double velocity_threshold_for_zero_rates = 14;  // [m/s] defaults to 0.1
+
+  // Version 0.1 (default):
+  //   - Gravity is not accounted for in this version.
+  // Version 0.2:
+  //   - Accounts for the longitudinal component of gravity. In this version , your vehicle will
+  //   accelerate
+  //     if it is going down hill and decelerate if it is going uphill.
+  simian_public.common.VersionMajorMinor version = 15;
+}
+
+message TriaxleZeroTrack {
+  double front_axle_to_middle_axle = 1;  // [m] MUST be non-negative
+  double middle_axle_to_rear_axle = 2;   // [m] MUST be non-negative
+  double mass = 3;                       // [kg] MUST be positive
+
+  // Inertia properties where position is relative to center of rear axle and inertia values are
+  // relative to an axis passing through the center of mass and parallel to the vehicle z-axis.
+  // The model assumes a zero-track shape (all wheels along the same longitudinal line), so it only
+  // uses x position ofhe center of mass. This model ignores the y and z center of mass locations.
+  spatial.InertiaSpec inertia = 4;  // [-]
+
+  // Determines how motive effort is split between axles. These need NOT sum to 1.0. The front,
+  // middle, and rear axle motive forces are determined as shown below. denominator =
+  // powertrain_ratio_front_axle + powertrain_ratio_middle_axle + powertrain_ratio_rear_axle
+  // front_axle_powertrain_force = total_powertrain_force * (powertrain_ratio_front_axle /
+  // denominator) middle_axle_powertrain_force = total_powertrain_force *
+  // (powertrain_ratio_middle_axle / denominator) rear_axle_powertrain_force =
+  // total_powertrain_force * (powertrain_ratio_rear_axle / denominator)
+  double powertrain_ratio_front_axle = 5;   // [-]
+  double powertrain_ratio_middle_axle = 6;  // [-]
+  double powertrain_ratio_rear_axle = 7;    // [-]
+
+  // Determines how service brake effort is split between axles.  These need NOT sum to 1.0. The
+  // front, middle, and rear axle braking forces are determined as shown below. denominator =
+  // service_brake_ratio_front_axle + service_brake_ratio_middle_axle +
+  // service_brake_ratio_rear_axle front_axle_braking_force = total_braking_force *
+  // (service_brake_ratio_front_axle / denominator) middle_axle_braking_force = total_braking_force
+  // * (service_brake_ratio_middle_axle / denominator) rear_axle_braking_force = total_braking_force
+  // * (service_brake_ratio_rear_axle / denominator)
+  double service_brake_ratio_front_axle = 8;   // [-]
+  double service_brake_ratio_middle_axle = 9;  // [-]
+  double service_brake_ratio_rear_axle = 10;   // [-]
+
+  // Number of tires on each axle. Used to compute lateral forces on each axle.
+  uint32 num_tires_front_axle = 11;   // [-] defaults to 1
+  uint32 num_tires_middle_axle = 12;  // [-] defaults to 1
+  uint32 num_tires_rear_axle = 13;    // [-] defaults to 1
+
+  // Determines how many Euler integration steps to take within a Simian tick.
+  uint32 num_integration_steps = 14;  // [-] defaults to 1
+
+  // Specifies the longitudinal speed below which slip angle will be clipped to zero. Sideslip (or
+  // slip angle) is determined by computing the arctangent of (vy/vx), where vy is the lateral (+y)
+  // velocity of the tire in the tire frame and vx is the longitudinal (+x) velocity of the tire in
+  // the tire frame. This setting allows Simian to avoid numerical issues when vx gets close to
+  // zero. Note: If you are using a magic formula tire, this value is referred to in the .tir files
+  // as VXLOW.
+  double min_velocity_sideslip = 15;  // [m/s]
+
+  // Mapping from front axle tire angle to rear axle tire angle.
+  FunctionMappingSteering rear_axle_steering = 16;  // [-]
+
+  // The longitudinal velocity below which rates (for eg. yaw rate) are clamped to 0.0.
+  double velocity_threshold_for_zero_rates = 17;  // [m/s] defaults to 0.1
+
+  // Version 0.1 (default):
+  //   -  Gravity is not accounted for in this version.
+  // Version 0.2:
+  //   - Accounts for the longitudinal component of gravity. In this version , your vehicle will
+  //   accelerate
+  //     if it is going down hill and decelerate if it is going uphill.
+  simian_public.common.VersionMajorMinor version = 18;
+}
+
+message FunctionMappingSteering {
+  simian_public.function_mapping.FunctionMapping mapping = 1;
+  // Input modifiers allow you to delay and rate limit a signal. For example, if there is delay in
+  // the controller that controls the rear steer angle as a function of the front steer angle, you
+  // can use the input modifier to account for this delay.
+  simian_public.signal_modifier.SignalModifier input_modifier = 2;
+
+  // The following field defines the hysteresis characteristic of the front-to-rear tire angle map.
+  Hysteresis hysteresis = 3;
+}
+message Hysteresis {
+  oneof hysteresis_type {
+    Band band = 1;
+  }
+}
+
+message Band {
+  // If the ego's longitudinal velocity is less than lower_limit, the rear axle steering controller
+  // receives front tire angle as reference.
+  // If the ego's longitudinal velocity is greater than upper_limit, the rear axle steering
+  // controller receives 0.0 as reference. In the ego's longitudinal velocity is within the
+  // hysteresis band (i.e., lower_limit < longitudinal_velocity < higher_limit), the rear axle
+  // steering controller receives front tire angle as reference if the ego's longitudinal velocity
+  // last entered the band by crossing hysteresis_band_lower_limit. If the velocity last entered the
+  // band crossing hysteresis_band_upper_limit rear axle steering controller receives 0.0 as
+  // reference.
+
+  // If either of these values are left unspecified, Simian sets them to infinity. This simulates a
+  // rear axle steering controller devoid of any hysteresis.
+
+  // If at the first tick the ego's lower_limit < longitudinal velocity < upper_limit, Simian
+  // assumes the controller is operating in the low speed state, i.e. the front tire angle is used
+  // as reference for the rear axle steering controller.
+
+  double lower_limit = 1;  // [OPTIONAL] defaults to infinity
+  double upper_limit = 2;  // [OPTIONAL] defaults to infinity
+}
+
+message Empty {}
+
+message ForceOrAccelTransferFunction {
+  transfer_function.TransferFunctionSpec transfer_function = 1;
+  TransferFunctionOutputType output_type = 2;
+  // Vehicle mass is only used when the output type is FORCE
+  double vehicle_mass = 3;
+
+  enum TransferFunctionOutputType {
+    FORCE = 0;
+    ACCEL = 1;
+  }
+}
+
+// ScalarFeedback provides scalar-valued information along with a type.
+message ScalarFeedback {
+  // A description to provide more context to the value.
+  FeedbackType type = 1;
+  // The scalar value of the feedback.
+  double value = 2;
+
+  enum FeedbackType {
+    _INVALID_FEEDBACK_TYPE = 0;  // Sentry for detecting bugs
+    NO_FEEDBACK = 1;             // The model does not provide this type of feedback
+    UNDEFINED = 2;  // In the mathematical sense, e.g. when the result is something divided by zero
+    ACTUAL = 3;  // There is an exact value, e.g. steering_angle from a steering angle input command
+    ESTIMATED = 4;  // There is no exact value, e.g. steering_angle from a velocity and curvature
+  }
+}

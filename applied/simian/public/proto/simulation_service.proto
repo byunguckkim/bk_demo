@@ -1,0 +1,128 @@
+// Copyright (C) 2018 Applied Intuition, Inc. All rights reserved.
+// This source code file is distributed under and subject to the LICENSE in license.txt
+
+syntax = "proto3";
+
+package simian_public.simulation;
+
+import "google/protobuf/duration.proto";
+import "applied/simian/public/proto/sim_command.proto";
+import "applied/simian/public/proto/common.proto";
+
+service SimulationService {
+  rpc GetProgress(GetProgressRequest) returns (GetProgressResponse) {}
+  rpc Pause(PauseRequest) returns (PauseResponse) {}
+  rpc Rewind(RewindRequest) returns (RewindResponse) {}
+  rpc Continue(ContinueRequest) returns (ContinueResponse) {}
+  rpc End(EndSimulationRequest) returns (EndSimulationResponse) {}
+  rpc Step(StepRequest) returns (StepResponse) {}
+  rpc ReloadStack(ReloadStackRequest) returns (ReloadStackResponse) {}
+  rpc ChangeSimState(ChangeSimStateRequest) returns (ChangeSimStateResponse) {}
+  rpc RecompileScenario(RecompileScenarioRequest) returns (RecompileScenarioResponse) {}
+  rpc IsSimulationReady(IsSimulationReadyRequest) returns (IsSimulationReadyResponse) {}
+}
+
+message PauseRequest {
+  bool continue_sending_updates = 1;  // Send sim states to customer stack while paused
+  string uuid = 2;
+}
+message PauseResponse {
+  // Common message, that contains the status and exception.
+  simian_public.common.CommonResponse common = 1;
+}
+
+message RewindRequest {
+  oneof duration {
+    double rewind_duration_s = 1;
+    google.protobuf.Duration rewind_duration = 2;
+    google.protobuf.Duration rewind_to = 3;
+  }
+  string uuid = 4;
+}
+message RewindResponse {
+  // Common message, that contains the status and exception.
+  simian_public.common.CommonResponse common = 1;
+}
+
+message ContinueRequest {
+  string uuid = 1;
+}
+message ContinueResponse {
+  // Common message, that contains the status and exception.
+  simian_public.common.CommonResponse common = 1;
+}
+
+message EndSimulationRequest {
+  string uuid = 1;
+}
+message EndSimulationResponse {
+  // Common message, that contains the status and exception.
+  simian_public.common.CommonResponse common = 1;
+}
+
+message StepRequest {
+  // Flag for RunController that time is driven externally; defaults to previous RunController
+  // behavior
+  bool external_time_control = 1;
+  string uuid = 2;
+}
+message StepResponse {
+  // Common message, that contains the status and exception.
+  simian_public.common.CommonResponse common = 1;
+}
+
+message ReloadStackRequest {
+  string uuid = 1;
+}
+message ReloadStackResponse {
+  // Common message, that contains the status and exception.
+  simian_public.common.CommonResponse common = 1;
+}
+
+message GetProgressRequest {
+  string uuid = 1;
+}
+message GetProgressResponse {
+  double progress = 1;  // Out of 1.0
+  bool paused = 2;
+  double simulation_time = 3;
+  // Get more accurate sim time when using sim API
+  google.protobuf.Duration simulation_timestamp = 4;
+  // Retrieves the maximum runtime of the simulation as specified from the timeout in the scenario
+  // YAML
+  double max_runtime = 5;
+  // Common message, that contains the status and exception.
+  simian_public.common.CommonResponse common = 6;
+}
+
+message ChangeSimStateRequest {
+  repeated sim_command.SimCommand sim_commands = 1;
+  string uuid = 2;
+}
+message ChangeSimStateResponse {
+  // Common message, that contains the status and exception.
+  simian_public.common.CommonResponse common = 1;
+}
+
+message RecompileScenarioRequest {
+  string yaml = 1;
+  string yaml_path = 2;
+  string output_path = 3;
+  string workspace_root = 4;
+  double restart_time = 5;
+  string uuid = 6;
+}
+
+message RecompileScenarioResponse {
+  // Common message, that contains the status and exception.
+  simian_public.common.CommonResponse common = 1;
+}
+
+message IsSimulationReadyRequest {
+  string uuid = 1;
+}
+message IsSimulationReadyResponse {
+  bool ready = 1;
+  // Common message, that contains the status and exception.
+  simian_public.common.CommonResponse common = 2;
+}

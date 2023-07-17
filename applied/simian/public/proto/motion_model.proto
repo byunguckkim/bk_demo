@@ -1,0 +1,1105 @@
+// Copyright (C) 2019 Applied Intuition, Inc. All rights reserved.
+// This source code file is distributed under and subject to the LICENSE in license.txt
+
+syntax = "proto3";
+
+package simian_public.motion_model;
+
+import "google/protobuf/duration.proto";
+import "applied/simian/public/proto/actuation_config.proto";
+import "applied/simian/public/proto/common.proto";
+import "applied/simian/public/proto/composite_vehicle.proto";
+import "applied/simian/public/proto/field_options.proto";
+import "applied/simian/public/proto/physics_engine.proto";
+import "applied/simian/public/proto/planar.proto";
+import "applied/simian/public/proto/scenario/common.proto";
+import "applied/simian/public/proto/scenario/vehiclesim_config.proto";
+import "applied/simian/public/proto/signal_modifier.proto";
+import "applied/simian/public/proto/spatial.proto";
+
+// This message specifies the motion_model_type to be used for the agent.
+// <!-- Next ID: 26 [last modified: louis] -->
+message Description {
+  oneof motion_model_type {
+    // Accepts Input.trajectory, returns Feedback.no_feedback.
+    PerfectTrajectoryTracking perfect_trajectory_tracking = 3;
+
+    // <!-- TODO consider adding configuration options such as whether to -->
+    // <!-- allow negative velocities. -->
+    // Accepts Input.acceleration_yawrate should have been called integrate_acceleration_yawrate,
+    // returns Feedback.no_feedback.
+    Empty rigid_body_integration = 4;
+
+    // Accepts Input.acceleration_yawrate, returns Feedback.no_feedback.
+    BicycleModel rigid_body_bicycle = 5;
+
+    // Accepts Input.normalized_dbw, returns Feedback.bicycle.
+    BicycleModel kinematic_bicycle = 6;
+
+    // Accepts Input.velocity_steering, returns Feedback.bicycle.
+    // Both ackermann and kinematic_bicycle_velocity_steering get compiled into this.
+    // The latter is an alias for the former.
+    // We introduced it to avoid confusing customers as Ackermann refers to a type of steering
+    // mechanism.
+    BicycleModel ackermann = 7;
+
+    // Accepts Input.normalized_dbw, returns Feedback.bicycle.
+    CoastdownBicycleModel coastdown_bicycle = 9;
+
+    // Accepts Input.normalized_torque_steering, returns Feedback.bicycle.
+    LongitudinalTorqueBicycleModel longitudinal_torque_bicycle = 10;
+
+    // Accepts Input.normalized_torque_gear_steering, returns Feedback.bicycle.
+    LagrangianBicycleWithTrailerModel lagrangian_bicycle_with_trailer = 12 [deprecated = true];
+
+    // Accepts Input.override_state, returns Feedback.no_feedback.
+    External external = 8;
+
+    // Accepts Input.override_state_list.
+    ExternalList external_list = 24;
+
+    // Accepts Input.override_state3d or Input.multi_section_override_states_3d, returns
+    // Feedback.no_feedback.
+    External3d external_3d = 16;
+
+    // Accepts Input.velocity_yawrate, returns Feedback.no_feedback.
+    IntegrateVelocityYawrate integrate_velocity_yawrate = 11;
+
+    // Accepts Input.rover_wheel_command, returns Feedback.no_feedback.
+    FourWheelRover four_wheel_rover = 13;
+
+    // Accepts Input.path_tracking_command, returns Feedback.path_tracking_feedback.
+    PathTracking path_tracking = 14;
+
+    // Accepts Input.composite_vehicle_command, returns Feedback.composite_vehicle or
+    // Feedback.dynamic_feedback.
+    simian_public.composite_vehicle.CompositeVehicleSpec composite_vehicle = 15;
+
+    // Accepts Input.skid_steer_command, returns Feedback.no_feedback.
+    SkidSteer skid_steer = 17;
+
+    // Contains motion models that use a physics engine under the hood to update state.
+    simian_public.physics_engine.PhysicsEngine physics_engine = 18;
+
+    // Allows you to specify multiple motion models and switch between them during a simulation.
+    SwitchableModel switchable_model = 19;
+
+    // Accepts Input.acceleration_lane_change_command, returns Feedback.no_feedback.
+    Empty acceleration_lane_change = 20;
+
+    // Accepts Input.private_model_3d_command, returns Feedback.custom_feedback.
+    PrivateModel3d private_model_3d = 21;
+
+    // Accepts Input.velocity_steering, returns Feedback.bicycle.
+    simian_public.motion_model.Description.BicycleModel kinematic_bicycle_velocity_steering = 22;
+
+    // Accepts Input.vehiclesim_command, returns Feedback.vehiclesim_feedback.
+    VehiclesimModel vehiclesim = 25;
+  }
+
+  // The switchable_model supports all motion and vehicle models but does not support adding dynamic
+  // trailers to the ego.
+  message SwitchableModel {
+    // A list of all of the motion models you would like to switch between during the course of a
+    // simulation.
+    repeated SwitchableModelCandidate candidates = 1;
+  }
+
+  message SwitchableModelCandidate {
+    string name = 1;
+    Description model = 2;
+  }
+
+  // This model accepts a 2D state, which the simulator uses to place the vehicle on terrain.
+  message External {
+    // Mode for determining how the obstacle behavior will move along terrain.
+    // If move_along_terrain is set to false, then Simian sets the ego position to exactly the x, y
+    // position provided in the input to the External model. In this case, the ego is placed on the
+    // terrain at precisely the x, y position that the customer stack commands. If
+    // move_along_terrain is true, then Simian calculates the 2D distance traveled and projects it
+    // onto the 3D terrain. This results in the reported ego position being slightly different from
+    // the commanded position, especially on highly-inclined terrain. In this case, there may be
+    // small, but accumulating, errors between the commanded x, y position and the reported x, y
+    // position.
+    bool move_along_terrain = 1;
+  }
+
+  // Used to specify the rate for how many states are given to the external model.
+  message ExternalList {
+    // Rate at which the external model is run.
+    // This is used to find the number of states that the external model needs for each simian tick.
+    double external_rate_hz = 1;
+  }
+
+  // This model accepts and perfectly realizes a full 3D state.
+  // This model uses terrain only for initial placement or when using ego behaviors,
+  // so you must ensure that the command places the model correctly with respect to terrain (perhaps
+  // using a Terrain Sensor).
+  message External3d {
+    // Version 0.1:
+    //   - When using ego behaviors, the predicted control command does not properly place the ego
+    //   on terrain
+    //     if the ego deviates in elevation by more than a few meters from the ego's initial
+    //     elevation.
+    // Version 0.2 (default; introduced in Simian v1.36):
+    //   - Applied fixed the bug in 0.1 so that, when using ego behaviors, the predicted control
+    //   command properly accounts for
+    //     terrain at all elevations. To obtain this fix, this version must be specified in the
+    //     `external_3d` model used in the predicted_control_command_config (note: if no
+    //     predicted_control_command_config is specified, then the `vehicle > external_3d` settings
+    //     are used for the predicted control motion model, and setting the version to 0.2 in
+    //     `vehicle > external_3d` will trigger the fix.
+    simian_public.common.VersionMajorMinor version = 3;
+
+    enum QuaternionMagnitude {
+      UNSET = 0;
+      // The input quaternion will be normalized by the receiving code, unless it's 0, in which case
+      // it will become NaN. Note: Passing a 0 quaternion may cause errors elsewhere in the
+      // simulation. Default.
+      NORMALIZE = 1;
+      // The simulation will fail if the input quaternion's magnitude
+      // is not close to 1 (within ~10^(-2)), including if the quaternion is zero.
+      // If the quaternion's magnitude is within ~10^(-2) of 1, the simulation does not fail and
+      // the quaternion will be normalized by the receiving code.
+      // Note: quaternions provided via sim commands are not affected by this setting.
+      STRICT_MAGNITUDE = 2;
+    }
+    // Choose how the simulation should handle quaternions whose magnitude is not close to 1.
+    QuaternionMagnitude quaternion_magnitude = 4;
+  }
+
+  // This model performs idealized trajectory tracking.
+  message PerfectTrajectoryTracking {
+    // [m/s^2] Deceleration to use in case of trajectory stitching failures.
+    double max_deceleration = 1;
+    // [m] Maximum distance between old and new trajectory during stitching.
+    double max_jump = 2;
+    // OPTIONAL Determines if terrain is taken into account when setting position from an incoming
+    // command.
+    bool move_along_terrain = 3;
+  }
+
+  // A kinematic bicycle motion model that accepts Input.velocity_steering.
+  // <!-- In a major Simian update, all BicycleModels should probably use this message instead of
+  // -->
+  // <!-- copy-pasting the same parameters into their own messages. This will require changes to the
+  // -->
+  // <!-- motion model definitions in *.scn.yaml files, which is why if we enforce this it should
+  // -->
+  // <!-- only occur during a major Simian update. -->
+  message BicycleModel {
+    // [m] Distance between the front and rear axles of the vehicle.
+    double wheelbase = 1;
+    // [m/s] Maximum velocity at which to clamp integration.
+    double max_velocity = 2;
+    // [m/s^2] Maximum deceleration.
+    double max_deceleration = 3;
+    // [m/s^2] Maximum acceleration.
+    double max_acceleration = 4;
+    // [rad] Maximum steering angle.
+    double max_steering_angle = 5;
+    // [rad/s] Maximum steering rate.
+    double max_steering_rate = 6;
+    uint32 num_integration_steps = 7;  // Optional, defaults to 1.
+    // [m/s^3] Maximum jerk in the direction of deceleration (defaults to no limit)
+    double max_jerk_decel = 8;
+    // [m/s^3] Maximum jerk in the direction of acceleration (defaults to no limit)
+    double max_jerk_accel = 9;
+  }
+
+  // Bicycle-constrained kinematic with consideration for road grade and friction losses from EPA
+  // Coastdown coefficients.
+  message CoastdownBicycleModel {
+    // [m] Distance between the front and rear axles of the vehicle.
+    double wheelbase = 1;
+    // [m/s] Maximum velocity at which to clamp integration.
+    double max_velocity = 2;
+    // [m/s^2] Maximum deceleration.
+    double max_deceleration = 3;
+    // [m/s^2] Maximum acceleration.
+    double max_acceleration = 4;
+    // [rad] Maximum steering angle.
+    double max_steering_angle = 5;
+    // [rad/s] Maximum steering rate.
+    double max_steering_rate = 6;
+    uint32 num_integration_steps = 7;  // Optional, defaults to 1.
+    // [kg] Mass of the (loaded) vehicle.
+    double vehicle_mass = 8;
+    // [N] Bias loss force.
+    double coastdown_a = 9;
+    // [Ns/m] Coefficient for friction losses proportional to velocity.
+    double coastdown_b = 10;
+    // [Ns^2/m^2] Coefficient for friction losses proportional to velocity squared.
+    double coastdown_c = 11;
+    // [m/s^3] Maximum jerk in the direction of deceleration (defaults to no limit).
+    double max_jerk_decel = 12;
+    // [m/s^3] Maximum jerk in the direction of acceleration (defaults to no limit).
+    double max_jerk_accel = 13;
+  }
+
+  // Dynamic with consideration for road grade, aerodynamic drag, and road friction.
+  // <!-- Next ID: 17 -->
+  message LongitudinalTorqueBicycleModel {
+    // [Nm] Maximum torque possible at the engine.
+    double max_torque = 1;
+    // Powertrain gear ratio (assumed constant).
+    double gear_ratio = 2;
+    // [m] Radius of the tires.
+    double wheel_radius = 3;
+    // [m^2] Cross-sectional area of the vehicle when viewed from the front.
+    double vehicle_frontal_area = 4;
+    // [kg] Gross vehicle mass.
+    double vehicle_mass = 5;
+    // Coefficient of aerodynamic drag in the longitudinal direction.
+    double drag_coefficient = 6;
+    // Coefficient of rolling friction of the tire with the terrain.
+    double road_friction = 7;
+    double air_density = 8;  // Optional, defaults to 1.225 kg/m3.
+
+    // <!-- parameters related to steering -->
+
+    // [m] Distance between the front and rear axles of the vehicle.
+    double wheelbase = 9;
+    // [rad] Maximum angle between the vehicle's forward direction and the rolling direction of a
+    // virtual wheel placed in the midpoint between the left and right front wheels.
+    double max_steering_angle = 10;
+    // [rad/s] Maximum rate of change of the steering angle.
+    double max_steering_rate = 11;
+    // [m/s^3] OPTIONAL Maximum jerk in the direction of deceleration; defaults to no limit.
+    double max_jerk_decel = 13;
+    // [m/s^3] OPTIONAL Maximum jerk in the direction of acceleration; defaults to no limit.
+    double max_jerk_accel = 14;
+    // [m/s^2] Maximum deceleration possible by the friction brake.
+    double max_brake_decel = 15;
+
+    // <!-- other parameters -->
+
+    uint32 num_integration_steps = 12;  // optional, defaults to 1
+    // OPTIONAL Brake model specification.
+    BrakeModel brake_model = 16;
+  }
+
+  // A motion model that integrates a given velocity and yawrate over the simulator tick duration.
+  // Each of the bounds arrays is either:
+  // - empty: no bounds are enforces
+  // - single value: symmetric bounds at +/- the given value
+  // - two values: [lower, upper] are the bounds that get enforced.
+  message IntegrateVelocityYawrate {
+    repeated double velocity_bounds = 1;        // [m/s] longitudinal velocity
+    repeated double acceleration_bounds = 2;    // [m/s2] longitudinal acceleration
+    repeated double yawrate_bounds = 3;         // [rad/s] angular velocity
+    repeated double yawrate_change_bounds = 4;  // [rad/s2] angular acceleration
+  }
+
+  // (Deprecated) A bicycle model that has longitudinal dynamics appropriate for a tractor
+  // semi-trailer with a diesel engine. The lateral motion is based on bicycle model kinematics. The
+  // longitudinal dynamics take into account motor force at a given gear and throttle percent,
+  // friction brake force at a given brake percent, road grade, road friction, and aerodynamic drag.
+  // Please let Applied know if you wish to continue using this model.
+  // Applied plans to remove this model in a future release.
+  message LagrangianBicycleWithTrailerModel {
+    // [m] Radius of the tires.
+    double wheel_radius = 1;
+    // [kg] Mass of the tractor.
+    double tractor_mass = 2;
+    // [kg] Mass of the trailer.
+    double trailer_mass = 3;
+    // [m^2] Aerodynamic reference surface for longitudinal motion.
+    double frontal_area = 4;
+    // Aerodynamic coefficient of drag for longitudinal motion.
+    double drag_coef = 5;
+    // [kg/m^3] (defaults to 1.225).
+    double air_density = 6;
+    // Rolling friction bias coefficient.
+    double friction_bias_coef = 7;
+    // Rolling friction velocity squared coefficient.
+    double friction_vel_coef = 8;
+    // [m/s^2] Maximum deceleration, which gets linearly mapped to normalized brake input.
+    double max_deceleration = 9;
+    // Gear ratio of the drive axle differential.
+    double axle_ratio = 10;
+    // Designates a file location OR preset configuration for the gear ratio at each gear, currently
+    // only preset configurations are possible.
+    Predefined.GearRatios gear_ratios = 11;
+    // Designates a file location OR preset configuration for a torque map, which is a mapping of
+    // engine rpm and throttle percentage vs torque at the engine, currently only preset
+    // configurations are possible
+    Predefined.TorqueMaps torque_map = 12;
+
+    // <!-- TODO(rami): needs description -->
+    double wheelbase = 13;
+    // [rad] Maximum angle between the vehicle's forward direction and the rolling direction of a
+    // virtual wheel placed in the midpoint between the left and right front wheels.
+    double max_steering_angle = 14;
+    // [rad/s] Maximum rate of change of the steering angle.
+    double max_steering_rate = 15;
+    // [m/s^3] Maximum jerk in the direction of deceleration; defaults to no limit.
+    double max_jerk_decel = 17;
+    // [m/s^3] Maximum jerk in the direction of acceleration; defaults to no limit.
+    double max_jerk_accel = 18;
+
+    // <!-- TODO(rami): needs description -->
+    uint32 num_integration_steps = 16;
+
+    // Defaults to true.
+    // If set to false, you should expect a compiler error.
+    // In a future release this will default to false and you will have to explicitly set this to
+    // true to run the model. If you are currently using this model and wish to continue using it
+    // (highly discouraged), please let Applied know. If you do not let Applied know, Applied will
+    // assume you aren't using this model and remove it in a future release.
+    bool allow_deprecated_lagrangian_bicycle_with_trailer_model = 19;
+  }
+
+  // Do not use this InertiaSpec. Instead use the InertiaSpec message in spatial.proto. The
+  // InertiaSpec in spatial.proto is more built-out and better-suited for extensibility.
+  message InertiaSpec {
+    oneof inertia_spec_type {
+      InertiaComVertical I_com_vertical = 1;
+    }
+    message InertiaComVertical {
+      planar.Point2d loc = 1;  // (x,y) position of the COM
+      double moment = 2;       // Mass moment of inertia around Z through the COM
+    }
+  }
+
+  // Motion command for the four_wheel_rover motion model.
+  message FourWheelRover {
+    double mass = 1;          // [kg] Mass of the vehicle.
+    double wheel_radius = 2;  // [m] Radius of the tires.
+    InertiaSpec inertia = 3;  // Inertia properties, position is relative to center of rear axle.
+    Wheel wheel_fl = 4;       // Front left.
+    Wheel wheel_fr = 5;       // Front right.
+    Wheel wheel_rl = 6;       // Rear left.
+    Wheel wheel_rr = 7;       // Rear right.
+
+    message Wheel {
+      planar.Point2d mount_point = 1;  // Wheel location relative to the center of the rear axle.
+      double kp = 2;
+      double ki = 4;
+      double i_max = 5;
+      double kd = 3;
+    }
+  }
+
+  // The skid steer model implements a kinematic model of a skid-steered vehicle.
+  message SkidSteer {
+    oneof model_type {
+      // Use this if you have empirically characterized your skid-steered vehicle's kinematics.
+      SkidSteerEmpericalKinematic empirical_kinematic = 1;
+      // Use this if you want to use a first principles based kinematic model of your skid-steered
+      // vehicle.
+      SkidSteerSymmetricKinematic symmetric_kinematic = 2;
+    }
+  }
+
+  message SkidSteerEmpericalKinematic {
+    // The following are coefficients of the 3 x 2 matrix that maps
+    // [left_wheel_center_linear_velocity, right_wheel_center_linear_velocity] -> [vx, vy, yawrate],
+    // where vx is the longitidinal (+x) velocity in the vehicle frame, vy is the lateral (+y)
+    // velocity in the vehicle frame and yawrate is the yaw rate in the world frame.
+
+    // [vx, vy, yawrate]^T = [a_11 a_12; a_21 a_22; a_31 a_32] *
+    // [left_wheel_center_linear_velocity, right_wheel_center_linear_velocity]^T
+
+    // Reference: Anousaki, Georgia & Kyriakopoulos, Kostas. (2004). A Dead-reckoning Scheme for
+    // Skid-steered Vehicles in Outdoor Environments.. 580-585. 10.1109/ROBOT.2004.1307211
+    double a_11 = 1;  // [-]
+    double a_12 = 2;  // [-]
+    double a_21 = 3;  // [-]
+    double a_22 = 4;  // [-]
+    double a_31 = 5;  // [1/m]
+    double a_32 = 6;  // [1/m]
+  }
+
+  message SkidSteerSymmetricKinematic {
+    double track_width = 1;  // [m]
+    // The terrain_dependent_param field is a terrain specific heuristic used to extend differential
+    // drive modelling techniques to skid-steer vehicles. For further context see page 13 of the
+    // attached reference. See pdf titled 'motion_planning_for_skid_steer_vehicles' in
+    // https://drive.google.com/drive/u/0/folders/11hg1aexjCvqAGErmHu95IMwGMoVSLNZg
+
+    // This parameter generally increases with surface friction and tire rolling resistance.
+    // For a concrete surface and for a certain type of tire the following paper recommends a value
+    // greater than 2. See pdf titled 'Dynamic Modeling of a Skid-Steered Wheeled Vehicle with
+    // Experimental Verification' in
+    // https://drive.google.com/drive/u/0/folders/11hg1aexjCvqAGErmHu95IMwGMoVSLNZg
+    double terrain_dependent_param = 2;  // [-]
+    // Version 0.1 (default):
+    //   - This version does not account for track width correctly and is only preserved in the
+    //   interest of maintaining
+    //     backwards compatability. The usage of this version is highly discouraged as it will
+    //     likely lead to inaccurate simulation results that do not account for your skid steer
+    //     vehicle's track width.
+    // Version 0.2 (introduced in Simian v1.30):
+    //   - In v1.30, Applied noticed and fixed an issue where the track_width parameter was found to
+    //   not have the
+    //     desired effect on vehicle motion. This version will allow you to leverage this
+    //     correction. However, note that setting version to 0.2 may be backwards incompatible as
+    //     your simulated ego will respond a little differently to the same control commands.
+    simian_public.common.VersionMajorMinor version = 3;
+  }
+
+  // This model follows a predefined path according to the commanded velocity or commanded total
+  // distance along path.
+  message PathTracking {
+    // List of points `{x: , y: }` in latitude-longitude coordinates defining the path.
+    repeated planar.Point2d path = 1;
+    // Arc length of path at first point passed in `path`, e.g. from odometry.
+    double start_length = 2;
+    // Arc length of path at final point passed in `path`, e.g. from odometry.
+    double end_length = 3;
+    // Starting position of ego along the path, in range [start_length, end_length].
+    double ego_start_position = 4;
+    // A piecewise polynomial function that describes the lateral offset from the reference path.
+    // This profile is specified by a list of phases that either hold the offset, or ramp the offset
+    // at a given rate.
+    LateralOffsetProfile lateral_offset_profile = 5;
+
+    message LateralOffsetProfile {
+      message Phase {
+        oneof profile {
+          HoldVelocity hold_offset_rate = 1;
+          RampVelocity ramp_offset_rate = 2;
+        }
+      }
+
+      message HoldVelocity {
+        double length = 1;
+      }
+      message RampVelocity {
+        oneof rate_type {
+          double length = 1;
+          double rate = 3;
+        }
+        double target = 2;
+      }
+
+      repeated Phase phases = 1;
+      double initial_offset = 2;
+      double initial_offset_rate = 3;
+      double initial_offset_acceleration = 4;
+    }
+  }
+
+  message PrivateModel3d {
+    // The vehicle is modeled internally by the simulator.
+    // For this 3D motion model, the vehicle model is fully specified by the `mesh_name` field.
+    // In this case, the `mesh_name` specifies the visual geometry in Simian's frontend, the
+    // visual geometry perceived by Spectral sensors, and the vehicle's dynamics modeled in
+    // Spectral. Consult Applied for the available values for `mesh_name`. Example scenario YAML:
+    // ```
+    // vehicle:
+    //   mesh_name: <customer_name>:<vehicle_name>
+    //   private_model_3d:
+    //     static_base: false
+    // ```
+
+    // Whether the the base should be a MobileBase or a StaticBase
+    PhysicsMode physics_mode = 1;
+
+    message PhysicsMode {
+      oneof mode {
+        // Default.
+        MobileBase mobile_base = 1;
+        // The vehicle's base will not move, though articulated portions of the vehicle may still
+        // move.
+        StaticBase static_base = 2;
+      }
+      message MobileBase {}
+      message StaticBase {}
+    }
+
+    // Defines a set of actuators attached to a vehicle or articulation.
+    simian_public.actuation_config.ActuationConfig actuation = 2;
+
+    // These are freeform parameters. The valid parameter names depend on
+    // the specific model. Consult Applied for the valid parameters for your model.
+    repeated Parameter parameters = 3;
+    message Parameter {
+      string name = 1;
+      // Specify the parameter value with the correct type. Consult Applied for the valid
+      // parameter type for each parameter. You will receive an error message if you
+      // provide a valid parameter name with an incorrect value type.
+      oneof value_type {
+        bool value_bool = 2;
+        double value = 3;
+        simian_public.common.Vector3 value_vector3 = 4;
+        string value_string = 5;
+      }
+    }
+  }
+
+  // <!-- Next ID: 6 [last modified: louis] -->
+  message VehiclesimModel {
+    message Timing {
+      oneof timing_type {
+        // The period of the simulation step.
+        google.protobuf.Duration period = 1;
+        // The frequency of the simulation step.
+        int32 hertz = 2;
+      }
+    }
+    // The name of the VehicleSim vehicle model.
+    string vehicle_model_name = 1 [(field_options.is_required) = true];
+    // Optional list VS variables to override vehicle parameters.
+    repeated simian_public.proto.scenario.vehiclesim_config.NamedVehiclesimVariableOverride
+        override_variables = 2;
+    // HPC licensing address configuration. You need to specify this field if the VehiclesimSolver
+    // license is provided by an HPC license server. This should be the case if you are using a
+    // Linux machines (except if you are using Simulink) to serve a HPC license to your VehicleSim
+    // vehicle model, or if your organization is using an HPC license server. For Windows machines
+    // and Simulink, you can serve a VehicleSim license by running a license server on host or by
+    // keeping the VS browser open.
+    oneof hpc_licensing {
+      // HPC licensing address. Use if you are using an HPC license server.
+      string hpc_licensing_address = 3;
+    }
+    // Terrain version
+    // - 0.1: The vehicle model drives on flat terrain.
+    // - 0.2 (default): The vehicle model drives on terrain as described in the map.
+    simian_public.common.VersionMajorMinor terrain_version = 4;
+    // Optional rate of the "subloop" for Simulink and C++ multirate interfaces, which allows for a
+    // faster controls loop with minimal impact to simulation performance. If the subloop is used,
+    // the sampling rate of the vehicle model will be set to the match the subloop rate.
+    Timing subloop_timing = 5;
+  }
+}
+
+// A set of predefined gear ratios and torque maps.
+message Predefined {
+  message GearRatios {
+    enum PredefinedGearRatios {
+      NO_GEARS = 0;
+      EPA_13_SPEED = 1;
+      TREMEC_18_SPEED = 2;
+    }
+    oneof gear_ratios_source {
+      PredefinedGearRatios predefined = 1;
+    }
+  }
+  message TorqueMaps {
+    enum PredefinedTorqueMaps {
+      NO_TORQUE_MAP = 0;
+      TRUCK_455HP = 1;
+    }
+    oneof torque_map_source {
+      PredefinedTorqueMaps predefined = 1;
+    }
+  }
+}
+
+// Contains a motion_command that specifies the input message that matches the desired motion model.
+// <!-- Next ID: 30 -->
+message Input {
+  oneof motion_command {
+    // This field is used to detect if no motion command is specified.
+    Empty undefined = 1;
+    // Motion command specifying the ego longitudinal acceleration and yawrate.
+    AccelerationYawrate acceleration_yawrate = 2;
+    // A sequence of acceleration_yawrate commands, along with the duration for each command in the
+    // sequence.
+    AccelerationYawrateSequence acceleration_yawrate_sequence = 7;
+    // Dimensionless drive-by-wire control signals
+    NormalizedDBW normalized_dbw = 3;
+    // A sequence of normalized_dbw commands, along with the duration for each command in the
+    // sequence.
+    NormalizedDBWSequence normalized_dbw_sequence = 8;
+    // Normalized torque and steering command.
+    NormalizedTorqueSteering normalized_torque_steering = 9;
+    // Normalized drive-by-wire signal with gear command.
+    NormalizedDBWGear normalized_dbw_gear = 12;
+    // Force, brake and steering command.
+    ForceBrakeSteering force_brake_steering = 11;
+    // List of samples, each with time and a state. The state is a pose (x, y, heading) with
+    // velocity and yawrate.
+    planar.Trajectory2d trajectory = 4;
+    // Longitudinal and steering command.
+    VelocitySteering velocity_steering = 5;
+    // Motion command specifying the 2D state of the ego.
+    planar.State2d override_state = 6;
+    // Motion command to specify the full 2D state of the ego. Please do not use
+    // override_state2d_full. It is not yet fully supported.
+    planar.State2dFull override_state2d_full = 19;
+    // Motion command specifying the 3D state of the ego.
+    spatial.State override_state3d = 18;
+    // Motion command specifying the ego longitudinal velocity and yawrate.
+    VelocityYawrate velocity_yawrate = 10;
+    // Motion command for the four_wheel_rover motion model.
+    RoverWheelCommand rover_wheel_command = 13;
+    // Motion command for the path_tracking motion model.
+    PathTrackingCommand path_tracking_command = 14;
+    // Motion command for the composite_vehicle_command motion model.
+    simian_public.composite_vehicle.CompositeVehicleCommand composite_vehicle_command = 15;
+    // Motion command specifying the 2D state of each section of a multi-section ego.
+    MultiSectionOverrideStates multi_section_override_states = 16;
+    // Motion command for a dynamic trailer.
+    TractorTrailerCommand tractor_trailer_command = 17;
+    // Motion command for skid_steer motion models.
+    SkidSteerCommand skid_steer_command = 20;
+    // Motion command for physics_engine motion models.
+    simian_public.physics_engine.PhysicsEngineCommand physics_engine_command = 21;
+    // Motion command for switchable_model motion models.
+    SwitchableModelInput switchable_command = 22;
+    // Motion command for the acceleration_lane_change motion models.
+    AccelerationLaneChangeCommand acceleration_lane_change_command = 23;
+    // Motion command to specify the 2D state of the ego and GUI signal.
+    OverrideStateAndGuiSignal override_state_and_gui_signal = 24;
+    // Motion command to specify the 3D state of the ego and GUI signal.
+    OverrideState3dAndGuiSignal override_state3d_and_gui_signal = 25;
+    // Motion command for private_model_3d motion models.
+    PrivateModel3dCommand private_model_3d_command = 26;
+    // Motion command specifying a list of samples consisting of a 2D state and lookahead duration.
+    OverrideStateList override_state_list = 27;
+    // Motion command for VehicleSim (e.g., CarSim) motion models.
+    VehiclesimCommand vehiclesim_command = 28;
+    // Motion command specifying the 3D state of each section of a multi-section ego.
+    MultiSectionOverrideStates3d multi_section_override_states_3d = 29;
+  }
+
+  // A motion model input that specifies a sequence of override 2D states when using external motion
+  // models.
+  message OverrideStateList {
+    message OverrideStateOutput {
+      planar.State2d override_state = 1;
+      google.protobuf.Duration lookahead_duration = 2;
+    }
+    // A list of planar.State2d override states.
+    repeated OverrideStateOutput override_state_list = 1;
+  }
+
+  // Motion command to specify the 2D state of the ego and GUI signal.
+  message OverrideStateAndGuiSignal {
+    // 2D state of the ego.
+    planar.State2d override_state = 1;
+    // These will be used by the Simian frontend to visualize steering, brake, and throttle.
+    GuiSignal gui_signal = 2;
+  }
+
+  // Motion command to specify the 3D state of the ego and GUI signal.
+  message OverrideState3dAndGuiSignal {
+    // 3D state of the ego.
+    spatial.State override_state3d = 1;
+    // These will be used by the Simian frontend to visualize steering, brake, and throttle.
+    GuiSignal gui_signal = 2;
+  }
+
+  message GuiSignal {
+    // Will be clipped to 0.0 if Simian receives normalized_brake less than 0.0.
+    // Will be clipped to 1.0 if Simian receives normalized_brake greater than 1.0.
+    double normalized_brake = 1;  // [-] lies in the interval [0,1].
+    // Will be clipped to 0.0 if Simian receives normalized_throttle less than 0.0.
+    // Will be clipped to 1.0 if Simian receives normalized_throttle greater than 1.0.
+    double normalized_throttle = 2;   // [-] lies in the interval [0,1].
+    double steering_wheel_angle = 3;  // [rad]
+  }
+
+  // A motion model input that allows you to specify multiple motion models and switch between them
+  // during a simulation. The motion model will use the input specified as model_input for state
+  // update. Simian will produce an error if the motion model input is not compatible with the
+  // motion model identified by the name.
+  message SwitchableModelInput {
+    // The name of the motion model to be used.
+    // Simian will produce an error if the motion model input is not compatible with the motion
+    // model identified by the name.
+    string motion_model_name = 1;
+
+    // The message functioning as the motion model input to the specified motion model.
+    Input motion_model_input = 2;
+  }
+
+  // A motion model input that specifies the tractor commands and the trailer brake. Used for the
+  // dynamic trailer motion model.
+  message TractorTrailerCommand {
+    // A CompositeVehicleCommand motion command consisting of a brake_input, a powertrain_input, and
+    // a steering_input.
+    simian_public.composite_vehicle.CompositeVehicleCommand tractor = 1;
+    // A BrakeInput motion command consisting of either a normalized_brake or tf_input value.
+    simian_public.composite_vehicle.BrakeInput trailer_brake = 2;
+  }
+
+  // This command provides inputs required by a kinematic skid-steer vehicle.
+  message SkidSteerCommand {
+    double left_wheel_center_linear_velocity = 1;   // [m/s]
+    double right_wheel_center_linear_velocity = 2;  // [m/s]
+  }
+
+  // A motion model input specified by acceleration and yawrate. Used as input to the `Rigid Body
+  // Integration` motion model.
+  message AccelerationYawrate {
+    // The acceleration used for the control input.
+    double acceleration = 1;
+    // The yawrate used for the control input.
+    double yawrate = 2;
+  }
+
+  // A sequence of AccelerationYawrate commands.
+  message AccelerationYawrateSequence {
+    // Time step duration.
+    double step_duration = 1;
+    // A list of AccelerationYawrate messages.
+    repeated AccelerationYawrate commands = 2;
+  }
+
+  // A motion model input specified by brake, throttle, and steering for drive-by-wire (DBW)
+  // control.
+  message NormalizedDBW {
+    double brake = 1;     // Range: [0,1].
+    double throttle = 2;  // Range: [0,1].
+    double steering = 3;  // Range: [-1,1].
+  }
+
+  // A sequence of NormalizedDBW commands.
+  message NormalizedDBWSequence {
+    // Time step duration.
+    double step_duration = 1;
+    // A list of NormalizedDBW messages.
+    repeated NormalizedDBW commands = 2;
+  }
+
+  // A motion model input specified by the velocity and steering angle.
+  message VelocitySteering {
+    double velocity = 1;        // [m/s]
+    double steering_angle = 2;  // [rad]
+  }
+
+  // A motion model input specified by motor torque, steering angle, and brake.
+  message NormalizedTorqueSteering {
+    double torque = 1;    // range [-1,1] mapped to max_torque.
+    double steering = 2;  // range [-1,1] mapped to max_steering_angle.
+    double brake = 3;     // range [0,1] mapped to max_deceleration.
+  }
+
+  // Motion command specifying the ego longitudinal velocity and yawrate.
+  message VelocityYawrate {
+    double velocity = 1;  // [m/s] Longitudinal (+x) velocity.
+    double yawrate = 2;   // [rad/s] Yawrate.
+  }
+
+  // (Deprecated) A motion model input specified by motor_force, brake and steering.
+  message ForceBrakeSteering {
+    double motor_force = 1;  // range [0,inf) [N]
+    double brake = 2;        // range [0,1] mapped to max_deceleration
+    double steering = 3;     // range [-1,1] mapped to max_steering_angle
+  }
+
+  // A motion model input specified by brake, throttle, steering, and gear for drive-by-wire (DBW)
+  // control
+  message NormalizedDBWGear {
+    double brake = 1;     // range [0,1]
+    double throttle = 2;  // range [0,1]
+    double steering = 3;  // range [-1,1]
+    int32 gear = 4;       // range [0, num gears - 1]
+  }
+  // A motion model input that specifies the steering and angular velocity for each of the four
+  // wheels of a vehicle. The steering command given to a wheel is immediately realized by the
+  // model. The angular velocity is passed to a PD controller, which tracks angular velocity and
+  // outputs the force acting at each wheel. The force acts at the wheel in the direction of the
+  // steering angle. The field for each wheel contains:
+  // * `steering`: scalar [rad] defined with respect to the body frame x-axis (front wheel steering
+  // > 0 means left turn)
+  // * `ang_vel`: scalar [rad/s] positive values move the vehicle forward at zero steering angle"
+  message RoverWheelCommand {
+    // Front left wheel control (steering and ang_vel)
+    WheelCommand fl = 1;
+    // Front right wheel control (steering and ang_vel)
+    WheelCommand fr = 2;
+    // Rear left wheel control (steering and ang_vel)
+    WheelCommand rl = 3;
+    // Rear right wheel control (steering and ang_vel)
+    WheelCommand rr = 4;
+    message WheelCommand {
+      double steering = 1;  // [rad] 0 straight ahead, CCW positive
+      double ang_vel = 2;   // [rad/s]
+    }
+  }
+
+  // (Beta) A motion model input that specifies the distance along a path and the longitudinal
+  // velocity for the path_tracking motion model.
+  message PathTrackingCommand {
+    oneof path_command {
+      double path_position = 1;  // [m], range [start_length, end_length], Distance along the path
+      double longitudinal_velocity = 2;  // [m/s]
+    }
+  }
+
+  // Motion command specifying the 2D state of each section of a multi-section ego.
+  message MultiSectionOverrideStates {
+    // 2D state of each section.
+    repeated planar.State2d override_states = 1;
+  }
+
+  // Motion command specifying the 3D state of each section of a multi-section ego.
+  message MultiSectionOverrideStates3d {
+    // 3D state of each section.
+    repeated spatial.State override_states_3d = 1;
+  }
+
+  // Motion command for the acceleration_lane_change motion models.
+  message AccelerationLaneChangeCommand {
+    // [m/s2] (+x) longitudinal acceleration of the vehicle observed in the world frame and
+    // expressed in the vehicle frame.
+    double longitudinal_acceleration = 1;
+    // An enum specifying the lane change direction. Possible values are `NONE`, `LEFT`, and
+    // `RIGHT`. Defaults to `NONE`.
+    simian_public.scenario.RelativeLaneChangeDirection.Direction lane_change_direction = 2;
+  }
+
+  message PrivateModel3dCommand {
+    // A motion model input that specifies commands for a customer-specific vehicle that is modeled
+    // internally by the simulator. This command type is generic so that it is compatible with any
+    // customer-specific vehicle. To learn the valid command names for your customer-specific
+    // vehicle, contact Applied Intuition support. If you specify an unexpected command, the
+    // simulation terminates with an error.
+
+    // A list of commands that can be used to specify arbitrary control inputs
+    repeated SingleCommand commands = 1;
+    message SingleCommand {
+      string name = 1;
+      oneof value_type {
+        double value = 2;
+      }
+    }
+  }
+
+  // A motion model input used for VehicleSim models containing fields for lateral and longitudinal
+  // controls. The commands in each of these fields should correspond to the commands expected in
+  // the VehicleSim model.
+  message VehiclesimCommand {
+    message LongitudinalControl {
+      message DBWLongitudinal {
+        double brake = 1;  // [MPa]. Mapped to master cylinder pressure (IMP_PCON_BK) in Vehiclesim.
+        double throttle =
+            2;  // range [0,1]. Mapped to throttle (IMP_THROTTLE_ENGINE) in Vehiclesim.
+      }
+      message TargetSpeed {
+        double speed = 1;  // [m/s]. Mapped to speed target (IMP_SPEED) in VehicleSim.
+      }
+      message TargetAcceleration {
+        double acceleration =
+            1;  // [m/s^2]. Mapped to acceleration target (IMP_AX_SC) in VehicleSim.
+      }
+      oneof command {
+        DBWLongitudinal dbw_longitudinal = 1;
+        TargetSpeed target_speed = 2;
+        TargetAcceleration target_acceleration = 3;
+      }
+    }
+    message LateralControl {
+      message DBWLateral {
+        double steering = 1;  // [deg]. Mapped to steering angle (IMP_STEER_SW) in Vehiclesim.
+      }
+      message SinglePreviewPoint {
+        double x = 1;  // range [-1,1]. Mapped to preview point x (IMP_X_DM) in Vehiclesim.
+        double y = 2;  // range [-1,1]. Mapped to preview point y (IMP_Y_DM) in Vehiclesim.
+      }
+      oneof command {
+        DBWLateral dbw_lateral = 1;
+        SinglePreviewPoint single_preview_point = 2;
+      }
+    }
+    // Lateral control can be one of the following:
+    // * dbw_lateral: A steering command in degrees.
+    // * single_preview_point: A preview point specified by an (x, y) coordinate used in the
+    // VehicleSim preview point controller.
+    LateralControl lateral_control = 1;
+    // Longitudinal control can be one of the following:
+    // * dbw_longitudinal: Consists of a brake command ([MPa]. Mapped to master cylinder pressure
+    // (IMP_PCON_BK) in Vehiclesim) and a throttle command (range [0,1]. Mapped to throttle
+    // (IMP_THROTTLE_ENGINE) in Vehiclesim).
+    // * target_speed: A target speed in [m/s]  [m/s] mapped to speed target (IMP_SPEED) in
+    // VehicleSim
+    // * target_acceleration:  A target acceleration in [m/s^2]  [m/s] mapped to acceleration target
+    // (IMP_AX_SC) in VehicleSim
+    LongitudinalControl longitudinal_control = 2;
+    // Dictionary containing the imports of your VehicleSim model. For each entry, the key must be
+    // the name of an import to your Vehicle model. You can get the list of available import name in
+    // Feedback.VehiclesimFeedback.model_import_names.
+    map<string, double> model_imports = 3;
+    // List of VS commands to send to the Vehiclesim solver. This option should be used by advanced
+    // users to provide control over the simulation process.
+    repeated string vs_commands = 4;
+  }
+}
+
+// Depending on the motion model, the simulator output that is sent to the AV stack at each sim step
+// can contain different kinds of feedback data, specified by this message. The idea is to make it
+// easier to use model-dependent internal state in the feedback of e.g. controllers in the AV stack.
+// The file motion_model.proto defines feedback available to motion models, while
+// composite_vehicle.proto defines feedback available to Composite Vehicle. motion_model.proto also
+// defines a DynamicFeedback type which populates feedback for fully dynamic composite vehicles.
+message Feedback {
+  oneof feedback_type {
+    // Used for error detection.
+    Empty undefined = 1;
+    // Used for models that do not send feedback.
+    Empty no_feedback = 2;
+    // Used for bicycle-based models.
+    Bicycle bicycle = 3;
+    // Used for path_tracking models.
+    PathTrackingFeedback path_tracking_feedback = 4;
+    // Used for composite_vehicle models.
+    simian_public.composite_vehicle.CompositeVehicleFeedback composite_vehicle = 5;
+    // Used by models that are fully dynamic. Shares some fields with composite vehicle feedback.
+    DynamicFeedback dynamic_feedback = 6;
+    // Free-form feedback. Currently used only by private_model_3d.
+    CustomFeedback custom_feedback = 7;
+    // Feedback message used by vehiclesim.
+    VehiclesimFeedback vehiclesim_feedback = 8;
+  }
+
+  // A feedback type used for bicycle models.
+  message Bicycle {
+    double ego_pitch = 1;     // [rad], positive means going downhill
+    double velocity = 2;      // longitudinal [m/s]
+    double acceleration = 3;  // longitudinal [m/s2]
+    // Tire angle in the vehicle frame.
+    double steering_angle = 4;  // [rad], positive means left forward curve
+    double steering_rate = 5;   // [rad/s]
+    double curvature = 6;       // [1/m], positive means left forward curve
+    int32 gear = 7;             // most recently-commanded gear
+  }
+
+  // A feedback type for path_tracking motion models.
+  message PathTrackingFeedback {
+    double sim_path_position = 1;  // internal arc length along the curve fit of the reference
+    double reference_path_position =
+        2;  // arc length along the reference specified for vehicle model
+  }
+
+  // Feedback message used by Vehiclesim.
+  message VehiclesimFeedback {
+    // List of the name of all the available model imports ranked by port number.
+    repeated string model_import_names = 1;
+    // Dictionary containing the exports of your VehicleSim model. For each entry, the key is
+    // the name of the variable defined in the 'I/O Channels: Export' screen and the value is
+    // the value of the export variable.
+    map<string, double> model_exports = 2;
+  }
+}
+
+// Provides all the feedback Composite Vehicle Feedback does in addition to some wheel and vehicle
+// body feedback specific to fully dynamic models.
+message DynamicFeedback {
+  // Feedback from the powertrain model associated with this vehicle section.
+  simian_public.composite_vehicle.PowertrainFeedback powertrain_feedback = 1;
+  // Feedback from the brake model associated with this vehicle section.
+  simian_public.composite_vehicle.BrakeFeedback brake_feedback = 2;
+  // Feedback from the steering model associated with this vehicle section.
+  simian_public.composite_vehicle.SteeringFeedback steering_feedback = 3;
+  // Feedback from the wheel model associated with this vehicle section.
+  WheelFeedback wheel_feedback = 4;
+  // Feedback from the body model associated with this vehicle section.
+  BodyFeedback body_feedback = 5;
+}
+
+message WheelFeedback {
+  // Axle names follow the below convention.
+  // If the Simian vehicle state update model has two axles, the front and rear
+  // axles refer to the first and second (last) axles of the vehicle respectively.
+  // If the Simian vehicle state update model has three axles, the front,
+  // middle, and rear axles refer to the first, second, and third axles of the
+  // vehicle, respectively.
+  //
+  // For example, if you wish to find out the slip angle of the rear wheels on
+  // your two-axle Simian vehicle you will have to tap into slip_angle_rear.
+  // <!-- TODO(rami): verify that For example and on gets generated, and check for other cases where
+  // comment is two parts. -->
+
+  // [rad] Lateral slip angle of the front wheel of any dynamic zero track model.
+  simian_public.composite_vehicle.ScalarFeedback slip_angle_front = 1;
+  // [rad] Lateral slip angle of the rear wheel of any dynamic zero track model.
+  simian_public.composite_vehicle.ScalarFeedback slip_angle_rear = 2;
+  // [rad] Lateral slip angle of the middle wheel of any dynamic zero track model.
+  simian_public.composite_vehicle.ScalarFeedback slip_angle_middle = 3;
+  // [N] Lateral force on the front wheel of any dynamic zero track model.
+  simian_public.composite_vehicle.ScalarFeedback force_lateral_front = 5;
+  // [N] Lateral force on the rear wheel of any dynamic zero track model.
+  simian_public.composite_vehicle.ScalarFeedback force_lateral_rear = 6;
+  // [N] Lateral force on the middle wheel of any dynamic zero track model.
+  simian_public.composite_vehicle.ScalarFeedback force_lateral_middle = 4;
+  // [N] Longitudinal force on the front wheel of any dynamic zero track model.
+  simian_public.composite_vehicle.ScalarFeedback force_longitudinal_front = 7;
+  // [N] Longitudinal force on the rear wheel of any dynamic zero track model.
+  simian_public.composite_vehicle.ScalarFeedback force_longitudinal_rear = 8;
+  // [N] Longitudinal force on the middle wheel of any dynamic zero track model.
+  simian_public.composite_vehicle.ScalarFeedback force_longitudinal_middle = 9;
+  // [N/rad] Cornering stiffness of the front wheel of any dynamic zero track model.
+  simian_public.composite_vehicle.ScalarFeedback cornering_stiffness_front = 10;
+  // [N/rad] Cornering stiffness of the rear wheel of any dynamic zero track model.
+  simian_public.composite_vehicle.ScalarFeedback cornering_stiffness_rear = 11;
+  // [N/rad] Cornering stiffness of the middle wheel of any dynamic zero track model.
+  simian_public.composite_vehicle.ScalarFeedback cornering_stiffness_middle = 12;
+}
+
+// A subfield of the DynamicFeedback message that contains feedback related to the vehicle body.
+message BodyFeedback {
+  // Sideslip value at the center of mass of the vehicle
+  simian_public.composite_vehicle.ScalarFeedback bodyslip_com = 1;  // [rad]
+  // Hitch angle is reported with respect to the preceeding section of the vehicle. It is not
+  // populated on the first section since the first section is not hitched to anything. E.g. the
+  // trailer at ego.sections[ii] will report its hitch angle with respect to the body at
+  // ego.sections[ii - 1].
+  simian_public.composite_vehicle.ScalarFeedback hitch_angle = 2;  // [rad]
+  // The hitch angle rate is observed in the world frame and expressed in the section frame.
+  simian_public.composite_vehicle.ScalarFeedback hitch_angle_rate = 3;  // [rad/s]
+  // Lateral velocity of this section's center of mass.
+  simian_public.composite_vehicle.ScalarFeedback velocity_lateral_com = 4;  // [m/s]
+  // Lateral acceleration of this section's center of mass.
+  simian_public.composite_vehicle.ScalarFeedback acceleration_lateral_com = 5;  // [m/s2]
+}
+
+// Free-form feedback. Currently used only by private_model_3d.
+message CustomFeedback {
+  // The string keys are the names of the feedback quantities
+  // (e.g., "load_kg").
+  map<string, FeedbackValue> entries = 1;
+  message FeedbackValue {
+    oneof value_type {
+      // Example: whether the vehicle is carrying an object.
+      bool boolean = 1;
+      // Example: mass of a load carried by the vehicle.
+      double scalar = 2;
+      // Example: position of an end effector of a robotic ar attached to the vehicle.
+      simian_public.common.Vector3 vector3 = 3;
+    }
+  }
+}
+
+// An empty field used to detect whether required fields are missing.
+message Empty {}
+
+// <!-- TODO(brandon) -->
+// <!-- THE BRAKE MODELS HERE NEED TO BE DEPRECATED -->
+// <!-- DO NOT MODIFY THE BELOW -->
+// <!-- FOR ALL NEW CODE, USE THE composite_vehicle.proto -->
+// (deprecated) A motion model can be used to describe different parameters of a braking system.
+message BrakeModel {
+  oneof brake_model_type {
+    // Linear mapping of the normalized brake signal to `max_brake_decel`.
+    LinearlyMapped linearly_mapped = 1;
+    // Linear mapping of the normalized brake signal to `max_brake_decel`, but the wheels will lock
+    // when the normalized signal exceeds `critical_brake_cmd`.
+    SimpleWheelLock simple_wheel_lock = 2;
+  }
+  // Command for signal modification.
+  simian_public.signal_modifier.SignalModifier signal_modifier = 3;
+  // Resistance created by any two objects when sliding against each other.
+  double sliding_friction = 4;
+
+  // Linear mapping of the normalized brake signal to `max_brake_decel`.
+  message LinearlyMapped {
+    // Max deceleration to slow velocity down. Units: [m/s^2].
+    double max_brake_decel = 2;
+  }
+
+  // Linear mapping of the normalized brake signal to `max_brake_decel`, but the wheels will lock
+  // when the normalized signal exceeds `critical_brake_cmd`.
+  message SimpleWheelLock {
+    // Max deceleration to slow velocity down. Units: [m/s^2].
+    double max_brake_decel = 2;
+    // If normalized_brake >  critical_brake_cmd, then wheels lock up and vehicle begins sliding.
+    // If normalized_brake <= critical_brake_cmd, then it gets renormalized as normalized_brake /
+    // critical_brake_cmd.
+    double critical_brake_cmd = 4;
+  }
+}

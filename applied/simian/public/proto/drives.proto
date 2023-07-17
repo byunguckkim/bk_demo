@@ -1,0 +1,72 @@
+// Copyright (C) 2018 Applied Intuition, Inc. All rights reserved.
+// This source code file is distributed under and subject to the LICENSE in license.txt
+
+syntax = "proto3";
+
+package simian_public.drive_data;
+
+import "google/protobuf/duration.proto";
+import "google/protobuf/struct.proto";
+import "google/protobuf/timestamp.proto";
+import "applied/simian/public/proto/ego.proto";
+import "applied/simian/public/proto/map_config.proto";
+import "applied/simian/public/proto/sensor_model.proto";
+import "applied/simian/public/proto/sim_data.proto";
+
+// This is equivalent to the future SimFrame except:
+// * Only 1 'stack' to interact with, so we don't repeat anything.
+// * No 'ground truth' per se, since we only have the result of perception.
+message DriveFrame {
+  // Put pose, perceived obstacles and sensor detections here:
+  ego.EgoOutput stack_input = 1;
+  // Put controls, data points, drawings and stack logs here:
+  sim_data.SimulatorInput stack_output = 2;
+  repeated sensor_model.SensorOutput camera_outputs = 3;
+  repeated sensor_model.SensorOutput lidar_outputs = 4;
+}
+
+service DriveConverter {
+  rpc OpenLog(OpenLogRequest) returns (OpenLogResponse);
+  rpc CloseLog(CloseLogRequest) returns (CloseLogResponse);
+  rpc ReadConvertedFrame(ReadConvertedFrameRequest) returns (ReadConvertedFrameResponse);
+  rpc GetMapKey(GetMapKeyRequest) returns (GetMapKeyResponse);
+}
+
+message OpenLogRequest {
+  string filename = 1;
+  string map_key = 2;
+  simian_public.map_config.MapConfig map_config = 3;
+}
+message OpenLogResponse {}
+message CloseLogRequest {}
+message CloseLogResponse {}
+
+message ReadConvertedFrameRequest {}
+message ReadConvertedFrameResponse {
+  DriveFrame frame = 1;
+  int64 start_time_ms = 2;
+}
+
+message GetMapKeyRequest {
+  string filename = 1;
+}
+message GetMapKeyResponse {
+  string map_key = 1;
+}
+
+message DehydratedDrive {
+  repeated ReadConvertedFrameResponse frames = 1;
+}
+
+message DriveLog {
+  string uuid = 1;
+  string name = 2;
+  string path = 3;
+  int64 size = 4;
+  google.protobuf.Timestamp driven = 5;
+  google.protobuf.Duration duration = 6;
+  google.protobuf.Value metadata = 7;
+  // Indicates whether a raw log is a directory or file
+  bool is_directory = 8;
+  google.protobuf.Timestamp last_modified = 9;
+}

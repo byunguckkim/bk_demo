@@ -1,0 +1,12 @@
+diff --git a/test/distrib/cpp/run_distrib_test_cmake.sh b/test/distrib/cpp/run_distrib_test_cmake.sh
+index dd3d7fc..b43b41f 100755
+--- a/test/distrib/cpp/run_distrib_test_cmake.sh
++++ b/test/distrib/cpp/run_distrib_test_cmake.sh
+@@ -40,6 +40,6 @@ popd
+ # Install protobuf
+ mkdir -p "third_party/protobuf/cmake/build"
+ pushd "third_party/protobuf/cmake/build"
+-cmake -Dprotobuf_BUILD_TESTS=OFF -DCMAKE_BUILD_TYPE=Release ..
++cmake -Dprotobuf_BUILD_TESTS=OFF -DCMAKE_BUILD_TYPE=Release -DCMAKE_POSITION_INDEPENDENT_CODE=TRUE ..
+ make -j4 install
+ popd

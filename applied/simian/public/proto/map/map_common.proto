@@ -1,0 +1,50 @@
+// Copyright (C) 2021 Applied Intuition, Inc. All rights reserved.
+// This source code file is distributed under and subject to the LICENSE in
+// license.txt
+
+syntax = "proto2";
+
+package simian_public.hdmap;
+
+// Custom tags that can be used to store semantic information about an element.
+message CustomTag {
+  // A string representing the name of the custom tag.
+  optional string key = 1;
+  // The actual value for the tag. Can be a string, double, or bool.
+  oneof value_field {
+    // A string representing the value of the tag.
+    string value = 2;
+    // A floating point number representing the value of the tag.
+    double value_number = 3;
+    // A boolean representing the value of the tag.
+    bool value_bool = 4;
+  }
+}
+
+// Must be in sync with map_enums.proto.
+enum ElementType {
+  UNSET = 0;
+  LANE = 1;
+  REGION = 2;
+  SIGNAL = 3;
+  SIGN = 4;
+  LINE = 5;
+  ROAD = 6;
+  ROAD_MARKING = 7;
+  INTERSECTION = 8;
+  LANE_GROUP = 9;
+}
+
+// Specifies the source of the map data.
+// Must be in sync with map_enums.proto.
+enum MapSource {
+  UNSET_SOURCE = 0;
+  // Specifies that the map was created in Meridian.
+  MERIDIAN = 1;
+  // Specifies that the map comes from open source data (e.g. OpenStreetMap).
+  OPEN_SOURCE = 2;
+  // Specifies that the map comes from a vendor.
+  VENDOR = 3;
+  // Specifies that the map comes from an in-house team.
+  CUSTOMER = 4;
+}

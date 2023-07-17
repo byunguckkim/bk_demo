@@ -1,0 +1,124 @@
+syntax = "proto3";
+
+package simian_public.run_results;
+
+import "google/protobuf/struct.proto";
+
+enum Result {
+  UNDEFINED = 0;
+  SUCCESS = 1;
+  FAILURE = 2;
+  ADP_ERROR = 3;
+  USER_ERROR = 4;
+}
+
+message CustomField {
+  string name = 1;
+  string value = 2;
+}
+
+message ObserverResult {
+  // The name of the scenario observer.
+  string name = 1;
+
+  Result result = 2;
+
+  // Requirements attached to the observer.
+  repeated string requirement_uuids = 3;
+}
+
+message StatMetadata {
+  string name = 1;
+}
+
+message StatValue {
+  oneof value {
+    double number = 1;
+    bool boolean = 2;
+    string string_value = 3;
+  }
+}
+
+message StatValueList {
+  repeated StatValue values = 1;
+}
+
+message StatValueMatrix {
+  repeated StatValueList lists = 1;
+}
+
+message PerSimStatResult {
+  StatMetadata metadata = 1;
+  repeated StatValue values = 2;
+  StatValueMatrix matrix = 3;
+}
+
+message ScenarioMetadata {
+  // The name of the scenario defined in the yaml under metadata/name.
+  string name = 1;
+  repeated string tags = 2;
+}
+
+// <!-- Next ID: 17 -->
+message RunResult {
+  int32 id = 1;
+  string uuid = 2;
+  Result result = 3;
+  float start_time_unix = 4;
+
+  string comment = 5;
+
+  repeated CustomField custom_fields = 6;
+
+  // Requirements attached to the scenario.
+  repeated string requirement_uuids = 7;
+  // Results for the observers in the scenario.
+  repeated ObserverResult observer_results = 8;
+  repeated PerSimStatResult per_sim_stats = 16;
+
+  // Data specified in scenario yaml 'extra_data' section.
+  google.protobuf.Struct extra_data = 9;
+
+  ScenarioMetadata scenario_metadata = 10;
+
+  // This is the string returned from customer_interface__get_stack_version,
+  // for the given sim.
+  string customer_stack_version = 11;
+
+  enum RequestType {
+    SIMIAN = 0;
+    COMMIT_TEST = 1;
+    SCHEDULED_ASSESSMENT = 2;
+    ADHOC_ASSESSMENT = 3;
+  }
+  // The source of how the sim run was triggered.
+  RequestType request_type = 12;
+
+  // ID of the auto-sampling run, if this sim run was a part of one.
+  uint32 autosampling_run_id = 13;  // Optional
+
+  // Parameter sweep names, if this scenario is a variation of a parameter sweep.
+  repeated string parameter_sweep_names = 14;
+
+  // Parameter sweep values, if this scenario is a variation of a parameter sweep.
+  repeated string parameter_sweep_values = 15;
+}
+
+message BatchResult {
+  message AutosamplingOptions {
+    uint32 autosampling_run_id = 1;
+    string logical_scenario_path = 2;
+    string seed_state_json = 3;  // JSON representing the initial state
+
+    uint32 epoch_index = 4;  // Index of the current epoch
+    uint32 max_epochs = 5;
+    string state_json = 6;  // JSON representing the state at this epoch
+  }
+
+  int32 id = 1;
+  string uuid = 2;
+  Result result = 3;
+  repeated RunResult runs = 4;
+  uint32 batch_request_id = 5;
+  AutosamplingOptions autosampling_options = 6;
+}

@@ -1,0 +1,55 @@
+// Copyright (C) 2018 Applied Intuition, Inc. All rights reserved.
+// This source code file is distributed under and subject to the LICENSE in license.txt
+
+// ============================================================================
+// DEPRECATED. DO NOT USE. DISABLED.
+// The new way to do this is to use plugin behaviors and actors.
+// ============================================================================
+
+syntax = "proto3";
+
+package simian_public.custom_actor;
+
+import "google/protobuf/struct.proto";
+import "applied/simian/public/proto/actor.proto";
+import "applied/simian/public/proto/motion_model.proto";
+import "applied/simian/public/proto/planar.proto";
+import "applied/simian/public/proto/shape.proto";
+import "applied/simian/public/proto/spatial.proto";
+
+// Specification for creating a custom actor. This is used in the
+// scenario description to define the specific custom actors to
+// create. And when the sim starts up, the custom actor factory is
+// called with this data to instantiate each custom actor.
+message Description {
+  int32 id = 1;
+
+  // Instance name, passed to customer-specific factory and used to
+  // distribute and collect actor inputs and outputs.
+  string name = 2;
+
+  // Type name, passed to customer-specific factory.
+  string custom_type = 3;
+
+  actor.Actor.ObstacleType obstacle_type = 4;
+  planar.State2d initial_state = 5;
+  shape.Shape shape = 6;
+  motion_model.Description motion_model = 7;
+  google.protobuf.Value extra_data = 8;
+}
+
+// Data flowing from sim to each custom actor.
+//
+// NOTE This is still work in progress.
+message SimToActor {
+  string name = 1;
+  spatial.State state = 2;
+}
+
+// Data flowing from each custom actor to sim.
+//
+// NOTE This is still work in progress.
+message ActorToSim {
+  string name = 1;
+  motion_model.Input command = 2;
+}

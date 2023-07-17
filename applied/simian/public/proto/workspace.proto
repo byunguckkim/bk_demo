@@ -1,0 +1,131 @@
+// Copyright (C) 2018 Applied Intuition, Inc. All rights reserved.
+// This source code file is distributed under and subject to the LICENSE in license.txt
+
+// A Simian workspace defines a set of directories where resources
+// such as scenarios, maps, and logs are found or written to. For more
+// details, see "Getting Started" --> "System Architecture" -->
+// "Workspaces" in the Simian manual.
+
+syntax = "proto3";
+
+package simian.shipping;
+
+message WorkspaceFile {
+  string current_workspace = 1;
+  repeated Workspace workspace = 2;
+}
+
+message Mount {
+  // Defines the name of the mount in the ADP container.
+  string adp_mount = 1;
+  // The path on the host filesystem.
+  string host = 2;
+}
+
+// <!-- Next ID: 26 -->
+message Workspace {
+  string name = 1;
+
+  string maps = 2;
+
+  // Path to the local scenario directory. Cannot be used in combination with scenario_mounts.
+  string scenarios = 3;
+  // Use for mounting multiple directories in a single local instance of ADP.
+  repeated Mount scenario_mounts = 17;
+
+  string output = 4;
+  string input_drives = 5;
+  string db = 6;
+  string config = 8;
+  string input_maps = 9;
+  string container_name = 10;
+  string frontend = 11;
+  string input_models = 13;
+  string cloud_creds = 14;
+  string dlc = 15;
+  string external_scenarios = 16;
+  string abstract_scenarios = 21;
+  string datasets = 18;
+  string input_georegions = 19;
+  string input_validation = 20;
+  string vehiclesim_repo = 22;
+  // Customer-specific location of the DLL for their customer interface (e.g.,
+  // customer_interface.dll); only used on Windows.
+  string customer_interface_binaries = 24;
+  string input_integrations = 25;
+
+  // reserved 7, 12;
+  // reserved "ci", "drive_extension";
+}
+
+// <!-- Next ID: 42 -->
+message WorkspaceCompiled {
+  string name = 1;
+
+  string maps = 2;
+
+  // Where tiles for ingested maps are stored.
+  string map_tiles = 32;
+
+  repeated Mount scenario_mounts = 25;
+
+  string output = 4;
+  string input_drives = 5;
+  string db = 6;
+  string config = 7;
+  string customer_output = 8;
+  string input_maps = 9;
+  string container_name = 10;
+  string drive_conversion_server = 13;
+  string frontend = 15;
+  string sim_log_output = 16;
+  string input_models = 17;
+  string stats_output = 18;
+  // spark_stats_output points to the same place as stats_output but requires a separate workspace
+  // entry to support Azure specific Spark access
+  string spark_stats_output = 40;
+  string cloud_creds = 19;
+  string spectral_dataset = 20;
+  // Location of temporary CI working directory
+  string ci = 21;
+  // Location for customer created content (external to a ship)
+  string dlc = 22;
+  // Location for maps in object storage
+  string maps_store = 23;
+  // Location for semantic maps in object storage.
+  string semantic_maps_store = 41;
+
+  string external_scenarios = 24;
+  // Workspace for A-SDL scenarios
+  string abstract_scenarios = 30;
+  // Theta data storage
+  string datasets = 26;
+  // Save queries from Basis storage
+  string query_results = 27;
+  // Location for serialized georegions used for map querying.
+  string input_georegions = 28;
+  // Location for map validation-related resources, such as custom validation scripts.
+  string input_validation = 29;
+  // Location for Carsim files
+  string vehiclesim_repo = 31;
+  // Location for drive configs pulled from ingestion images.
+  string drive_configs = 34;
+  // Location of tmp output directory for ephemeral operations
+  string tmp_output = 35;
+  // Customer-specific location of the DLL for their customer interface (e.g.,
+  // customer_interface.dll); only used on Windows.
+  string customer_interface_binaries = 36;
+  // Location of tmp upload directory for ephemeral operations
+  string tmp_upload = 37;
+  // Location for the integration wizard to store FMU and stack related description files and
+  // binaries.
+  string input_integrations = 38;
+  // This is where the Simulink (or MIL) customer interface is stored on Windows.
+  // This is NOT applicable to Linux.
+  // This path is used when the --use_simulink_customer_interface_binaries sim flag is specified.
+  // Customers cannot and should not modify this.
+  string simulink_customer_interface_binaries = 39;
+
+  // reserved 3, 12, 14;
+  // reserved "scenarios", "drive_extension", "stack_server";
+}

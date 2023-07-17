@@ -1,0 +1,18 @@
+// A dummy proto we can use as a source to the osi3 bazel target to preserve backwards
+// compatibility.
+syntax = "proto2";
+
+package osi3;
+
+import "applied/simian/public/osi3/osi_common.proto";
+import "applied/simian/public/osi3/osi_environment.proto";
+import "applied/simian/public/osi3/osi_groundtruth.proto";
+import "applied/simian/public/osi3/osi_lane.proto";
+import "applied/simian/public/osi3/osi_object.proto";
+import "applied/simian/public/osi3/osi_occupant.proto";
+import "applied/simian/public/osi3/osi_roadmarking.proto";
+import "applied/simian/public/osi3/osi_trafficlight.proto";
+import "applied/simian/public/osi3/osi_trafficsign.proto";
+import "applied/simian/public/osi3/osi_version.proto";
+
+option optimize_for = SPEED;

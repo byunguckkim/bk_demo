@@ -1,0 +1,59 @@
+// Copyright (C) 2022 Applied Intuition, Inc. All rights reserved.
+// This source code file is distributed under and subject to the LICENSE in license.txt
+
+syntax = "proto3";
+
+package simian_public.proto.scenario.simulink_config;
+
+import "google/protobuf/duration.proto";
+
+// <!-- Next ID: 6 -->
+// Configuration used to configure Simulink co-sim startup.
+message SimulinkConfig {
+  // <!-- Next ID: 4 -->
+  message AutomationConfiguration {
+    // system absolute path to MATLAB root directory.
+    string matlab_root_absolute = 1;
+    // system absolute path to desired .slx file.
+    string model_absolute_path = 2;
+    // list of system aboslute paths to model dependencies.
+    repeated string model_deps_absolute = 3;
+    // list of system absolute path to directory.
+    repeated string matlab_absolute_paths = 4;
+    // list of filenames with extension .m.
+    repeated string model_init_scripts_filenames = 5;
+    // list of filenamse with extension .m.
+    repeated string model_post_init_scripts_filenames = 6;
+  }
+  message NetworkConfiguration {
+    // This field enables the user to send data to an arbitrary IP address for co-simulation.
+    // 127.0.0.1 (Linux localhost) by default.
+    string simulink_ip_address = 3;
+    // Network port for the Simulink Manager (in Simulink), defaults to 40500.
+    uint32 manager_port = 4;
+    // Network port for the Simulink Automator, defaults to 40400.
+    uint32 automator_port = 5;
+  }
+  message TimeoutConfiguration {
+    // This field enables the user to set the timeout field to start the Simian-Simulink
+    // co-simulation. Set as 30s by default.
+    google.protobuf.Duration simulink_start_timeout_duration = 4;
+    // This field enables the user to specify the timeout for calls from ADP to send to Simulink.
+    // Set as 0.1s by default
+    google.protobuf.Duration adp_send_to_simulink_timeout_duration = 5;
+    // This field enables the user to specify the timeout for calls from ADP to receive from
+    // Simulink. Set as 2s by default
+    google.protobuf.Duration adp_receive_from_simulink_timeout_duration = 6;
+  }
+
+  // More verbose version of Simulink bridge that can be used for debugging.
+  bool verbose = 1;
+  // This field enables the user to pause a Simulink simulation within Simulink for debugging
+  // purposes.
+  bool pause_enabled = 2;
+  // Network configuration for Simulink.
+  NetworkConfiguration network_configuration = 3;
+  // Timeout configuration for the Simulink bridge.
+  TimeoutConfiguration timeout_configuration = 4;
+  AutomationConfiguration automation_configuration = 5;
+}

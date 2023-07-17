@@ -1,0 +1,126 @@
+// Copyright (C) 2019 Applied Intuition, Inc. All rights reserved.
+// This source code file is distributed under and subject to the LICENSE in
+// license.txt
+
+syntax = "proto3";
+
+package public_log_search;
+
+import "applied/simian/public/proto/common.proto";
+import "applied/simian/public/proto/public_query_service.proto";
+
+message LogSearchRequest {
+  enum LogSearchQueryType {
+    UNKNOWN_QUERY_TYPE = 0;
+    DEFAULT_TIME_WINDOW = 1;
+    EXACT_MATCH = 2;
+  }
+
+  oneof query {
+    // Use this field when passing in a log search request that matches the filter
+    // string used in the Strada Explore page UI.
+    string filter_string = 1;
+    // Use this field when passing in a raw SQL query to conduct a search
+    // over logs.
+    string sql_query = 2;
+  }
+
+  // Artificially limit the number of results returned by the query.
+  uint32 results_limit = 3;
+
+  // Instead of querying all logs, limit the query to only search over the
+  // specified number of most recent logs.
+  uint32 most_recent_logs_limit = 4;
+
+  // This hostname will be used to format the playback links of
+  // the results returned by the query.
+  string hostname = 5;
+
+  public_query.PaginationRequest pagination = 6;
+
+  LogSearchQueryType query_type = 7;
+
+  message ConditionalQueryBlock {
+    // ConditionalQueryBlock defines a query block condition that is used when searching for
+    // interesting snippets in Strada. This is equivalent to a row in the query builder in the
+    // frontend.
+    enum Operator {
+      UNSET = 0;
+      GT = 1;
+      LT = 2;
+      EQ = 3;
+      EXISTS = 4;
+    }
+
+    message Metric {
+      // A metric is the name of the stat or data point you are searching over.
+      oneof identifier {
+        string string_metric = 1;
+      }
+    }
+    message Value {
+      // This defines the value of the metric being queried over.
+      oneof identifier {
+        string string_value = 1;
+      }
+    }
+
+    Metric metric = 1;
+    Operator operator = 2;
+    Value value = 3;
+  }
+
+  message TemporalConditionQueryBlock {
+    // The minimal TemporalConditionQueryBlock is defined by a time and a condition.
+    // We search for events where the condition specified in this message occur within time_seconds
+    // of the condition of the previous event. Individually, a block doesn't have any meaning.
+    // Multiple blocks can be chained together to form a temporal condition query. For the first
+    // TemporalConditionalQueryBlock, the time_seconds field is ignored.
+
+    // Example:
+    // [time: unset, ConditionalQueryBlock c1],
+    // [time: 1, ConditionalQueryBlock c2],
+    // [time: 3, ConditionalQueryBlock c3]
+    // This represents a query where we return all instances of c3 that
+    // occur within 3 seconds of c2 occuring, where c2 occurs within 1 second of c1 occuring.
+
+    ConditionalQueryBlock condition = 1;
+
+    int32 time_seconds = 2;
+  }
+
+  repeated TemporalConditionQueryBlock temporal_condition_query_blocks = 8;
+}
+
+message LogSearchResponse {
+  simian_public.common.CommonResponse common = 1;
+
+  // The total number of results that are within result_json.
+  uint32 total_count = 2;
+
+  // The actual results of the query. The format will look like so:
+  // {
+  //  "status": "SUCCESS",
+  //  "total_count": 100,
+  //  "results": [
+  //      {
+  //          "id": 1,
+  //          "longitude": "-122.0108170015959",
+  //          "latitude": "37.406939964916496",
+  //          "map_key": "sunnyvale@2b5b70deb5",
+  //          "uuid": "log-path-example-1642368844249",
+  //          "log_path": "log-path-example",
+  //          "event_time_epoch_ms": 5800.0,
+  //          "playback_url":
+  //          "http://<...>.applied.dev/strada/library/drives/log-path-example-1642368844249/playback/?currentTime=5.8&snippetStart=0&snippetEnd=10.8&zoomLevel=0",
+  //          "metric_name_val": "value",
+  //      },
+  //      {
+  //          "id": 2,
+  //          ...
+  //      },
+  //      ...
+  //  ]
+  // }
+  string result_json = 3;
+}

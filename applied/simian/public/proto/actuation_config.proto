@@ -1,0 +1,160 @@
+// Copyright (C) 2022 Applied Intuition, Inc. All rights reserved.
+// This source code file is distributed under and subject to the LICENSE in license.txt
+
+syntax = "proto3";
+
+package simian_public.actuation_config;
+
+// Define a set of actuators attached to a vehicle or articulation.
+message ActuationConfig {
+  repeated Actuator actuators = 1;
+  message Actuator {
+    string name = 1;
+
+    oneof actuator_type {
+      HydraulicActuator hydraulic = 2;
+      SpeedStateMachineActuator speed_state_machine = 3;
+    }
+  }
+
+  // This actuator takes a dimensionless input in [-1, 1] that determines the desired speed for a
+  // degree of freedom via a state machine. The states in the state machine are:
+  // - idle
+  // - wind up
+  // - speed up
+  // - active
+  // - slow down
+  // The state transition rules are as follows:
+  //   input speed 0 -> non-zero: wind up
+  //   input speed non-zero for wind_up_duration: speed up
+  //   input speed non-zero for speed_up_duration: active
+  //   input speed non-zero -> zero: slow down
+  //   input speed is zero for slow_down_duration: idle
+  //
+  // All fields are required.
+  // <!-- Next ID: 10 -->
+  message SpeedStateMachineActuator {
+    // The maximum possible desired speed.
+    // Units of radians/second for an angular degree of freedom, and meters/second for a
+    // translational degree of freedom. Whether the degree of freedom is angular or translational
+    // depends on the model. Must be positive.
+    double max_speed = 1;
+    // Duration between when control input is first non-zero and when joint speed becomes non-zero.
+    // Must be positive.
+    double wind_up_duration = 2;  // [seconds]
+    // Duration for which the desired speed is linearly interpolated between 0 and max_speed *
+    // input. Must be positive.
+    double speed_up_duration = 3;  // [seconds]
+    // Duration between when control input first becomes 0 and the joint speed reaches 0.
+    // Must be positive.
+    double slow_down_duration = 4;  // [seconds]
+    // Damping applied to the error between desired and actual speed when the input is 0.
+    // The actual damping is between zero_input_damping and max_input_damping, as a function of the
+    // input. Must be non-negative.
+    double zero_input_damping = 5;  // [N*m*s] if angular, [N*s/m] if translational
+    // Damping applied to the error between desired and actual speed when the input is -1 or 1.
+    // Must be non-negative.
+    double max_input_damping = 6;  // [N*m*s] if angular, [N*s/m] if translational
+    // Minimum value of the degree of freedom position.
+    // Must be less than or equal to max_position.
+    double min_position = 7;  // [radians] or [meters]
+    // Maximum value of the degree of freedom position.
+    // Must be greater than or equal to min_position.
+    double max_position = 8;  // [radians] or [meters]
+    // Whether the min_position and max_position are enforced.
+    bool enforce_limits = 9;
+  }
+
+  message HydraulicActuator {
+    oneof attachment {
+      Coordinate coordinate = 1;
+    }
+
+    // The following parameters may be the same across multiple hydraulic actuators in
+    // the same hydraulic system.
+    OilProperties oil_properties = 2;
+    MechanicalProperties mechanical_properties = 3;
+    ControlValve control_valve = 4;
+    HydraulicPressure hydraulic_pressure = 5;
+    ReliefValve relief_valve = 6;
+
+    // Spring stiffness of the piston against the end of cylinder to enforce contact.
+    double cylinder_stop_stiffness = 7;  // [N/m]
+
+    // The following parameters are likely to be different for each hydraulic actuator.
+    CylinderProperties cylinder_properties = 8;
+
+    message Coordinate {
+      // The name of the degree of freedom that this actuator acts along.
+      string name = 1;
+    }
+
+    message OilProperties {
+      // Spring stiffness of hydraulic oil when control valve is in neutral.
+      double neutral_spring_stiffness = 1;  // [N/m]
+
+      // Density of hydraulic fluid.
+      double density = 2;  // [kg/m^3]
+
+      // Bulk modulus of hydraulic fluid.
+      double bulk_modulus = 3;  // [N/m^2]
+    }
+
+    message MechanicalProperties {
+      // Viscous friction coefficient of the hydraulic fluid inside the cylinder.
+      double piston_viscous_friction_coefficient = 1;  // [N*s/m]
+
+      // Kinetic Coulomb friction force between the piston and cylinder wall.
+      double piston_coulomb_friction_force = 2;  // [N]
+
+      // Static friction force between the piston and cylinder wall.
+      double piston_static_friction_force = 3;  // [N]
+    }
+
+    message ControlValve {
+      // Discharge coefficient of the control valve orifice into the hydraulic cylinder.
+      double discharge_coefficient = 1;  // [-]
+
+      // Area of the control valve orifice per unit of normalized valve control input ([-1, 1]).
+      double control_coefficient = 2;  // [m^2]
+    }
+
+    message HydraulicPressure {
+      // Supply pressure of the hydraulic system.
+      double supply = 1;  // [N/m^2] a.k.a [Pa]
+
+      // Drain pressure of the hydraulic system.
+      double drain = 2;  // [N/m^2] a.k.a [Pa]
+    }
+
+    message ReliefValve {
+      // Pressure that triggers relief valve.
+      double cracking_pressure = 1;  // [N/m^3]
+
+      // Slope coefficient of relief valve.
+      double slope_coefficient = 2;  // [m^4*s/kg]
+    }
+
+    message CylinderProperties {
+      // Contact surface area on the extension side of the piston. This surface is pressurized
+      // during extension. This area is often called the "bore".
+      double pressurized_piston_area_extension = 1;  // [m^2]
+
+      // Contact surface area on the retraction side of the piston. This surface is pressurized
+      // during retraction.
+      double pressurized_piston_area_retraction = 2;  // [m^2]
+
+      // The full length that the piston inside the cylinder could travel.
+      double piston_stroke_length = 3;  // [m]
+
+      // Constant hydraulic oil volume on the extension side of the piston.
+      double constant_oil_volume_extension = 4;  // [m^3]
+
+      // Constant hydraulic oil volume on the retraction side of the piston.
+      double constant_oil_volume_retraction = 5;  // [m^3]
+
+      // Distance between the actuator's two mounting points when the actuator is fully retracted.
+      double minimum_mount_distance = 6;  // [m]
+    }
+  }
+}

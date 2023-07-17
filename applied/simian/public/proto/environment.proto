@@ -1,0 +1,404 @@
+// Copyright (C) 2019 Applied Intuition, Inc. All rights reserved.
+// This source code file is distributed under and subject to the LICENSE in
+// license.txt
+
+// This file contains all the spectral environment properties
+syntax = "proto3";
+
+package simian_public.environment;
+
+import "applied/simian/public/proto/common.proto";
+import "applied/simian/public/proto/sensor_sim/fragment_description.proto";
+import "applied/simian/public/proto/sensor_sim/spectral_materials.proto";
+import "applied/simian/public/proto/sensor_sim/spectral_rendering.proto";
+import "applied/simian/public/proto/spatial.proto";
+
+message WeatherSpec {
+  oneof weather_type {
+    // name of the weather condition preset
+    simian_public.environment.WeatherCondition predefined_weather = 1;
+    // custom weather
+    simian_public.environment.Weather user_defined_weather = 2;
+  }
+}
+
+// List of available lighting conditions in Spectral
+enum WeatherCondition {
+  option allow_alias = true;
+
+  NIGHT = 0;
+  CLEARNOON = 1;
+  CLOUDYNOON = 2;
+  WETNOON = 3;
+  WETCLOUDYNOON = 4;
+  MIDRAINNOON = 5;
+  HARDRAINNOON = 6;
+  SOFTRAINNOON = 7;
+  CLEARSUNSET = 8;
+  CLOUDYSUNSET = 9;
+  WETSUNSET = 10;
+  WETCLOUDYSUNSET = 11;
+  MIDRAINSUNSET = 12;
+  HARDRAINSUNSET = 13;
+  SOFTRAINSUNSET = 14;
+  SNOWCLEARNOON = 15;
+  SNOWCLOUDYNOON = 16;
+  USER = 17;
+
+  // Lowercase aliases here to preserve backward compatibility.
+  // Listed last to direct users to use the uppercase convention.
+  // These will be removed in the future in favor of the above entries.
+  night = 0 [deprecated = true];
+  clearnoon = 1 [deprecated = true];
+  cloudynoon = 2 [deprecated = true];
+  wetnoon = 3 [deprecated = true];
+  wetcloudynoon = 4 [deprecated = true];
+  midrainnoon = 5 [deprecated = true];
+  hardrainnoon = 6 [deprecated = true];
+  softrainnoon = 7 [deprecated = true];
+  clearsunset = 8 [deprecated = true];
+  cloudysunset = 9 [deprecated = true];
+  wetsunset = 10 [deprecated = true];
+  wetcloudysunset = 11 [deprecated = true];
+  midrainsunset = 12 [deprecated = true];
+  hardrainsunset = 13 [deprecated = true];
+  softrainsunset = 14 [deprecated = true];
+  snowclearnoon = 15 [deprecated = true];
+  snowcloudynoon = 16 [deprecated = true];
+  user = 17 [deprecated = true];
+}
+
+// <!-- Next ID: 37 -->
+message Weather {
+  enum Type {
+    RAIN = 0 [deprecated = true];
+    HAIL = 1 [deprecated = true];
+    SLEET = 2 [deprecated = true];
+    SNOW = 3 [deprecated = true];
+  }
+  string name = 1;
+  double solar_height = 2 [deprecated = true];
+  double solar_angle = 3 [deprecated = true];
+  double solar_brightness = 4 [deprecated = true];
+  double solar_directional_intensity = 5 [deprecated = true];
+  double solar_indirect_intensity = 6 [deprecated = true];
+  simian_public.common.RGBA solar_directional_color = 7 [deprecated = true];
+  double fog_density = 8 [deprecated = true];
+  double horizon_falloff = 9 [deprecated = true];
+  simian_public.common.RGBA sky_zenith_color = 10 [deprecated = true];
+  simian_public.common.RGBA sky_horizon_color = 11 [deprecated = true];
+  simian_public.common.RGBA sky_cloud_color = 12 [deprecated = true];
+  simian_public.common.RGBA sky_overall_color = 13 [deprecated = true];
+  double sky_light_intensity = 14 [deprecated = true];
+  simian_public.common.RGBA sky_light_color = 15 [deprecated = true];
+  bool precipitation = 16 [deprecated = true];
+  Type precipitation_type = 17 [deprecated = true];
+  double precipitation_amount = 18 [deprecated = true];
+  double ground_water_accumulation = 19 [deprecated = true];
+  bool wind = 20 [deprecated = true];
+  double wind_intensity = 21 [deprecated = true];
+  double wind_angle = 22 [deprecated = true];
+  double water_level = 23 [deprecated = true];
+  double puddle_spread = 24 [deprecated = true];
+  double blend_snow = 25 [deprecated = true];
+  double snow_depth = 26 [deprecated = true];
+  double amount_of_driving = 27 [deprecated = true];
+  double cloud_opacity = 28 [deprecated = true];
+  string default_weather_string = 29 [deprecated = true];
+  // Control of the Directional Light component in the spectral sky system
+  message Sun {
+    double illuminance = 1;  // Intensity of the sun in LUX (float)
+    message Position {
+      double az = 1;  // Azimuth (radians)
+      double el = 2;  // Elevation (radians)
+    }
+    Position position = 2;
+    bool override_sun_position = 3;
+    simian_public.common.RGBA color = 4;  // Sunlight color. Units normalized [0,1]
+    float source_angle = 5;               // Angle subtended by light source (radians)
+    float shadow_amount =
+        6;  // Amount of shadow occlusion. 0 means no shadows. Units normalized [0,1]
+    // List of What wavelength channels the Sun is visible to
+    repeated simian_public.sensor_sim.spectral_rendering.SpectralWavelengthChannel.Enum
+        wavelength_channels = 7;
+  }
+  Sun sun = 30;
+
+  // Control of the SkyAtmosphere
+  message Atmosphere {
+    double cloud_density = 1;
+    double precipitation = 2;
+    double fog_density = 3 [deprecated = true];
+    double wind = 4;         // Not processed for now
+    double temperature = 5;  // Not processed for now
+    message RainParticle {
+      double height = 1;
+      double radius = 2;
+    }
+    RainParticle rain_particle = 6;
+
+    // these map into the skylight component in UE
+    float scattered_light_scalar =
+        7;  // Energy emission scalar of the skylight. Units normalized [0,1]
+    simian_public.common.RGBA scattered_light_color =
+        15;  // color of the skylight. Units normalized [0,1]
+
+    // Atmospheric params.
+    // See https://docs.unrealengine.com/en-US/BuildingWorlds/FogEffects/SkyAtmosphere/index.html
+    float atmosphere_absorption_scale = 8;  // amnt of light the atmosphere absorbs.  Range [0+]
+    float rayleigh_scattering_scale = 9;    // amnt of light scattered by the atmosphere. Range [0+]
+    float mie_absorption_scale = 10;        // amnt of light abosorbed by air particles. Range [0+]
+    float mie_scattering_scale = 11;        // amnt of light scattered by air particles. Range [0+]
+    float atmosphere_multiscatter = 12;     // amnt of light scattered by atmosphere. Range [0+]
+    simian_public.common.RGBA rayleigh_scattering =
+        16;  // scattering coefficients resulting from molecules in the air at an altitude of 0
+    // kilometer. Units normalized [0,1]
+
+    // Fog params
+    // see https://docs.unrealengine.com/en-US/BuildingWorlds/FogEffects/HeightFog/
+    message Fog {
+      float density = 1;         // how much fog. Units [0-10]
+      float height_falloff = 2;  // control the density vs height factor. Units [0-10]
+      simian_public.common.RGBA inscattering_color =
+          3;                      // color of the light scatter in the fog. Units normalized [0,1]
+      float max_opacity = 4;      // how transparent the fog is. Units normalized [0,1]
+      float distance = 5;         // how far away the fog starts [0-5000]
+      float cutoff_distance = 6;  // how far away to stop rendering fog [0-20000000]
+      bool override_light_color_with_fog_inscatter =
+          7;  // do we use the fog inscattering color instead of light color in the fog.
+
+      message SecondFog {
+        float density = 1;         // how much fog. Units [0-10]
+        float height_falloff = 2;  // control the density vs height factor. Units [0-10]
+        float height_offset = 3;   // control the density vs height factor. Units [0-2]
+      }
+      SecondFog second_fog = 8;
+
+      // vertical offset from the ground plane for any height related parameters. Default is 0.
+      // Units [m]
+      float height_offset = 9;
+    }
+    Fog fog = 13;
+
+    message VolumetricFog {
+      bool enable = 1;  // turn on volumetric fog.
+      float scattering_distribution =
+          2;  // how much light scatters in various directions. [-1 to 1]
+      simian_public.common.RGBA albedo_color = 3;  // color of the fog. Units normalized [0,1]
+      simian_public.common.RGBA emissive_color =
+          4;  // color of the fog emission. Units normalized [0,1]
+      float extinction_scale =
+          5;  // controls how fog absorbs light. larger numbers means more absorption. Units [0-10]
+      float view_distance = 6;  // how far away we see the fog. Units [0-10000]
+      float static_light_scattering_intensity =
+          7;  // how much light is scattered by the fog. Units [0-10]
+    }
+    VolumetricFog volumetric_fog = 14;
+
+    // List of what wavelength channels the sky's atmosphere is visible to
+    repeated simian_public.sensor_sim.spectral_rendering.SpectralWavelengthChannel.Enum
+        wavelength_channels = 36;
+  }
+  Atmosphere atmosphere = 31;
+
+  message WorldSurface {
+    double water_level = 1;
+    double puddle_spread = 2;
+    double blend_snow = 3;
+    double snow_depth = 4;
+    double amount_of_driving = 5;
+    double roughness = 6;
+    simian_public.common.RGBA reflectivity = 7;
+  }
+  WorldSurface world_surface = 32;
+
+  message Location {
+    double lat = 1;
+    double lng = 2;
+  }
+  Location location = 33;
+
+  message DateTime {
+    int32 time_of_day = 1;
+    message Date {
+      float month = 1;
+      float day = 2;
+    }
+    Date date = 2;
+    double time_zone = 3;
+  }
+  DateTime datetime = 34;
+
+  message DaylightSavings {
+    bool enable_daylight_savings = 1;
+    int32 start_month = 2;
+    int32 start_day = 3;
+    int32 end_month = 4;
+    int32 end_day = 5;
+    int32 switch_hour = 6;
+  }
+  DaylightSavings daylight_savings = 35;
+}
+
+// Road marking configurations are only supported for certain maps
+// Please contact Applied Intuition if you are interested in controlling
+// these markings
+message RoadMarkingConfiguration {
+  LaneLineType lane_line_type = 1;
+  PavementMarkerType pavement_marker_type = 2;
+
+  enum LaneLineType {
+    INVALID_LANE_LINE = 0;  // Sentinel
+    NO_LANE_LINE = 1;
+    SOLID_WHITE = 2;
+    DASHED_WHITE = 3;
+    MULTIPLE_LANE = 4;
+    LANE_CHANGE = 5;
+    MERGING = 6;
+  }
+
+  enum PavementMarkerType {
+    INVALID_PAVEMENT_MARKER = 0;  // Sentinel
+    NO_PAVEMENT_MARKER = 1;
+    YELLOW_RAISED = 2;
+    WHITE_BOTTS_DOT = 3;
+  }
+}
+
+// options for overriding material parameter collection assets in UE.
+message MaterialOverrideConfiguration {
+  // Base set of material params
+  message BasicMaterialParams {
+    simian_public.common.RGBA color = 1;  // Tint of the base color. Units normalized [0,1]
+    double roughness_mult = 2;  // Scalar for the amount of roughness. Units normalized [0,1]
+    simian_public.sensor_sim.spectral_materials.MaterialColorModifier base_color_modifier =
+        3;  // Can specify a scalar or array of values that will either tint or override the
+    // material
+  }
+
+  // params specific to lane lines
+  message LaneLineParams {          // Settings related to lane line material parameters
+    double degradation_factor = 1;  // How much to degrade/break up the line. Units normalized [0,1]
+    simian_public.common.RGBA color = 2;  // Diffuse (base) color. Units normalized [0,1]
+    double retro_reflectivity = 3;        // Amount of reflectance. Units normalized [0,1]
+  }
+
+  // collection for the road surface
+  message RoadSurfaceParams {
+    double material_blend =
+        1;  // Amount to blend between lighter and darker materials. Normalized [0,1]
+    double material_blend_sharpness =
+        2;  // Control blend sharpness. Higher value weighted to darker material. Normalized [0,1]
+    double specular = 3;  // Specular amount. Normalized [0,1]
+    double metallic = 4;  // How metallic it looks. Normalized [0,1]
+    simian_public.sensor_sim.spectral_materials.MaterialColorModifier base_color_modifier =
+        5;  // Can specify a scalar or array of values that will either tint or override the road
+    // material
+  }
+
+  // base collection of properties
+  message BasicMPCGroup {  // basic available materials to modify
+    BasicMaterialParams concrete = 1;
+    float seed = 2;  // seed that controls dirt offset to add additional variation
+  }
+
+  // collections specific to tunnels
+  message TunnelMPCGroup {  // tunnels are multi material, need to drive several sub mpc assets
+    BasicMaterialParams concrete = 1;
+    BasicMaterialParams tile = 2;
+  }
+
+  // collection specific to tunnels
+  message LaneLineMPCGroup {
+    LaneLineParams lane_divider = 1;  // Markings that show the division of traffic direction
+    LaneLineParams lane_interior =
+        2;                           // Markings that divide lanes of a single direcction of traffic
+    LaneLineParams lane_erased = 3;  // Markings that have been removed/repainted/etc..
+    simian_public.sensor_sim.spectral_materials.MaterialColorModifier base_color_modifier =
+        4;  // Can specify a scalar or array of values that will either tint or override the lane
+    // line material
+  }
+
+  message SideWalkParams {
+    simian_public.sensor_sim.spectral_materials.MaterialColorModifier base_color_modifier =
+        1;  // Can specify a scalar or array of values that will either tint or override the side
+    // walk material
+  }
+
+  message SideWalkCurbParams {
+    simian_public.sensor_sim.spectral_materials.MaterialColorModifier base_color_modifier =
+        1;  // Can specify a scalar or array of values that will either tint or override the side
+    // walk curb material
+  }
+
+  message SideWalkGutterParams {
+    simian_public.sensor_sim.spectral_materials.MaterialColorModifier base_color_modifier =
+        1;  // Can specify a scalar or array of values that will either tint or override the side
+    // walk gutter material
+  }
+
+  message UtilityPoleParams {
+    simian_public.sensor_sim.spectral_materials.MaterialColorModifier base_color_modifier =
+        1;  // Can specify a scalar or array of values that will either tint or override the utility
+    // pole material
+  }
+
+  BasicMPCGroup walls = 1;
+  BasicMPCGroup barriers = 2;
+  TunnelMPCGroup tunnels = 3;
+  LaneLineMPCGroup lane_lines = 4;
+  RoadSurfaceParams road_surface = 5;
+  SideWalkParams side_walks = 6;
+  SideWalkCurbParams side_walk_curbs = 7;
+  SideWalkGutterParams side_walk_gutters = 8;
+  UtilityPoleParams utility_poles = 9;
+  float global_seed = 10;  // global seed that adds to each local object seed, affecting variation
+                           // in all environment objects
+}
+message SpectralTerrainConfiguration {
+  message VoxelTerrainDescription {  // These fields are only available on maps with voxel terrain.
+    float frequency = 1;             // Sets frequency of noise applied across the landscape.
+    float height = 2;                // Sets the height of the noise applied across the landscape.
+
+    bool generate_mound = 3;       // Allows the generation of an additional hill on the landscape.
+    float mound_height = 4;        // [cm]
+    float inner_mound_radius = 5;  // [cm]
+    float outer_mound_radius = 6;  // [cm]
+    spatial.Pose mound_location = 7;  // Sets location of the mound relative to center of the voxel
+    // terrain. Currently the z value for this field is ignored.
+
+    int32 seed = 8;
+
+    message Mound {
+      // Elevation of the top of the mound.
+      float height_meters = 1;
+      // Radius (in the XY plane) of the top of the mound (at height_meters)
+      float top_radius_meters = 2;
+      // Radius (in the XY plane) of the bottom of the mound (at Z = 0).
+      // Typically larger than top_radius_meters, but this is not a requirement.
+      float bottom_radius_meters = 3;
+      // Position of the center of the bottom face of the mound in the Simian world frame.
+      simian_public.common.Vector2 world_position_center_meters = 4;
+    }
+    // A mound is like a plateau: it has a flat top and vertical cross section is approximately a
+    // trapezoid.
+    repeated Mound mounds = 9;
+
+    // Set density of terrain. This is used when the terrain is converted into moveable mass.
+    // Default: 1000 kg/m^3.
+    float density_kilograms_per_meter_cubed = 10;  // [kg/m^3]
+
+    // Properties of the spherical fragments that can be removed from voxel terrain.
+    simian_public.sensor_sim.FragmentDescription fragment = 11;
+  }
+  VoxelTerrainDescription voxel_terrain = 1;
+}
+
+// These parameters affect Spectral rigid body simulation, which is relevant when using the
+// private_model_3d motion model. These parameters are unrelated to "physics-based sensor models".
+message SpectralPhysicsEngineConfiguration {
+  // Higher values (e.g., 64) increase the accuracy to which constraints are enforced.
+  // Valid range: [0, 64]
+  // Default (triggered by specifying 0): 4.
+  int32 solver_iterations = 1;
+}

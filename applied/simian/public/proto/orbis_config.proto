@@ -1,0 +1,260 @@
+// Copyright (C) 2019 Applied Intuition, Inc. All rights reserved.
+// This source code file is distributed under and subject to the LICENSE in
+// license.txt
+
+syntax = "proto3";
+
+package simian_public.orbis_config;
+
+import "google/protobuf/struct.proto";
+import "applied/simian/public/proto/common.proto";
+import "applied/simian/public/proto/plugin.proto";
+
+message OrbisConfig {
+  // Version of the config definition (we are currently on v6.0)
+  int32 version = 1;
+  // A list of scenario group definitions
+  repeated ScenarioGroup scenario_group = 2;
+  // The scenario groups and their configurations for assessments
+  repeated AssessmentGroup assessment = 3;
+  // The scenario groups and their configurations for commit tests
+  // NOTE: there should be a single CommitGroup block, even if this is a repeated field
+  repeated CommitGroup commit = 4;
+  // The default environment definition (flags, containers, plugins) to run scenarios
+  DefaultEnv default_env = 5;
+}
+
+message ScenarioGroup {
+  // The name of this scenario group
+  string name = 1;
+  // A list of scenarios in this scenario group
+  repeated string scenario = 2;
+  // The sim flags to use for running scenarios in this group
+  repeated string sim_flag = 3;
+  // <!-- TODO: not sure what this start flag is -->
+  repeated string start_flag = 4;
+  // The specifications of the sidecars used by the scenarios in this group
+  repeated Sidecar sidecars = 5;
+  // The specification(s) of the plugin(s) used by the scenarios in this group
+  repeated simian_public.plugin.PluginConfig plugins = 6;
+  // The specification of the main container used by the scenarios in this group
+  Sidecar main_container = 7;
+  // A list of configurations targeted towards individual scenarios
+  // This is unrelated to the key/value pairs of the ScenarioConfig message
+  repeated SingleScenarioConfig single_scenario_configs = 8;
+  // The (absolute) workspace path for the scenarios defined in scenario group
+  string workspace_root = 9;
+  // Configuration to use when running the simulator
+  SimulatorSpec simulator = 10;
+  // Pod configuration options
+  PodSpec pod = 11;
+  // List of customer containers and sidecar groupings to support multi-ego sims.
+  // If this is specified, we will ignore the sidecars and main_container fields.
+  repeated CustomerContainerGroup customer_containers = 12;
+  // Selected values for each scenario configuration key defined in scenarios in
+  // this scenario group
+  repeated common.ScenarioConfig scenario_configs = 13;
+  // In the event that you don't want to specify every single scenario configuration
+  // key value pair, the TestConfigurationIdentifier can be used in conjunction with the
+  // test_configuration_mapping field in the scenario to specify 1 configuration to correspond
+  // to all of these key value scenario configuration combinations.
+  common.TestConfigurationIdentifier test_configuration_identifier = 15;
+  // Query used to populate parameter sweeps in map agnostic scenarios. Existence of
+  // this field indicates that this is a map agnostic scenario group. Can be run on all scenarios
+  // in the scenario group.
+  repeated MapQuery map_query = 14;
+}
+
+message MapQuery {
+  // Map parameter name to query string.
+  message ParameterQuery {
+    // Name of the parameter that the query will populate, e.g. map_point.
+    string parameter = 1;
+    // Full query string in query syntax.
+    string query = 2;
+  }
+  repeated ParameterQuery param_query = 1;
+  // Map keys for maps that need to be queried.
+  repeated string map_key = 2;
+}
+
+message AssessmentGroup {
+  // A list of scenario groups in the assessment
+  repeated string scenario_group = 1;
+  // Deprecated but needs to stay here for CI backwards compatiblity
+  repeated string branch = 2;
+  // Name of the assessment group
+  string name = 3;
+  repeated TestStep test_step = 4;
+}
+
+message CommitGroup {
+  // A list of scenario groups in the commit test suite
+  repeated string scenario_group = 1;
+  // The name of the commit test group
+  string name = 2;
+  repeated TestStep test_step = 3;
+}
+
+message DefaultEnv {
+  // The default list of sidecars to run the commit test/assessment with
+  repeated Sidecar sidecars = 1;
+  // The default list of sim flags to run the commit test/assessment with
+  repeated string sim_flag = 2;
+  // <!-- TODO: not sure what this does -->
+  repeated string start_flag = 3;
+  // The default list of plugins to include when running commit test/assessments
+  repeated simian_public.plugin.PluginConfig plugins = 4;
+  // The default main customer container to run the commit test/assessment with
+  Sidecar main_container = 5;
+  // Configuration to use when running the simulator
+  SimulatorSpec simulator = 10;
+  // Pod configuration options
+  PodSpec pod = 11;
+  // List of customer containers and sidecar groupings to support multi-ego sims.
+  // If this is specified, we will ignore the sidecars and main_container fields.
+  repeated CustomerContainerGroup customer_containers = 12;
+  // Default scenario config to use for all scenario groups that do not
+  // specify their own scenario configs
+  repeated common.ScenarioConfig scenario_configs = 13;
+  // In the event that you don't want to specify every single scenario configuration
+  // key value pair, the TestConfigurationIdentifier can be used in conjunction with the
+  // test_configuration_mapping field in the scenario to specify 1 configuration to correspond
+  // to all of these key value scenario configuration combinations.
+  common.TestConfigurationIdentifier test_configuration_identifier = 14;
+}
+
+message Sidecar {
+  // The docker image tag url that defines which sidecar image to use
+  string image_tag_url = 1;
+  // The name of the sidecar
+  string name = 2;
+  // The resource kubespec for K8S -- includes resource requests/limits.
+  // Full list of valid fields are available here:
+  // https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.19/#container-v1-core
+  google.protobuf.Struct kubespec = 3;
+  google.protobuf.ListValue volumes =
+      4;  // pod volume spec see https://kubernetes.io/docs/concepts/storage/volumes/
+}
+
+// For specifying a main container and its sidecars.
+message CustomerContainerGroup {
+  Sidecar main_container = 1;
+  // The sidecars for the main container.
+  repeated Sidecar sidecars = 2;
+}
+
+message SimulatorSpec {
+  KubernetesResources resources = 1;
+  // reserved 2;
+  // reserved "simulator_name";
+}
+
+// Resource specification used for kubernetes containers. For more information about how it's used,
+// see
+// https://kubernetes.io/docs/concepts/configuration/manage-resources-containers/#requests-and-limits
+message KubernetesResources {
+  ResourceSpec requests = 1;
+  ResourceSpec limits = 2;
+}
+
+// cpu and memory resource unit specifcation used for specifying kubernetes resource requests and
+// limits For more information about units and format, see
+// https://kubernetes.io/docs/concepts/configuration/manage-resources-containers/#requests-and-limits
+message ResourceSpec {
+  string cpu = 1;
+  string memory = 2;
+}
+
+// TestStep defines a step that runs a set of scenario groups.
+// Users can specify a list of test step, and they will be processed one by one.
+// Only if the previous test step passes would we proceed to the next test step.
+message TestStep {
+  // A list of scenario groups to run during this test step
+  repeated string scenario_group = 1;
+  // Test step name
+  string name = 2;
+}
+
+message SingleScenarioConfig {
+  // Path to the specific scenario (path is relative to the simian/ directory)
+  string scenario_path = 1;
+  // A list of variations for param sweep scenarios
+  repeated int32 variations = 2;
+  // number of times to run this scenario
+  int32 count = 3;
+  // Scenario config to use for the scenario, will overwrite
+  // the configs given in the scenario group and default environment.
+  repeated common.ScenarioConfig scenario_configs = 4;
+  // In the event that you don't want to specify every single scenario configuration
+  // key value pair, the TestConfigurationIdentifier can be used in conjunction with the
+  // test_configuration_mapping field in the scenario to specify 1 configuration to correspond
+  // to all of these key value scenario configuration combinations.
+  common.TestConfigurationIdentifier test_configuration_identifier = 5;
+}
+
+message PodSpec {
+  // A list of init containers to run in the sim pods
+  repeated Container init_containers = 1;
+  // Volumes to create.
+  google.protobuf.ListValue volumes = 2;
+}
+
+// A single application container that you want to run within a pod.
+// Documentation:
+// https://v1-18.docs.kubernetes.io/docs/reference/generated/kubernetes-api/v1.18/#container-v1-core
+// Proto from https://github.com/kubernetes/api/blob/master/core/v1/generated.proto
+message Container {
+  // Name of the container
+  string name = 1;
+  // Docker image name.
+  string image = 2;
+  // Entrypoint array. Not executed within a shell.
+  repeated string command = 3;
+  // Arguments to the entrypoint.
+  repeated string args = 4;
+  // Container's working directory.
+  string workingDir = 5;
+
+  // List of ContainerPort protos
+  // https://github.com/kubernetes/api/blob/07d5b5c5af4475bee3a8f1f5d9e9c2424cd58bd8/core/v1/generated.proto#L799
+  google.protobuf.ListValue ports = 6;
+
+  // List of sources to populate environment variables in the container.
+  google.protobuf.ListValue envFrom = 7;
+
+  // List of environment variables to set in the container.
+  google.protobuf.ListValue env = 8;
+
+  // Compute Resources required by this container.
+  google.protobuf.Struct resources = 9;
+
+  // Pod volumes to mount into the container's filesystem.
+  google.protobuf.ListValue volumeMounts = 10;
+
+  // volumeDevices is the list of block devices to be used by the container.
+  google.protobuf.ListValue volumeDevices = 11;
+
+  google.protobuf.Struct livenessProbe = 12;
+  google.protobuf.Struct readinessProbe = 13;
+  google.protobuf.Struct startupProbe = 14;
+
+  // Actions that the management system should take in response to container lifecycle events.
+  // https://github.com/kubernetes/api/blob/07d5b5c5af4475bee3a8f1f5d9e9c2424cd58bd8/core/v1/generated.proto#L1924
+  google.protobuf.Struct lifecycle = 15;
+  string terminationMessagePath = 16;
+  string terminationMessagePolicy = 17;
+
+  // Image pull policy.
+  // One of Always, Never, IfNotPresent.
+  string imagePullPolicy = 18;
+
+  // SecurityContext defines the security options the container should be run with.
+  google.protobuf.Struct securityContext = 19;
+
+  bool stdin = 20;
+  bool stdinOnce = 21;
+
+  // Whether this container should allocate a TTY for itself, also requires 'stdin' to be true.
+  bool tty = 22;
+}

@@ -1,0 +1,38 @@
+// Copyright (C) 2022 Applied Intuition, Inc. All rights reserved.
+// This source code file is distributed under and subject to the LICENSE in license.txt
+
+syntax = "proto3";
+
+package simian_public.vehiclesim;
+
+// <!-- Next ID: 7 -->
+message ImportSettings {
+  // The import mode determines the effect of the import variable on the existing variables in the
+  // system. See vs_commands.pdf in the VS SDK documentation for more details on these import modes.
+  // Regarding the VS_ prefix: if the mode keyword has the prefix VS_ (VS_ADD, VS_MULTIPLY, or
+  // VS_REPLACE), and the VS Math Model is running with Simulink or LabVIEW, the Import variable is
+  // not added to the array of variables transferred from the external software to the VS Math
+  // Model.
+  enum ImportMode {
+    // Replace the value of the built-in variable with the value of the Import variable.
+    REPLACE = 0;
+    VS_REPLACE = 1;
+    // Multiply the Import variable with the built-in variable. The Import variable will be
+    // dimensionless in this case.
+    MULTIPLY = 2;
+    VS_MULTIPLY = 3;
+    // Add the Import variable to the built-in variable.
+    ADD = 4;
+    VS_ADD = 5;
+    // Default mode: ignore externally provided value; use only the built-in variable.
+    IGNORE_IMPORT = 6;
+  }
+
+  // Value of the import.
+  double value = 1;
+  // Mode of the import, see ImportMode.
+  ImportMode mode = 2;
+  // Indicate if the value should be interpolated in case the VS solver sampling time does not match
+  // Simian's rate.
+  bool interpolated = 3;
+}

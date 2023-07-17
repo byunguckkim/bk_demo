@@ -1,0 +1,84 @@
+// Copyright (C) 2020 Applied Intuition, Inc. All rights reserved.
+// This source code file is distributed under and subject to the LICENSE in
+// license.txt
+
+syntax = "proto2";
+
+package simian_public.hdmap;
+
+import "applied/simian/public/proto/map/map_enums.proto";
+import "applied/simian/public/proto/map/map_geometry.proto";
+import "applied/simian/public/proto/map/map_id.proto";
+import "applied/simian/public/proto/map/map_lane.proto";
+
+// MapMarkings is the top level datastructure that describes all the map
+// markings in a map (e.g. solid boundary lines, dashed lines) and how
+// those markings encode the lane boundaries described in a corresponding
+// HD map.
+//
+// Note that, despite the word "lane" in the name of this file, not everything
+// in a MapMarkings message is necessarily a lane strictly speaking.  It might
+// also be (for example) a pedestrian crossing or stop line.
+message MapMarkings {
+  repeated MarkingBoundary boundaries = 1;
+  repeated LongMarking long_markings = 2;
+}
+
+// MarkingBoundary describes a lane boundary defined by a seequence of lane
+// markings or sub-sections of lane markings.
+message MarkingBoundary {
+  message LongMarkingSection {
+    optional Id marking_id = 1;
+    // Some markings may be longer than the portion that borders a lane.
+    // For example, a highway lane may be bordered by asolid line along
+    // until an exit ramp starts and a dashed line defines the boundary.
+    // |starting_point_idx| and |ending_point_idx| define the inclusive
+    // start and end of the marking that borders the lane.
+    // When |starting_point_idx| is omitted, it can be assumed to be 0.
+    // When |ending_point_idx| is omitted, it can be assumed to the the
+    // last point of the marking.
+    optional uint64 starting_point_idx = 2;
+    optional uint64 ending_point_idx = 3;
+  }
+  message Section {
+    oneof marking {
+      LongMarkingSection long_marking = 1;
+    }
+  }
+
+  // |lane_id| is the id of the corresponding lane in the HDMap.
+  optional Id lane_id = 1;
+  // |boundary_id| is the id of the corresponding boundary in the HDMap.
+  optional Id boundary_id = 2;
+  // |is_left| is true iff this boundary is the left boundary of the given
+  // lane_id.
+  optional bool is_left = 3;
+  // |is_right| is true if this boundary is the left boundary of the given
+  // lane_id. |is_left| is false if this boundary is the right boundary of the
+  // given lane_id.
+  optional bool is_right = 4;
+  // |boundary_sections| is a list of sections of markings that fall on, and define, the
+  // lane boundary.
+  repeated Section sections = 5;
+}
+
+// In its main usage, LongMarking describes a lane marking defined by a relatively long
+// center line aligned  with the direction of the neighboring lanes and an orthogonal
+// width of the marking along the entire center line.
+//
+// In some cases, it may also describe other sorts of linear road markings, such as
+// pedestrian crossings and stop lines.
+message LongMarking {
+  // |marking_id| is a unique identifier among all map markings elements in a
+  // MapMarkings instance.
+  optional Id marking_id = 1;
+  // |center_points| is an ordered sequence of points that make up the lane
+  // boundary.
+  optional LineSegment center_line = 2;
+  // |width| of the lane marking in meters.
+  optional double width = 3;
+  oneof road_marking {
+    hdmap.LaneBoundaryType marking_type = 4;
+    hdmap.RoadMarkingTypeEnum.RoadMarkingType road_marking_type = 5;
+  }
+}

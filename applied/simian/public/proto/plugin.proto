@@ -1,0 +1,1183 @@
+// Copyright (C) 2019 Applied Intuition, Inc. All rights reserved.
+// This source code file is distributed under and subject to the LICENSE in license.txt
+syntax = "proto3";
+
+package simian_public.plugin;
+
+import "google/protobuf/duration.proto";
+import "google/protobuf/struct.proto";
+import "google/protobuf/timestamp.proto";
+import "applied/simian/public/proto/common.proto";
+import "applied/simian/public/proto/dataset.proto";
+import "applied/simian/public/proto/drawing.proto";
+import "applied/simian/public/proto/drives.proto";
+import "applied/simian/public/proto/kubernetes_config.proto";
+import "applied/simian/public/proto/planar.proto";
+import "applied/simian/public/proto/plugin_schema.proto";
+import "applied/simian/public/proto/public_triage_service.proto";
+import "applied/simian/public/proto/run_results.proto";
+import "applied/simian/public/proto/scenario/scenario_digest.proto";
+import "applied/simian/public/proto/sensor_model.proto";
+import "applied/simian/public/proto/sensor_output.proto";
+import "applied/simian/public/proto/sim_data.proto";
+import "applied/simian/public/proto/triage.proto";
+import "applied/simian/public/proto/v2/io.proto";
+
+service PluginService {
+  rpc HeartbeatPluginService(HeartbeatPluginServiceRequest)
+      returns (HeartbeatPluginServiceResponse);
+  rpc GetPluginProfile(GetPluginProfileRequest) returns (GetPluginProfileResponse);
+  rpc StartPluginService(StartPluginServiceRequest) returns (StartPluginServiceResponse);
+  rpc FinalizePluginService(FinalizePluginServiceRequest) returns (FinalizePluginServiceResponse);
+
+  // Simulations
+  rpc StartPluginSim(StartPluginSimRequest) returns (StartPluginSimResponse);
+  rpc UpdatePluginScenarioMetadata(UpdatePluginScenarioMetadataRequest)
+      returns (UpdatePluginScenarioMetadataResponse);
+  rpc UpdatePluginSimState(UpdatePluginSimStateRequest) returns (UpdatePluginSimStateResponse);
+  rpc FinalizePluginSim(FinalizePluginSimRequest) returns (FinalizePluginSimResponse);
+
+  // Actor behaviors
+  rpc GetSupportedActorBehaviors(GetSupportedActorBehaviorsRequest)
+      returns (GetSupportedActorBehaviorsResponse);
+  rpc InitializeActorBehavior(InitializeActorBehaviorRequest)
+      returns (InitializeActorBehaviorResponse);
+  rpc AdvanceTimestepActorBehavior(AdvanceTimestepActorBehaviorRequest)
+      returns (AdvanceTimestepActorBehaviorResponse);
+  rpc FinalizeActorBehavior(FinalizeActorBehaviorRequest) returns (FinalizeActorBehaviorResponse);
+
+  // Number stats
+  rpc GetSupportedNumberStats(GetSupportedNumberStatsRequest)
+      returns (GetSupportedNumberStatsResponse);
+  rpc InitializeNumberStat(InitializeNumberStatRequest) returns (InitializeNumberStatResponse);
+  rpc UpdateNumberStats(UpdateNumberStatsRequest) returns (UpdateNumberStatsResponse);
+
+  // Boolean stats
+  rpc GetSupportedBooleanStats(GetSupportedBooleanStatsRequest)
+      returns (GetSupportedBooleanStatsResponse);
+  rpc InitializeBooleanStat(InitializeBooleanStatRequest) returns (InitializeBooleanStatResponse);
+  rpc UpdateBooleanStats(UpdateBooleanStatsRequest) returns (UpdateBooleanStatsResponse);
+
+  // Playback plugins
+  rpc PlayPlayback(PlayPlaybackRequest) returns (PlaybackResponse);
+  rpc OpenPlayback(OpenPlaybackRequest) returns (PlaybackResponse);
+  rpc PausePlayback(PausePlaybackRequest) returns (PlaybackResponse);
+  rpc StepPlayback(StepPlaybackRequest) returns (PlaybackResponse);
+  rpc ChangeSpeedPlayback(ChangeSpeedPlaybackRequest) returns (PlaybackResponse);
+  rpc GoToTimestampPlayback(GoToTimestampPlaybackRequest) returns (PlaybackResponse);
+  rpc ClosePlayback(ClosePlaybackRequest) returns (PlaybackResponse);
+
+  // Post-process observers
+  rpc InitializePostprocessResults(InitializePostprocessResultsRequest)
+      returns (InitializePostprocessResultsResponse);
+  rpc UpdatePostprocessResults(UpdatePostprocessResultsRequest)
+      returns (UpdatePostprocessResultsResponse);
+  rpc FinalizePostprocessResults(FinalizePostprocessResultsRequest)
+      returns (FinalizePostprocessResultsResponse);
+
+  // Drive requests
+  rpc GetCustomerDriveLogs(GetCustomerDriveLogsRequest) returns (GetCustomerDriveLogsResponse);
+
+  // Scenario plugins
+  rpc GetSupportedScenarioGenerators(GetSupportedScenarioGeneratorsRequest)
+      returns (GetSupportedScenarioGeneratorsResponse);
+  rpc GenerateScenarios(GenerateScenariosRequest) returns (GenerateScenariosResponse);
+
+  // Issue tracker plugin
+  rpc GetAvailableIssues(GetAvailableIssuesRequest) returns (GetAvailableIssuesResponse) {}
+  rpc UpdateIssueWithEvent(UpdateIssueWithEventRequest) returns (UpdateIssueWithEventResponse) {}
+  rpc BulkUpdateIssueWithEvents(BulkUpdateIssueWithEventsRequest)
+      returns (BulkUpdateIssueWithEventsResponse) {}
+  rpc CreateNewIssue(CreateNewIssueRequest) returns (CreateNewIssueResponse) {}
+  rpc RemoveEventFromIssue(RemoveEventFromIssueRequest) returns (RemoveEventFromIssueResponse) {}
+  rpc BulkRemoveEventsFromIssue(BulkRemoveEventsFromIssueRequest)
+      returns (BulkRemoveEventsFromIssueResponse) {}
+  rpc GetEventUpdatesFomIssueTracker(GetEventUpdatesFomIssueTrackerRequest)
+      returns (GetEventUpdatesFomIssueTrackerResponse) {}
+
+  // Requirement tracker plugin
+  rpc SyncRequirements(SyncRequirementsRequest) returns (SyncRequirementsResponse) {}
+  rpc SyncTestCycles(SyncTestCyclesRequest) returns (SyncTestCyclesResponse) {}
+  rpc GetIngestionTypes(GetIngestionTypesRequest) returns (GetIngestionTypesResponse) {}
+  rpc GetIngestionResults(GetIngestionResultsRequest) returns (GetIngestionResultsResponse) {}
+
+  // Results postback plugin
+  rpc PostBackBatchResults(PostBackBatchResultsRequest) returns (PostBackBatchResultsResponse) {}
+  rpc PostBackRunResults(PostBackRunResultsRequest) returns (PostBackRunResultsResponse) {}
+
+  // Export datasets from Strada
+  rpc ExportDataset(ExportDatasetRequest) returns (ExportDatasetResponse) {}
+  rpc CreateDatasetItems(CreateDatasetItemsRequest) returns (CreateDatasetItemsResponse) {}
+  rpc GetSupportedExportDatasetOptions(GetSupportedExportDatasetOptionsRequest)
+      returns (GetSupportedExportDatasetOptionsResponse) {}
+  rpc GetDatasetItemCreationSchema(GetDatasetItemCreationSchemaRequest)
+      returns (GetDatasetItemCreationSchemaResponse) {}
+
+  // Export triage events from Strada.
+  rpc ExportTriageEvents(ExportTriageEventsRequest) returns (ExportTriageEventsResponse) {}
+
+  // Send dataset items to labeling
+  rpc SendDatasetItemsToLabeling(SendDatasetItemsToLabelingRequest)
+      returns (SendDatasetItemsToLabelingResponse) {}
+
+  // Send drive snippets from Strada to be labeled
+  rpc SendToLabeling(SendToLabelingRequest) returns (SendToLabelingResponse) {}
+
+  // Ingest labels into a processed Strada drive
+  rpc IngestLabels(IngestLabelsRequest) returns (IngestLabelsResponse) {}
+
+  // Called before kicking off a Strada drive conversion
+  rpc PreConvertDrive(PreConvertDriveRequest) returns (PreConvertDriveResponse) {}
+
+  // Export Strada collections
+  rpc ExportCollection(ExportCollectionRequest) returns (stream ExportCollectionResponse) {}
+  // Return the various customizations that the ExportCollection plugin supports.
+  // This allows the frontend to help users specify valid customizations.
+  rpc GetSupportedExportCollectionOptions(GetSupportedExportCollectionOptionsRequest)
+      returns (GetSupportedExportCollectionOptionsResponse) {}
+
+  // Map management plugin
+  rpc FetchExternalMap(FetchExternalMapRequest) returns (FetchExternalMapResponse);
+  rpc FetchExternalGeoregions(FetchExternalGeoregionsRequest)
+      returns (FetchExternalGeoregionsResponse);
+  rpc ExportMap(ExportMapRequest) returns (ExportMapResponse);
+  rpc GetSupportedExportMapFormats(GetSupportedExportMapFormatsRequest)
+      returns (GetSupportedExportMapFormatsResponse);
+
+  // Scenario editor plugin
+  rpc GetMutationNames(GetMutationNamesRequest) returns (GetMutationNamesResponse) {}
+  rpc ApplyScenarioMutation(ApplyScenarioMutationRequest) returns (ApplyScenarioMutationResponse) {}
+
+  //
+  // Spectral Sensor Model API - Runtime order of operations:
+  //
+  //    <simian and plugin containers launched>
+  //
+  //    <simulation run setup>
+  //    1. <Constructor> (C++)
+  //    2. GetSensorModelPluginInfo()
+  //    3. InitializeSensorModel()
+  //    <simulation run starts>
+  //    4. AdvanceSensorModel()
+  //       ...
+  //       AdvanceSensorModel()
+  //       ...
+  //       AdvanceSensorModel()
+  //    <simulation run ends>
+  //    5. FinalizeSensorModel()
+  //    6. <Destructor> (C++)
+  //
+
+  // Gets supported sensor-model API version.
+  rpc GetSensorModelPluginInfo(GetSensorModelPluginInfoRequest)
+      returns (GetSensorModelPluginInfoResponse);
+
+  // Gets the initial sensor model description before a simulation starts.
+  rpc InitializeSensorModel(InitializeSensorModelRequest) returns (InitializeSensorModelResponse);
+
+  // Given the Spectral sensor data, update the sensor model (invoked at sensor's channel rate).
+  rpc AdvanceSensorModel(AdvanceSensorModelRequest) returns (AdvanceSensorModelResponse);
+
+  // Signals the simulation has ended and there will be no more calls to AdvanceSensorModel.
+  rpc FinalizeSensorModel(FinalizeSensorModelRequest) returns (FinalizeSensorModelResponse);
+}
+
+message HeartbeatPluginServiceRequest {}
+message HeartbeatPluginServiceResponse {
+  common.CommonResponse common = 1;
+}
+
+message GetPluginProfileRequest {}
+message GetPluginProfileResponse {
+  map<string, PerformanceProfile> performance_profiles_by_endpoint = 1;
+}
+
+// Performance profile for a plugin and its subcomponents
+// This is a tree structure. An example structure of top to bottom:
+// For each plugin server -> Multiple gRPC endpoints (Initialize, update, finalize for sim plugins)
+// For each gRPC endpoint -> Multiple plugin instances (Different instances managed by sim plugin
+// managers)
+// Example structure:
+// AdvanceTimestepActorBehavior: 1.00s
+// ├── constant_velocity: 0.50s
+// └── simple_waits: 0.49s
+// UpdateBooleanStats: 5.00s
+// ├── ego_speeding: 4.91s
+// └── always_true: 0.09s
+message PerformanceProfile {
+  // Name of this profile.
+  string name = 1;
+  // Total duration of this profile in seconds
+  float total_duration_s = 2;
+  // Subcomponents of this profile
+  repeated PerformanceProfile subcomponent_profiles = 3;
+}
+
+// When container_name is blank, we assume it's in the same
+// container as the stack. Fill it in only if using a sidecar
+message PluginConfig {
+  enum State {
+    UNSET = 0;
+    ACTIVE = 1;    // Pod running, interaction allowed.
+    DISABLED = 2;  // Pod not running, interaction not allowed.
+    // INACTIVE is not implemented now, but might be useful in the future. Keeping below as a
+    // reminder. INACTIVE = 3;  // Pod running, interaction not allowed.
+  }
+
+  string name = 1;
+  string container_username = 2;
+  string container_name = 3;
+  string server_run_cmd = 4;
+  int32 port = 5;
+  google.protobuf.Value extra_data = 6;
+  // Full path to the image to bring up, useful for cloud
+  string container_image = 7;
+  // Plugin resources to use when bringing up cloud pod.
+  simian_public.kubernetes_config.KubernetesResources plugin_resources = 8;
+  // The desired k8s pod state and plugin manager's connection state of this plugin.
+  State desired_state = 9;
+  // (For Cloud non sim plugins only) How many replicas we want to create for this plugin.
+  // When not set, we treat it as 1. This number can be set to 0.
+  // Use oneof to achieve optional field.
+  oneof optional_num_replicas {
+    int32 num_replicas = 10;
+  }
+}
+
+// Scenario extra_data and map_key is shared with all plugins
+// Automatically pulled from scenario fields
+// This proto also contains some sim run metadata, such as the run_id
+message PluginScenarioMetadata {
+  google.protobuf.Value scenario_extra_data = 1;
+  string map_key = 2;
+  string record_stack_data_path = 3;
+  string run_id = 4;
+  scenario.ScenarioDigest scenario_digest = 5;
+  simian_public.simulator.v2.LogOpenOutput log_open_output = 6;
+}
+
+// Metadata shared to plugin server on initialization
+message PluginMetadata {
+  PluginServiceMetadata service_metadata = 1;
+}
+
+// Metadata around plugin service
+message PluginServiceMetadata {
+  string map_service_address = 1;
+  string queue_service_address = 2;
+  string query_service_address = 3;
+}
+
+message StartPluginServiceRequest {
+  PluginMetadata plugin_metadata = 1;
+}
+message StartPluginServiceResponse {
+  common.CommonResponse common = 1;
+}
+
+message UpdatePluginScenarioMetadataRequest {
+  PluginScenarioMetadata scenario_metadata = 1;
+}
+message UpdatePluginScenarioMetadataResponse {
+  common.CommonResponse common = 1;
+}
+
+message FinalizePluginServiceRequest {}
+message FinalizePluginServiceResponse {
+  common.CommonResponse common = 1;
+}
+
+// Common functions when running a sim
+message StartPluginSimRequest {
+  PluginScenarioMetadata scenario_metadata = 1;
+}
+message StartPluginSimResponse {
+  common.CommonResponse common = 1;
+}
+
+// Update sim state for all plugins to use
+message UpdatePluginSimStateRequest {
+  sim_data.SimulatorOutput sim_state = 1;
+}
+message UpdatePluginSimStateResponse {
+  common.CommonResponse common = 1;
+}
+
+message FinalizePluginSimRequest {}
+message FinalizePluginSimResponse {
+  common.CommonResponse common = 1;
+}
+
+// Actor behavior plugins
+message InitializeActorBehaviorRequest {
+  ActorBehaviorScenarioDescription behavior_description = 1;
+  planar.State2d prev_state2d = 2;
+}
+message InitializeActorBehaviorResponse {
+  common.CommonResponse common = 1;
+  int64 actor_behavior_id = 2;
+}
+
+message AdvanceTimestepActorBehaviorRequest {
+  int64 actor_behavior_id = 1;
+  planar.State2d prev_state2d = 2;
+  double dt = 3;
+}
+message AdvanceTimestepActorBehaviorResponse {
+  common.CommonResponse common = 1;
+  planar.State2d next_state2d = 2;
+  double dt_elapsed = 3;
+  bool finished = 4;
+  repeated drawing.Drawing drawings = 5;
+}
+
+// Finalize actor behavior after behavior terminates
+message FinalizeActorBehaviorRequest {
+  int64 actor_behavior_id = 1;
+}
+message FinalizeActorBehaviorResponse {
+  common.CommonResponse common = 1;
+}
+
+// <!-- TODO(Jonathan): Schema will include type and data layout in the future for
+// the config to support additional autocomplete features in the editor -->
+message ActorBehaviorScenarioSchema {
+  ActorBehaviorScenarioDescription default_description = 1;
+}
+
+message ActorBehaviorScenarioDescription {
+  string name = 1;
+  google.protobuf.Value config = 2;
+  bool move_along_terrain = 3;
+  int32 actor_id = 4;  // ID populated automatically from simulator
+  string plugin_server_name = 5;
+}
+
+message GetSupportedActorBehaviorsRequest {}
+message GetSupportedActorBehaviorsResponse {
+  common.CommonResponse common = 1;
+  repeated ActorBehaviorScenarioSchema behavior_schemas = 2;
+}
+
+// Number stat plugins
+message InitializeNumberStatRequest {
+  NumberStatScenarioDescription number_stat_description = 1;
+}
+message InitializeNumberStatResponse {
+  common.CommonResponse common = 1;
+  int64 number_stat_id = 2;
+}
+
+message UpdateNumberStatsRequest {
+  repeated int64 number_stat_ids = 1;
+}
+message UpdateNumberStatsResponse {
+  common.CommonResponse common = 1;
+  map<int64, double> number_stat_id_and_value_map = 2;
+}
+
+message NumberStatScenarioSchema {
+  NumberStatScenarioDescription default_description = 1;
+}
+
+message NumberStatScenarioDescription {
+  string name = 1;
+  google.protobuf.Value config = 2;
+  string plugin_server_name = 3;
+}
+
+message GetSupportedNumberStatsRequest {}
+message GetSupportedNumberStatsResponse {
+  common.CommonResponse common = 1;
+  repeated NumberStatScenarioSchema stat_schemas = 2;
+}
+
+// Boolean stat plugins
+message InitializeBooleanStatRequest {
+  BooleanStatScenarioDescription boolean_stat_description = 1;
+}
+message InitializeBooleanStatResponse {
+  common.CommonResponse common = 1;
+  int64 boolean_stat_id = 2;
+}
+
+message UpdateBooleanStatsRequest {
+  repeated int64 boolean_stat_ids = 1;
+}
+message UpdateBooleanStatsResponse {
+  common.CommonResponse common = 1;
+  map<int64, bool> boolean_stat_id_and_value_map = 2;
+}
+
+message BooleanStatScenarioSchema {
+  BooleanStatScenarioDescription default_description = 1;
+}
+
+message BooleanStatScenarioDescription {
+  string name = 1;
+  google.protobuf.Value config = 2;
+  string plugin_server_name = 3;
+}
+
+message GetSupportedBooleanStatsRequest {}
+message GetSupportedBooleanStatsResponse {
+  common.CommonResponse common = 1;
+  repeated BooleanStatScenarioSchema stat_schemas = 2;
+}
+
+// Playback plugins
+message OpenPlaybackRequest {
+  // Path to the customer output directory in the AV stack docker.
+  string customer_output_path = 1;
+}
+message PlayPlaybackRequest {
+  // Timestamp that the playback begins playing at.
+  double timestamp_ms = 1;
+}
+message PausePlaybackRequest {}
+message StepPlaybackRequest {
+  // Timestamp that the playback is at before stepping.
+  double start_ms = 1;
+  // Timestamp that the playback is at after stepping.
+  // The number of frames in one step depends on the speed multiplier, but defaults to 1.
+  double end_ms = 2;
+}
+message ChangeSpeedPlaybackRequest {
+  // The playback rate, which defaults to 1x speed.
+  double speed_multiplier = 1;
+}
+message GoToTimestampPlaybackRequest {
+  // Timestamp to jump to in the playback.
+  double timestamp_ms = 1;
+}
+message ClosePlaybackRequest {}
+message PlaybackResponse {
+  common.CommonResponse common = 1;
+}
+
+message PostprocessResultScenarioDescription {
+  string name = 1;
+  google.protobuf.Value config = 2;
+  string plugin_server_name = 3;
+  // This flag can be set to True if this plugin observer results should be
+  // calculated externally. The simulation will be blocked from finishing
+  // while awaiting the external results. APIs are provided to get blocked sims,
+  // to set observer results, and to finish a blocked simulation.
+  bool await_external_observer_results = 4;
+}
+
+message InitializePostprocessResultsRequest {
+  repeated PostprocessResultScenarioDescription postprocess_result_descriptions = 1;
+}
+message InitializePostprocessResultsResponse {
+  common.CommonResponse common = 1;
+}
+
+message UpdatePostprocessResultsRequest {}
+message UpdatePostprocessResultsResponse {
+  common.CommonResponse common = 1;
+}
+
+message FinalizePostprocessResultsRequest {}
+message FinalizePostprocessResultsResponse {
+  common.CommonResponse common = 1;
+  repeated BooleanStatResult boolean_stats = 2;
+  repeated NumberStatResult number_stats = 3;
+  repeated StringStatResult string_stats = 4;
+  repeated PerSimBooleanStatResult per_sim_boolean_stats = 5;
+  repeated PerSimNumberStatResult per_sim_number_stats = 6;
+  repeated PerSimStringStatResult per_sim_string_stats = 7;
+  repeated DrawingsResult drawings_results = 8;
+}
+
+// <!-- Next ID: 12 -->
+message ObserverResultInfo {
+  string name = 1;
+  bool is_optional = 2;
+  enum OverrideOption {
+    NO_OVERRIDE = 0;
+    OVERRIDE_PASS = 1;
+    OVERRIDE_FAIL = 2;
+  }
+  // Set override_result to override the observer result
+  OverrideOption override_result = 3;
+  string error_message = 4;
+  // Whether to create triage events from observer failures.
+  bool create_triage_events = 5;
+  // Whether to re-simulate triage events from observer failures.
+  bool auto_resim = 11;
+  // This flag can be used if the observer is not relevant to the scenario. This is different
+  // from is_optional because is_not_applicable plugin observers will not display a `PASS` or `FAIL`
+  // evaluation in the frontend, but rather display `N/A` in place of the result.
+  bool is_not_applicable = 7;
+  string triage_event_key = 8;
+
+  // Whether to extract resim scenarios from events created from observer failures.
+  bool extract_resim_scenario = 9;
+
+  // Basis plan item uuids for result traceability.
+  repeated string plan_item_uuids = 10;
+
+  bool resim_on_trigger = 6;  // deprecated, use auto_resim instead
+}
+
+message BooleanStatResult {
+  string name = 1;
+  repeated bool values = 2;
+  repeated double sim_times = 3;
+  ObserverResultInfo observer_info = 4;
+  MetricResultInfo metric_info = 5;
+}
+
+message PerSimBooleanStatResult {
+  string name = 1;
+  repeated bool values = 2;
+}
+
+message DrawingsResult {
+  google.protobuf.Timestamp time = 1;
+  repeated drawing.Drawing drawings = 2;
+}
+
+message MetricResultInfo {
+  string name = 1;
+  string units = 2;
+  common.EnumPlotMetadata enum_plot_metadata = 3;
+}
+
+message NumberStatResult {
+  string name = 1;
+  repeated double values = 2;
+  repeated double sim_times = 3;
+  MetricResultInfo metric_info = 4;
+}
+
+message PerSimNumberStatResult {
+  string name = 1;
+  repeated double values = 2;
+}
+
+message StringStatResult {
+  string name = 1;
+  repeated string values = 2;
+  repeated double sim_times = 3;
+  MetricResultInfo metric_info = 4;
+}
+
+message PerSimStringStatResult {
+  string name = 1;
+  repeated string values = 2;
+}
+
+message GetCustomerDriveLogsRequest {
+  string query = 1;
+}
+message GetCustomerDriveLogsResponse {
+  common.CommonResponse common = 1;
+  repeated drive_data.DriveLog drive_logs = 2;
+}
+
+message GetSupportedScenarioGeneratorsRequest {}
+message GetSupportedScenarioGeneratorsResponse {
+  common.CommonResponse common = 1;
+  repeated string plugin_names = 2;
+}
+
+message GenerateScenariosRequest {
+  string plugin_name = 1;
+  string input_yaml = 2;
+}
+message GenerateScenariosResponse {
+  common.CommonResponse common = 1;
+  map<string, string> result_yaml_map = 2;
+}
+
+message IssueTrackingAuth {
+  // Username for authenticating with issue tracking platform
+  string username = 1;
+  // Token for authenticating with issue tracking platform
+  string token = 2;
+  // Root url for issue tracking platform
+  string root_url = 3;
+  // Project name for issue tracking project
+  string project = 4;
+}
+
+message IssueMetadata {
+  // For Jira this should be the issue key
+  string id = 1;
+  // For Jira this should be the issue summary
+  string display_name = 2;
+  // Permalink to the issue
+  string hyperlink = 3;
+  // Email of the assignee
+  string assignee = 4;
+  // Issue priority
+  string priority = 5;
+  // Issue status
+  string status = 6;
+  // Issue project
+  string project = 7;
+  // Issue created datetime
+  google.protobuf.Timestamp created_at = 8;
+  // Issue last updated datetime
+  google.protobuf.Timestamp updated_at = 9;
+  // Issue last closed/resolved datetime
+  google.protobuf.Timestamp resolved_at = 10;
+}
+
+message GetAvailableIssuesRequest {
+  IssueTrackingAuth auth = 1;
+}
+
+message GetAvailableIssuesResponse {
+  common.CommonResponse common = 1;
+  repeated IssueMetadata issues = 2;
+}
+
+message UpdateIssueWithEventRequest {
+  IssueTrackingAuth auth = 1;
+  public_triage.TriageEvent event = 2;
+  string issue_id = 3;
+  // Information related to the log that the event occurred in
+  public_triage.DriveMetadata drive_metadata = 4;
+}
+
+message UpdateIssueWithEventResponse {
+  common.CommonResponse common = 1;
+}
+
+message IssueTrackingEventInfo {
+  public_triage.TriageEvent event = 1;
+  public_triage.DriveMetadata drive_metadata = 2;
+}
+
+message BulkUpdateIssueWithEventsRequest {
+  IssueTrackingAuth auth = 1;
+  string issue_id = 2;
+  repeated IssueTrackingEventInfo event_info = 3;
+}
+
+message BulkUpdateIssueWithEventsResponse {
+  common.CommonResponse common = 1;
+}
+
+message CreateNewIssueRequest {
+  IssueTrackingAuth auth = 1;
+  // Triage event that the issue is being created for
+  public_triage.TriageEvent event = 2;
+  // Summary for the new issue
+  string issue_summary = 3;
+  // Information related to the log that the event occurred in
+  public_triage.DriveMetadata drive_metadata = 4;
+}
+
+message CreateNewIssueResponse {
+  simian_public.common.CommonResponse common = 1;
+  // Newly created issue
+  IssueMetadata issue = 2;
+}
+
+message RemoveEventFromIssueRequest {
+  IssueTrackingAuth auth = 1;
+  // UUID for the triage event to unlink from the issue
+  string event_uuid = 2;
+  // Unique identifier for the existing issue
+  string issue_id = 3;
+}
+
+message RemoveEventFromIssueResponse {
+  simian_public.common.CommonResponse common = 1;
+}
+
+message BulkRemoveEventsFromIssueRequest {
+  IssueTrackingAuth auth = 1;
+  // UUIDs for the triage event to unlink from the issue.
+  repeated string event_uuids = 2;
+  // Unique identifier for the existing issue.
+  string issue_id = 3;
+}
+
+message BulkRemoveEventsFromIssueResponse {
+  simian_public.common.CommonResponse common = 1;
+}
+
+message GetEventUpdatesFomIssueTrackerRequest {
+  IssueTrackingAuth auth = 1;
+}
+
+message GetEventUpdatesFomIssueTrackerResponse {
+  message TriageEvent {
+    // Must populate event UUID to specify which event will be updated.
+    string uuid = 1;
+
+    // The below fields will be updated on the event if populated here.
+    string status = 2;
+  }
+  common.CommonResponse common = 1;
+  repeated TriageEvent events = 2;
+}
+
+message SyncRequirementsRequest {
+  // Optionally sent to sync just the specified requirements from a third-party requirements manager
+  // into Basis. If empty all requirements should be synced into Basis.
+  repeated string uuids = 1;
+}
+
+message SyncRequirementsResponse {
+  common.CommonResponse common = 1;
+  enum RequirementType {
+    REQUIREMENT = 0;
+    TEST_CASE = 1;
+    OBSERVER = 2;
+    FOLDER = 3;
+    ACTION_BLOCK = 4;
+    CAPABILITY = 5;
+  }
+
+  message ParameterInfo {
+    // A variable name for the parameter for use in the scenario yaml.
+    string name = 1;
+    // Description of the parameter.
+    string description = 2;
+    double first_value = 3;
+    double last_value = 4;
+    // The number of variations within the parameter range.
+    int32 num_steps = 5;
+  }
+
+  message RequirementMetadata {
+    string uuid = 1;
+    string name = 2;
+    string description = 3;
+    string external_link = 4;
+    RequirementType requirement_type = 5;
+    // Test parameters that are added to associated scenario via parameter sweeps.
+    repeated ParameterInfo test_parameters = 6;
+    string parent_uuid = 7;
+    // Project name that the requirement belongs to. Used when syncing requirements to delete
+    // requirements that have been removed from the source project.
+    string project = 8;
+    // Optional tags to apply to the requirement, typically 1:1 with tags in external software like
+    // Jama.
+    repeated string tags = 9;
+    // Optional custom fields. New custom fields not seen before will be created.
+    repeated common.CustomField custom_fields = 10;
+    // The name of the plan item type that the plan item should have.
+    // If set, plan_item_type_name overrides requirement_type.
+    string plan_item_type_name = 11;
+  }
+  repeated RequirementMetadata requirements = 2;
+
+  // If true, will remove all requirements that are missing from the response
+  // for each project within Basis. Use this to sync requirements that have been
+  // deleted.
+  bool remove_missing_requirements = 3;
+}
+
+message SyncTestCyclesRequest {}
+
+message SyncTestCyclesResponse {
+  common.CommonResponse common = 1;
+  message TestGroupMetadata {
+    string name = 1;
+  }
+
+  repeated TestGroupMetadata test_cycles = 2;
+}
+
+message GetIngestionTypesRequest {}
+
+message GetIngestionTypesResponse {
+  common.CommonResponse common = 1;
+  // A string identifier for the different types of test runs results the plugin supports.
+  repeated string ingestion_types = 2;
+}
+
+message GetIngestionResultsRequest {
+  message TestCaseResult {
+    // The content of the result file ingested.
+    string result_content = 1;
+    oneof requirement {
+      // Requirement uuid passed in if its called from the individual test case within a
+      // test cycle.
+      string requirement_uuid = 2;
+    }
+  }
+  // What ingestion type the results come from.
+  string ingestion_type = 1;
+  repeated TestCaseResult results = 2;
+}
+
+message GetIngestionResultsResponse {
+  enum TestStepStatus {
+    UNDEFINED = 0;
+    SUCCESS = 1;
+    FAILURE = 2;
+  }
+
+  message TestRunResults {
+    message TestStepResult {
+      // Index of the test step the status is for.
+      int32 test_step_index = 1;
+      // Status of the test step for the test run.
+      TestStepStatus status = 2;
+    }
+    // The uuid of the requirement the result is associated to.
+    string requirement_uuid = 1;
+    repeated TestStepResult test_step_results = 2;
+    TestStepStatus overall_status = 3;
+  }
+  common.CommonResponse common = 1;
+  repeated TestRunResults test_run_results = 2;
+}
+
+message PostBackBatchResultsRequest {
+  repeated run_results.BatchResult batch_results = 1;
+}
+
+message PostBackBatchResultsResponse {
+  common.CommonResponse common = 1;
+}
+
+message PostBackRunResultsRequest {
+  repeated run_results.RunResult run_results = 1;
+}
+
+message PostBackRunResultsResponse {
+  common.CommonResponse common = 1;
+}
+
+// Corresponds to a v2_api_basic log source from the drive conversion.
+message LogSource {
+  string path = 1;
+  google.protobuf.Duration start_offset = 2;
+}
+
+// For a Strada dataset event
+message DatasetEvent {
+  repeated LogSource log_sources = 1;
+  // Time that the event occurs at relative to the start of the drive
+  int64 event_timestamp_ms = 2;
+  // Time window before
+  int64 time_before_ms = 3;
+  // Time window after
+  int64 time_after_ms = 4;
+  string run_uuid = 5;
+  // Equal to event_timestamp_ms - time_before_ms
+  int64 event_start_timestamp_ms = 6;
+  // Equal to event_timestamp_ms + time_after_ms
+  int64 event_end_timestamp_ms = 7;
+  google.protobuf.Value extra_data = 8;
+  repeated string channels = 9;
+}
+
+message GetSupportedExportDatasetOptionsRequest {
+  // reserved 1, 2;
+}
+
+message GetSupportedExportDatasetOptionsResponse {
+  common.CommonResponse common = 1;
+  repeated simian_public.plugin_schema.PluginOption options = 3;
+
+  // reserved 2;
+  // reserved "export_schemas";
+}
+
+message ExportDatasetRequest {
+  repeated DatasetEvent events = 1;
+  string dataset_name = 2;
+  repeated simian_public.plugin_schema.PluginOption options = 4;
+
+  // reserved 3;
+  // reserved "selected_export_schemas";
+}
+
+message ExportDatasetResponse {
+  common.CommonResponse common = 1;
+  // optional URL to download the dataset
+  string url = 2;
+}
+
+message ExportTriageEventsRequest {
+  repeated public_triage.TriageEvent events = 1;
+  QueueMetadata queue_metadata = 2;
+}
+
+message ExportTriageEventsResponse {
+  common.CommonResponse common = 1;
+  // URL to download the exported triage metadata.
+  string url = 2;
+}
+
+// These fields correspond to metadata that are used to
+// represent a triage queue on Strada.
+message QueueMetadata {
+  string name = 1;
+  // Search term that is used to define the type of events in a queue.
+  string search_term = 2;
+  // Email of the creator of the queue.
+  string author_email = 3;
+  // Defines if the queue is shared.
+  bool is_public = 4;
+  // Status of queue.
+  string status = 5;
+  // Priority of queue.
+  string priority = 6;
+  // Expiration time of the queue.
+  google.protobuf.Timestamp expiration_time = 7;
+}
+
+message SendToLabelingRequest {
+  repeated DatasetEvent events = 1;
+  string dataset_name = 2;
+}
+
+message SendToLabelingResponse {
+  common.CommonResponse common = 1;
+}
+
+message SendDatasetItemsToLabelingRequest {
+  // List of dataset items to send to labeling.
+  repeated simian_public.dataset.DatasetItem dataset_items = 1;
+  // The labeling job uuid.
+  string labeling_job_uuid = 2;
+}
+
+message SendDatasetItemsToLabelingResponse {
+  common.CommonResponse common = 1;
+}
+
+message IngestLabelsRequest {
+  LogSource log_source = 1;
+  google.protobuf.Duration drive_duration = 2;
+  // Data must be returned in batches less than 200 Mb.
+  // start_index and next_start_index allow you to implement batching logic.
+  // The plugin will be called repatedly until all data has been returned.
+  int64 start_index = 3;
+}
+
+message IngestLabelsResponse {
+  common.CommonResponse common = 1;
+  // Data points should be in sorted order by sim_time.
+  repeated common.TimestampedDataPoint timestamped_data_points = 2;
+  // Images should be in sorted order by sim_time.
+  // Be sure to populate CameraImage.name, which will be used as the channel name.
+  repeated simian_public.sensor_model.SensorOutput.TimestampedCameraImage timestamped_images = 3;
+  // Leave unset or 0 if this is the last batch of data and the plugin should not be called again.
+  int64 next_start_index = 4;
+}
+
+message PreConvertDriveRequest {
+  public_triage.ConvertDriveRequest convert_drive_request = 1;
+}
+
+message PreConvertDriveResponse {
+  common.CommonResponse common = 1;
+  repeated public_triage.ConvertDriveRequest convert_drive_requests = 2;
+  bool skip_ingestion = 3;
+}
+
+//
+// Map Management Plugin
+//
+message FetchExternalMapRequest {
+  string map_name = 1;
+  string map_version = 2;
+  // [Optional] image_tag for the customer to use as an input in their map plugin logic.
+  string image_tag = 3;
+}
+
+message FetchExternalMapResponse {
+  common.CommonResponse common = 1;
+  // Optional map key to use for the map for customers who want to use their own versioning scheme
+  // for maps.
+  string customer_map_version = 2;
+  // Path to the map folder in the customer plugin container.
+  string map_folder_path = 3;
+}
+
+message FetchExternalGeoregionsRequest {
+  string map_name = 1;
+  string map_version = 2;
+}
+
+message FetchExternalGeoregionsResponse {
+  common.CommonResponse common = 1;
+  // Path to the folder in the customer plugin container which conatins the imported georegions.
+  string georegions_folder_path = 2;
+}
+
+message ExportMapRequest {
+  string map_name = 1;
+  string map_version = 2;
+  // Path to the map folder in the customer plugin container.
+  // This is where the map data to be exported is located.
+  string map_folder_path = 3;
+  string map_format = 4;
+}
+
+message ExportMapResponse {
+  common.CommonResponse common = 1;
+}
+
+message GetSupportedExportMapFormatsRequest {}
+
+message GetSupportedExportMapFormatsResponse {
+  common.CommonResponse common = 1;
+  // The map formats the map management plugin instanced supports exporting to.
+  repeated string map_formats = 2;
+}
+
+//
+// Spectral Sensor Model Plugin
+//
+message SensorModelPluginScenarioDescription {
+  string plugin_name = 1;
+  string plugin_server_name = 2;
+  string sensor_name = 3;
+  google.protobuf.Value config = 4;
+}
+
+message GetSensorModelPluginInfoRequest {
+  // Scenario description of the plugin configuration.
+  SensorModelPluginScenarioDescription plugin_description = 1;
+}
+message GetSensorModelPluginInfoResponse {
+  common.CommonResponse common = 1;
+
+  enum SensorModelAPIVersion {
+    V0 = 0;  // default
+  }
+  SensorModelAPIVersion api_version = 2;
+}
+
+message InitializeSensorModelRequest {
+  // Name of source Spectral sensor this request applies to.
+  string sensor_name = 1;
+
+  // Scenario description of the sensor model configuration.
+  simian_public.sensor_model.Description sensor_description = 2;
+}
+message InitializeSensorModelResponse {
+  common.CommonResponse common = 1;
+
+  // Initial sensor description for the sensor model configuration.
+  simian_public.sensor_model.Description sensor_description = 2;
+}
+
+message AdvanceSensorModelRequest {
+  // Name of source Spectral sensor this request applies to.
+  string sensor_name = 1;
+
+  // Latest sensor description
+  simian_public.sensor_model.Description sensor_description = 2;
+
+  // Latest frame of sensor data output.
+  oneof sensor_data {
+    simian_public.sensor_model.SensorOutput.CameraImage camera_image = 3;
+    simian_public.sensor_model.SensorOutput.LidarCloud lidar_cloud = 4;
+    simian_public.sensor_model.SensorOutput.RadarTrack radar_track = 5;
+    simian_public.sensor_model.SensorOutput.Range ultrasound_range = 6;
+    simian_public.sensor_output.SensorOutputList output_list = 8;
+  }
+
+  // The current timestamp for the sensor channel.
+  google.protobuf.Timestamp current_timestamp = 7;
+}
+message AdvanceSensorModelResponse {
+  common.CommonResponse common = 1;
+
+  // New sensor description
+  simian_public.sensor_model.Description sensor_description = 2;
+}
+
+message FinalizeSensorModelRequest {
+  // Name of source Spectral sensor this request applies to.
+  string sensor_name = 1;
+
+  // Latest sensor description
+  simian_public.sensor_model.Description sensor_description = 2;
+}
+message FinalizeSensorModelResponse {
+  common.CommonResponse common = 1;
+}
+
+message GetMutationNamesRequest {}
+
+message GetMutationNamesResponse {
+  common.CommonResponse common = 1;
+  // A string identifier for the different mutations the plugin supports
+  repeated string mutation_names = 2;
+}
+
+message ScenarioDescriptionInfo {
+  // The file name of the scenario.
+  string file_name = 1;
+  // The yaml content of the scenario.
+  string file_content = 2;
+}
+
+message ApplyScenarioMutationRequest {
+  // The name of the mutation to apply.
+  string mutation_name = 1;
+  // The scenario descriptions that the mutation should be applied to.
+  repeated ScenarioDescriptionInfo scenario_descriptions = 2;
+}
+
+message ApplyScenarioMutationResponse {
+  common.CommonResponse common = 1;
+  // The scenario descriptions with the mutation applied.
+  repeated ScenarioDescriptionInfo scenario_descriptions = 2;
+}
+
+message CreateDatasetItemsRequest {
+  repeated DatasetEvent events = 1;
+  string dataset_name = 2;
+  simian_public.plugin_schema.DatasetItemCreationSchema schema = 4;
+
+  // reserved 3;
+}
+
+message CreateDatasetItemsResponse {
+  common.CommonResponse common = 1;
+  repeated simian_public.dataset.DatasetItem items = 2;
+}
+
+message GetDatasetItemCreationSchemaRequest {}
+
+message GetDatasetItemCreationSchemaResponse {
+  common.CommonResponse common = 1;
+  simian_public.plugin_schema.DatasetItemCreationSchema schema = 2;
+}
+
+// Events in a collection that are associated with the same log.
+message CollectionEventsForLog {
+  string log_path = 1;
+  repeated simian_public.dataset.DatasetInterval dataset_intervals = 2;
+}
+
+message ExportCollectionRequest {
+  // The display name of the collection.
+  string display_name = 1;
+  // The events in the collection.
+  repeated CollectionEventsForLog collection_events = 2;
+  // The options to use for exporting the collection.
+  repeated simian_public.plugin_schema.PluginOption options = 3;
+}
+
+// Optional fields that user can populate to approximate the progress of the plugin.
+// These fields will be used to provide feedback to the user during the export process.
+message ExportCollectionResponse {
+  // Short user-defined string indicating the current action that the plugin is taking.
+  string state = 1;
+  // User-defined float from 0-100 indicating the approximate progress of the plugin.
+  float percentage_progress = 2;
+}
+
+message GetSupportedExportCollectionOptionsRequest {}
+
+// Return options that the plugin has been implemented to support.
+message GetSupportedExportCollectionOptionsResponse {
+  repeated simian_public.plugin_schema.PluginOption options = 1;
+}

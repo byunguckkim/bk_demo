@@ -1,0 +1,28 @@
+// Copyright (C) 2023 Applied Intuition, Inc. All rights reserved.
+// This source code file is distributed under and subject to the LICENSE in license.txt
+
+syntax = "proto3";
+
+import "applied/simian/public/proto/sensor_sim/materials/common_material_properties.proto";
+
+package simian_public.sensor_sim.materials.lane_line_material;
+
+/* Preset materials made by Spectral - When used will apply preset values and textures to a given
+material. If the user chooses a preset material, they can still configure the
+CommonMaterialProperties to override the preset's values */
+message LaneLineMaterialPresetEnum {
+  enum LaneLineMaterialPreset {
+    UNSET = 0;
+    SOLID_WHITE = 1;
+    SOLID_YELLOW = 2;
+  }
+}
+
+message LaneLineMaterial {
+  LaneLineMaterialPresetEnum.LaneLineMaterialPreset preset = 1;
+  simian_public.sensor_sim.materials.common_material_properties.CommonMaterialProperties
+      common_material_properties = 2;
+  float paint_thickness = 3;    // Controls how much paint is laid down for the lane.
+  float retroreflectivity = 4;  // Controls the amount of retroreflectivity.
+  float degradation = 5;        // Controls amount of degradation on the lane line.
+}

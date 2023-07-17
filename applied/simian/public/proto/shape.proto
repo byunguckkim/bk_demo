@@ -1,0 +1,39 @@
+// Copyright (C) 2018 Applied Intuition, Inc. All rights reserved.
+// This source code file is distributed under and subject to the LICENSE in license.txt
+
+syntax = "proto3";
+
+package simian_public.shape;
+
+import "applied/simian/public/proto/planar.proto";
+
+// Shape is defined in ego reference frame.
+// Read more here:
+// https://home.applied.co/manual/adp/latest/#/integrating_with_adp/coordinate_systems/coordinate_systems?id=ego-reference-frame
+message Shape {
+  oneof shape_type {
+    VerticalPrism vertical_prism = 1;
+    AxisAlignedBox axis_aligned_box = 2;
+  }
+
+  message VerticalPrism {
+    double z_lower = 1;
+    double z_upper = 2;
+    repeated simian_public.planar.Point2d points = 3;
+  }
+
+  message AxisAlignedBox {
+    // Defines the rear extent of the AABB.
+    double x_lower = 1;
+    // Defines the front extent of the AABB.
+    double x_upper = 2;
+    // Defines the right extent of the AABB.
+    double y_lower = 3;
+    // Defines the left extent of the AABB.
+    double y_upper = 4;
+    // Defines the bottom extent of the AABB.
+    double z_lower = 5;
+    // Defines the top extent of the AABB.
+    double z_upper = 6;
+  }
+}

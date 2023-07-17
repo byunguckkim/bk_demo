@@ -1,0 +1,73 @@
+// Copyright (C) 2018 Applied Intuition, Inc. All rights reserved.
+// This source code file is distributed under and subject to the LICENSE in license.txt
+
+syntax = "proto3";
+
+package simian_public.plan_item;
+
+message PlanItems {
+  // Map between plan item uuids to plan item content.
+  map<string, PlanItemContent> plan_items = 1;
+}
+
+message PlanItemContent {
+  // Plan item name.
+  string name = 1;
+  // Plan item description.
+  string description = 2;
+  // Plan item requirement type.
+  int32 requirement_type = 3;
+  // Plan item project.
+  string project = 4;
+  // Plan item parent requirement.
+  string parent_requirement = 5;
+  // Plan item metrics table.
+  TableContent metrics = 6;
+  // Plan item observers table.
+  TableContent observers = 7;
+  // Plan item parameters table.
+  TableContent parameters = 8;
+  // Plan item test steps table.
+  TableContent test_steps = 9;
+  // Map of plan item custom fields.
+  map<string, string> custom_fields = 10;
+  // Plan item tags.
+  repeated string tags = 11;
+  // Custom data tables or text.
+  CustomData custom_data = 12;
+  // Image data encoded into base 64 format.
+  repeated string images = 13;
+  // Describes relationships to other plan items.
+  map<string, Relationships> relationships = 14;
+}
+
+message CustomData {
+  oneof custom_data {
+    // Custom table.
+    TableContent tables = 1;
+    // Custom text.
+    string text = 2;
+  }
+}
+
+message TableContent {
+  // Table headers.
+  repeated string headers = 1;
+  // Table rows.
+  repeated TableRow table_rows = 2;
+}
+
+message TableRow {
+  // Content for each table row.
+  repeated string row_content = 1;
+}
+
+message Relationships {
+  // Name of the paired relationship.
+  string reverse_name = 1;
+  // UUIDs for the related plan items
+  repeated string source_uuids = 2;
+  repeated string target_uuids = 3;
+  bool should_execute_test_cases = 4;
+  bool should_inject_includes = 5;
+}

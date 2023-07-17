@@ -1,0 +1,52 @@
+syntax = "proto3";
+
+package simian_public.sensor_sim.imported_vehicle_description;
+
+import "applied/simian/public/proto/sensor_sim/mesh_description.proto";
+import "applied/simian/public/proto/spatial.proto";
+
+message ImportedVehicleDescription {
+  // Information for the primary mesh, including file information and properties.
+  simian_public.sensor_sim.mesh_description.MeshDescription mesh_description = 1;
+  // Attachments to the primary mesh.
+  repeated ImportedAttachmentDescription attachments = 2;
+  // Defines a list of wheel properties that will be spawned and handled by Spectral
+  repeated WheelDescription wheels = 3;
+  WheelTypeEnum.WheelTypes wheel_type = 4;  // Swaps the wheel mesh for all wheels
+}
+
+message ImportedAttachmentDescription {
+  simian_public.sensor_sim.mesh_description.MeshDescription mesh_description = 1;
+  // Pose relative to the primary mesh to which this mesh is attached.
+  simian_public.spatial.PoseSpec relative_pose = 2;
+}
+
+message WheelDescription {
+  string wheel_name = 1;
+  float wheel_scale = 2;
+  // Sets the initial pose of the wheel relative to the main vehicle mesh
+  simian_public.spatial.Point initial_pose = 3;
+
+  // The following suspension parameters will NOT affect vehicle dynamics
+  // they are meant to be used for visualization puposes only.
+  // Max height the wheel will ever be allowed to move up relative to the pose of the wheel
+  float suspension_max_up = 4;
+  // Max height the wheel will ever be allowed to move down
+  float suspension_max_down = 5;
+}
+
+message WheelTypeEnum {
+  enum WheelTypes {
+    DEFAULT = 0;
+    ONROAD_WHEEL_1 = 1;
+    ONROAD_WHEEL_2 = 2;
+    ONROAD_WHEEL_3 = 3;
+    ONROAD_WHEEL_4 = 4;
+    ONROAD_WHEEL_5 = 5;
+    ONROAD_WHEEL_6 = 6;
+    SPOKED_WHEEL_1 = 7;
+    OFFROAD_WHEEL_1 = 8;
+    SEMI_TRUCK_TRAILER_WHEEL_1 = 9;
+    SEMI_TRUCK_CAB_WHEEL_1 = 10;
+  }
+}

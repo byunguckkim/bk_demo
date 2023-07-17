@@ -1,0 +1,1146 @@
+// Copyright (C) 2018 Applied Intuition, Inc. All rights reserved.
+// This source code file is distributed under and subject to the LICENSE in license.txt
+
+syntax = "proto3";
+
+package simian_public.actor;
+
+import "google/protobuf/struct.proto";
+import "applied/simian/public/proto/common.proto";
+import "applied/simian/public/proto/composite_vehicle.proto";
+import "applied/simian/public/proto/sensor_sim/basic_types.proto";
+import "applied/simian/public/proto/sensor_sim/fragment_description.proto";
+import "applied/simian/public/proto/sensor_sim/model_output.proto";
+import "applied/simian/public/proto/spatial.proto";
+import "applied/simian/public/proto/spectral_assets.proto";
+
+// An "actor" is a simulated entity that can move around, be picked up
+// by sensors, and collide with things. The actor message is tailored
+// for the "ground-truth" information about an actor. How an actor is
+// perceived by the simulated ego vehicle is a slightly different
+// matter, that information is stored underneath EgoOutput in the
+// SimulatorOutput.
+//
+// Consistent with the definition accepted in software development communities, a deprecated field
+// in Simian is one whose use is discouraged. Please note that deprecation and removal are NOT
+// synonyms.
+//
+// <!-- TODO(rolo,fahhem) Improve shape semantics, retire the legacy shape
+// fields. Why this is currently tricky: similarly to EgoOutput, we
+// use this for things that need backwards compatibility. We should
+// create a separate message for that purpose, so we can easily and
+// cleanly evolve the runtime API. -->
+//
+// <!-- Next ID: 29 [last modified by: pkrutty] -->
+message Actor {
+  // Not actually legacy (currently used)
+  LegacyFields legacy = 100;
+
+  ObstacleType obstacle_type = 1;
+  int32 id = 2;
+
+  // <!-- TODO(rolo) introduce spatial.StatePV / StatePVA and use the
+  // former here instead of two separate fields. -->
+
+  // Pose of section 0 (i.e., sections[0]) reported in world frame
+  spatial.Pose pose = 3;
+  // Velocity of section 0 (i.e. sections[0]) observed in world frame, expressed in world frame.
+  spatial.Screw velocity = 4;
+
+  // Not actually legacy (currently used)
+  message LegacyFields {
+    // Length of the actor along its local X-axis.
+    double length = 1;
+    // Width of the actor along its local Y-axis.
+    double width = 2;
+    // Height of the actor along its local Z-axis.
+    double height = 3;
+    // Polygon vertices defining the base of the actor, in UTM coordinates.
+    // By default, all polygon points lie in the XY plane of the actor frame, and
+    // the length of this repeated field is the number of vertices in the polygon.
+    // If users modify the points in a scenario (under `obstacle: {model: {static: point: {...}}}`),
+    // then it's possible that these polygon points do not lie in the XY plane of the actor frame.
+    repeated spatial.Point polygon_points = 4;
+  }
+  // All actors have at least one section.
+  // Actors with trailers have two sections; the first is the tractor, and the second is the
+  // trailer.
+  repeated Section sections = 20;
+
+  message Section {
+    // Note that sections is only populated if actor_state_reporting is set to
+    // POPULATE_OUTER_FIELDS_AND_SECTIONS.
+
+    // The state describes the motion of the origin of the section, which is typically the center of
+    // the base of the actor. Pose, velocity, and acceleration are observed in the world frame and
+    // expressed in the world frame.
+    spatial.State world_state = 1;
+    // Bounding box height. Identical to the actor's legacy.height.
+    double height = 2;  // [m]
+    // Polygon vertices defining the base of the actor, in UTM coordinates.
+    // By default, all polygon points lie in the XY plane of the actor frame, and
+    // the length of this repeated field is the number of vertices in the polygon.
+    // If users modify the points in a scenario (under `obstacle: {model: {static: point: {...}}}`),
+    // then it's possible that these polygon points do not lie in the XY plane of the actor frame.
+    // Identical to the actor's legacy.polygon_points.
+    repeated spatial.Point world_polygon_points = 3;
+    // Simian uses mesh idenitified by mesh_name to visualize this section in the frontend.
+    string mesh_name = 4;
+    // Model representing this section in Spectral.
+    simian_public.sensor_sim.models.SpectralModelOutput spectral_model_output = 5;
+
+    // This field is only populated by actor sensors with a MapPropertyFilter SensorFilter,
+    // when the `all_polygon_points` query is requested.
+    // This field contains map properties for each polygon point.
+    // When this field is populated, it has the same size as world_polygon_points.
+    repeated MapProperties polygon_map_properties = 6;
+  }
+
+  // Neither closest_lane_id nor on_lane are currently populated by default,
+  // mainly due to performance reasons. Users can set the  'populate_closest_lane_id' flag in
+  // the actor sensor config to obtain the closest lane ID.
+  //
+  // This field is NOT set by the MapPropertyFilter.
+  string closest_lane_id = 5;            // Lane id on map for actor
+  bool on_lane = 6 [deprecated = true];  // Are we on lane
+
+  // This field is only populated by actor sensors with a MapPropertyFilter SensorFilter,
+  // when the `origin` query is requested.
+  // Representing the actor origin's map properties.
+  MapProperties origin_map_properties = 23;
+
+  // This field is only populated by actor sensors with a MapPropertyFilter SensorFilter,
+  // when the `all_polygon_points` query is requested.
+  // This field contains map properties for each polygon point.
+  // When this field is populated, it has the same size as polygon_points.
+  repeated MapProperties polygon_map_properties = 24;
+  message MapProperties {
+    // Whether the corresponding point is on lane or not.
+    bool on_lane = 1;
+
+    // Closest lane id for the corresponding point.
+    string closest_lane_id = 2;
+  }
+
+  // Messages
+  repeated simian_public.common.Message messages = 7;
+
+  // Any data points provided here will be displayed in the actor overhead view in
+  // the results visualization.
+  repeated simian_public.common.DataPoint data_points = 8;
+
+  // Mesh name of section 0 (i.e. sections[0]).
+  string mesh_name = 9;
+
+  ActorFeedback feedback = 19;
+
+  // Note this is used by internal data flows between Simian and
+  // Spectral. Customer code should not rely on this information, as
+  // it is likely to change or get moved around.
+  spatial.PoseSpec.RollPitchYaw spectral_rotation = 10;
+
+  // <!-- Next ID: 24 -->
+  enum ObstacleType {
+    _INVALID_OBSTACLE_TYPE_ = 0;  // Sentinel, you should never see this.
+    UNKNOWN = 1;
+    UNKNOWN_MOVABLE = 2;
+    UNKNOWN_UNMOVABLE = 3;
+    PEDESTRIAN = 4;
+    VEHICLE = 5;
+    BICYCLE = 6;
+    MOTORCYCLE = 7;
+    TRUCK = 8;
+    GOLF_CART = 9;
+    ANIMAL = 10;
+    VEHICLE_ON_SHOULDER = 11;
+    TRAILER = 17;
+    // reserved 12 to 16;
+    OTHER_EGO = 18;
+    BUS = 19;
+    AIRPLANE = 20;
+    // Specify custom obstacle type by setting `obstacle_type` to `CUSTOM_OBSTACLE` and specifying
+    // `custom_type` string.
+    CUSTOM_OBSTACLE = 21;
+    ROTORCRAFT = 22;
+    BOAT = 23;
+  }
+  // Only read when type is CUSTOM_OBSTACLE.
+  string custom_type = 22;
+
+  // As of 1.27, using `spectral_model_output` is the preferred method
+  // of resolving properties and types for actors when running Spectral.
+  // spectral_model, spectral_static_model, and spectral_asset are deprecated.
+  SpectralModel spectral_model = 12;
+  SpectralStaticModel spectral_static_model = 14;
+  AssetConfig spectral_asset = 15;
+
+  // Model representing this section in Spectral.
+  simian_public.sensor_sim.models.SpectralModelOutput spectral_model_output = 21;
+  enum SpectralModel {
+    DEFAULT = 0;
+    GENERIC_CONVERTIBLE = 1;
+    GENERIC_SEDAN = 2;
+    GENERIC_SPRINTER = 3;
+    GENERIC_MINIVAN = 4;
+    GENERIC_SUV = 5;
+    GENERIC_PICKUP_BLACK = 6;
+    GENERIC_PICKUP_WHITE = 7;
+    GENERIC_VAN = 8;
+    GENERIC_SEMI_TRUCK_TRAILER = 9;
+    GENERIC_SEMI_TRUCK_CAB = 10;
+    GENERIC_POLICECAR = 11;
+    GENERIC_AMBULANCE = 12;
+    GENERIC_COMMUTER_BUS = 13;
+    GENERIC_SEDAN_SMALL = 14;
+    GENERIC_SEDAN_WHITE = 15;
+    GENERIC_SEDAN_WHITE_HEADLIGHTS = 16;
+    GENERIC_SUV_LARGE = 17;
+    GENERIC_ALPHARD = 18;
+    GENERIC_PROFIA = 19;
+    GENERIC_YARIS = 20;
+    GENERIC_MODEL_S = 21;
+    GENERIC_CANBUS = 22;
+    GENERIC_SEMI_TRUCK_TRAILER_COMPLEX = 23;
+    GENERIC_ROBOT = 24;
+    GENERIC_SAMBAR = 25;
+    GENERIC_AEROQUEEN = 26;
+    GENERIC_LS500 = 27;
+    GENERIC_FIESTA = 28;
+    GENERIC_CROWN_POLICECAR = 29;
+    GENERIC_ODYSSEY = 30;
+    GENERIC_LAND_CRUISER = 31;
+    GENERIC_HIACE_AMBULANCE = 32;
+    GENERIC_F150 = 33;
+    GENERIC_PRIUS = 34;
+    GENERIC_AUTO_HAULER = 35;
+    GENERIC_AUTO_HAULER_LOADED = 36;
+    GENERIC_MIATA_NO_ANTENNA = 37;
+    GENERIC_AVENTADOR = 38;
+    GENERIC_CHR = 39;
+    GENERIC_SILVERADO = 40;
+    GENERIC_CRV = 41;
+    GENERIC_LC500 = 42;
+    GENERIC_RC = 43;
+    GENERIC_SUPERSEVEN = 44;
+    GENERIC_3HATCHBACK = 45;
+    GENERIC_COASTER_BUS = 46;
+    GENERIC_28FT_TRUCK_TRAILER_COMPLEX = 47;
+    GENERIC_COPEN = 48;
+    GENERIC_LOWBOY_TRAILER = 49;
+    GENERIC_CANTER_FIRETRUCK = 50;
+    GENERIC_FUSOFIGHTER = 51;
+    GENERIC_SKW475 = 52;
+    GENERIC_TANKER_TRUCK = 53;
+    GENERIC_SEMI_TRUCK_FULL = 54;
+    GENERIC_EXPLORER_POLICE = 55;
+    GENERIC_CHARGER_POLICE = 56;
+    GENERIC_EXPLORER = 57;
+    GENERIC_CHARGER = 58;
+    GENERIC_CRANE = 59;
+    GENERIC_NBOX = 60;
+    GENERIC_54FT_TANKER = 61;
+    GENERIC_FIRETRUCK = 62;
+    GENERIC_TRANSIT_AMBULANCE = 63;
+    GENERIC_GRAND_CHEROKEE = 64;
+    GENERIC_SIENNA = 65;
+    GENERIC_IONIQ = 66;
+    GENERIC_STEAM_ROLLER = 67;
+    GENERIC_EXCAVATOR = 68;
+    GENERIC_ASPHALT_PAVER = 69;
+    GENERIC_FORKLIFT = 70;
+    GENERIC_GOLF_CART = 71;
+    GENERIC_AIRPLANE = 72;
+    GENERIC_KLOADER = 73;
+    GENERIC_CARGO_PALLET_TRAILER = 74;
+    GENERIC_LYRIQ = 75;
+    GENERIC_CESSNA = 76;
+    GENERIC_SEMI_TRUCK_TRAILER_REEFER = 77;
+    GENERIC_C17_AIRPLANE = 78;
+    GENERIC_ZOE_COMPACT = 79;
+    GENERIC_LEGEND_SEDAN = 80;
+    GENERIC_48FT_TRUCK_TRAILER_COMPLEX = 81;
+    GENERIC_TRAILER_RAILYARD = 82;
+    GENERIC_TRAILER_RAILYARD_CONTAINER = 83;
+    GENERIC_MD11_AIRPLANE = 84;
+    GENERIC_EQS = 85;
+    GENERIC_SEMI_TRAILER_48FT = 86;
+    GENERIC_SEMI_TRAILER_48FT_REEFER = 87;
+    GENERIC_ALTIMA = 88;
+    GENERIC_CARERRA = 89;
+    GENERIC_TRACTOR_8RT = 90;
+    GENERIC_QUADCOPTER = 91;
+    GENERIC_TU_95 = 92;
+    GENERIC_TU_160 = 93;
+    GENERIC_T_90 = 94;
+    GENERIC_SU_27 = 95;
+    GENERIC_STEREGUSHCHIY = 96;
+    GENERIC_SOVREMENNY = 97;
+    GENERIC_SA_21 = 98;
+    GENERIC_KA_60 = 99;
+    GENERIC_9T250_1_ISKANDER_M = 100;
+    GENERIC_2S6 = 101;
+    GENERIC_2S19 = 102;
+    GENERIC_MZKT_79221 = 103;
+    GENERIC_D_30 = 104;
+    GENERIC_BTR_90 = 105;
+    GENERIC_TK_208 = 106;
+    GENERIC_EVTOL = 107;
+    GENERIC_EVTOL_SUAS = 108;
+    GENERIC_TR_7_TRACTOR = 109;
+    GENERIC_TR_7_TRACTOR_TILL = 110;
+    GENERIC_MRZR_D4 = 111;
+    GENERIC_YARD_TRUCK = 112;
+    GENERIC_SCHOOL_BUS = 113;
+    GENERIC_AMBULANCE_KO_STAREX = 114;
+    GENERIC_FIRETRUCK_KO_PAVISE = 115;
+    GENERIC_TR_7_TRACTOR_TILL_DOWN = 116;
+    GENERIC_REVELATION_UP = 117;
+    GENERIC_REVELATION_DOWN = 118;
+    GENERIC_CONTAINER_SHIP = 119;
+    GENERIC_FISHING_TRAWLER = 120;
+    GENERIC_GAS_CARRIER_SHIP = 121;
+    GENERIC_TYPE_052C_SHIP = 122;
+    GENERIC_SEA_HUNTER = 123;
+    GENERIC_ISLAND_PATROL_BOAT = 124;
+    GENERIC_MARK_IV_PATROL_BOAT = 125;
+    GENERIC_MARTAC_T38 = 126;
+    GENERIC_JETSKI = 127;
+    GENERIC_JETSKI_STANDING = 128;
+    GENERIC_BRADLEY_M2 = 129;
+    GENERIC_POLICE_KO_SONATA = 130;
+    GENERIC_X5 = 131;
+    GENERIC_FIRETRUCK_EU_AROCS = 132;
+    GENERIC_KO_BUS_SUPER_AERO_CITY = 133;
+    GENERIC_PICKUP_BONGO = 134;
+    // reserved 135 to 1000;  // Reserve for more vehicles.
+
+    GENERIC_MALE = 1001;
+    GENERIC_FEMALE = 1002;
+    GENERIC_BOY = 1003;
+    GENERIC_GIRL = 1004;
+    GENERIC_MALE_NATHAN = 1005;
+    GENERIC_FEMALE_AMBER = 1006;
+    GENERIC_MALE_SIMON = 1007;
+    GENERIC_FEMALE_CLAUDIA = 1008;
+    GENERIC_MALE_ERIC = 1009;
+    GENERIC_BOY_TYLER = 1010;
+    GENERIC_GIRL_LUISA = 1011;
+    GENERIC_DOG = 1012;
+    GENERIC_PEDESTRIAN = 1013;
+    GENERIC_BEATRICE = 1014;
+    GENERIC_CINDY = 1015;
+    GENERIC_HENRY = 1016;
+    GENERIC_LIZ = 1017;
+    GENERIC_MIRA = 1018;
+    GENERIC_SHAWN = 1019;
+    GENERIC_STEPHEN = 1020;
+    GENERIC_TORI = 1021;
+    GENERIC_MOOSE_MALE = 1022;
+
+    GENERIC_HUMAN = 1023;
+    // reserved 1024 to 2000;  // reserve for more pedestrians
+
+    GENERIC_MOTORCYCLE_STREET = 2001;
+    GENERIC_MOTORCYCLE_CRUISER = 2002;
+    GENERIC_MOTORCYCLE_Z125 = 2003;
+    GENERIC_MOTORCYCLE_ZOOMER = 2004;
+    GENERIC_MOTORCYCLE_Z900 = 2005;
+    GENERIC_MOTORCYCLE_KS750 = 2006;
+    GENERIC_MOTORCYCLE_SPYDER = 2007;
+    GENERIC_MOTORCYCLE_CB300R = 2008;
+    GENERIC_ELECTRIC_SCOOTER = 2009;
+    GENERIC_DAELIM_MOTORBIKE = 2010;
+    // reserved 2011 to 3000;  // reserve for more motorcycles
+
+    GENERIC_ROAD_BICYCLE = 3001;
+    GENERIC_LEISURE_BICYCLE = 3002;
+    GENERIC_ROAD_BICYCLE_02 = 3003;
+    GENERIC_ROAD_BICYCLE_03 = 3004;
+    GENERIC_ROAD_BICYCLE_04 = 3005;
+    GENERIC_ROAD_BICYCLE_05 = 3006;
+    GENERIC_LEISURE_BICYCLE_02 = 3007;
+    GENERIC_LEISURE_BICYCLE_03 = 3008;
+    GENERIC_LEISURE_BICYCLE_04 = 3009;
+    // reserved 3010 to 4000;  // reserve for more bicycles
+    SPECIFIC_SPECTRAL_MODEL = 10001;
+  }
+
+  enum SpectralStaticModel {
+    NONE = 0;
+    CUSTOM = 1;
+    GENERIC_TRAFFIC_CONE = 2;
+    GENERIC_TURKEY = 3;
+    GENERIC_STREET_BARRIER = 4;
+    GENERIC_TRASH_BIN = 5;
+    GENERIC_CREASED_BOX = 6;
+    GENERIC_CREASED_BOX_2 = 7;
+    GENERIC_CREASED_BOX_3 = 8;
+    GENERIC_CREASED_BOX_4 = 9;
+    GENERIC_TRAFFIC_CONE_2 = 10;
+    GENERIC_TRASH_BAG = 11;
+    GENERIC_WOOD_BEAM = 12;
+    GENERIC_MAN_POSED = 13;
+    GENERIC_MAN_POSED_2 = 14;
+    GENERIC_WOMAN_POSED = 15;
+    GENERIC_WOMAN_CHILD_POSED = 16;
+    GENERIC_LARGE_BOX = 17;
+    GENERIC_TRASH_CAN = 18;
+    GENERIC_TRASH_CAN_2 = 19;
+    GENERIC_CEMENT_BARRIER = 20;
+    GENERIC_FREEWAY_LIGHT = 21;
+    GENERIC_MAIL_BOX = 22;
+    GENERIC_CEMENT_BARRIER_2 = 23;
+    GENERIC_CEMENT_BARRIER_3 = 24;
+    GENERIC_CHECKERBOARD = 25;
+    GENERIC_CHECKERBOARD_8x12 = 26;
+    GENERIC_TIRE = 27;
+    GENERIC_TIRE_2 = 28;
+    GENERIC_TIRE_3 = 29;
+    GENERIC_TIRE_4 = 30;
+    GENERIC_TIRE_5 = 31;
+    GENERIC_TIRE_6 = 32;
+    GENERIC_TIRE_BUNCH = 33;
+    GENERIC_TIRE_BUNCH_2 = 34;
+    GENERIC_TIRE_BUNCH_3 = 35;
+    GENERIC_TIRE_BUNCH_4 = 36;
+    GENERIC_TIRE_BARRICADE = 37;
+    GENERIC_TIRE_BARRICADE_2 = 38;
+    GENERIC_PALLET = 39;
+    GENERIC_SOFA = 40;
+    GENERIC_DOTTED_CHECKERBOARD_11x8 = 41;
+    GENERIC_COLOR_CALIBRATOR = 42;
+    GENERIC_TYLER_CROUCHING = 43;
+    GENERIC_TYLER_LYING = 44;
+    GENERIC_TYLER_STANDING = 45;
+    GENERIC_TYLER_SITTING = 46;
+    GENERIC_SIMON_CROUCHING = 47;
+    GENERIC_SIMON_LYING = 48;
+    GENERIC_SIMON_STANDING = 49;
+    GENERIC_SIMON_SITTING = 50;
+    GENERIC_TRAFFIC_CONE_3 = 51;
+    GENERIC_ARROW_SIGN = 52;
+    GENERIC_TIRE_7 = 53;
+    GENERIC_PARKED_MOTORCYCLE_Z125 = 54;
+    GENERIC_TREE_FIR = 55;
+    GENERIC_TREE_POPLAR = 56;
+    GENERIC_ROCK_1 = 57;
+    GENERIC_ROCK_2 = 58;
+    GENERIC_JAPANESE_SIGNBOARD = 59;
+    GENERIC_HIGHWAY_DRUM = 60;
+    GENERIC_PARKED_MOTORCYCLE_Z900 = 61;
+    GENERIC_PARKED_MOTORCYCLE_ZOOMER = 62;
+    GENERIC_TRAFFIC_ROBOT = 63;
+    GENERIC_SOLAR_PANEL = 64;
+    GENERIC_SOLAR_BASE = 65;
+    GENERIC_BUS_STOP = 66;
+    GENERIC_CHECKERBOARD_7x11 = 67;
+    GENERIC_SOLAR_POLE = 68;
+    GENERIC_GRASS_1 = 69;
+    GENERIC_GRASS_2 = 70;
+    GENERIC_DIRT_RUT = 71;
+    GENERIC_JAPANESE_BARRICADE = 72;
+    GENERIC_FOV_CALIBRATOR = 73;
+    GENERIC_BABY_STROLLER = 74;
+    GENERIC_BABY_STROLLER_EMPTY = 75;
+    GENERIC_CONSTRUCTION_FENCE_1 = 76;
+    GENERIC_FENCE_1 = 77;
+    GENERIC_FENCE_2 = 78;
+    GENERIC_TRAFFIC_BARREL_1 = 79;
+    GENERIC_TRAFFIC_BARREL_2 = 80;
+    GENERIC_SMALL_BUSH_1 = 81;
+    GENERIC_BUSH_1 = 82;
+    GENERIC_LARGE_BUSH_1 = 83;
+    GENERIC_PINE_SHRUB = 84;
+    GENERIC_GRANITE_BOLLARD_1 = 85;
+    GENERIC_TRASH_CAN_3 = 86;
+    GENERIC_FIRE_HYDRANT_2 = 87;
+    GENERIC_TRAFFIC_CONTROL_1 = 88;
+    GENERIC_CONCRETE_PLANT_POT_1 = 89;
+    GENERIC_PARKING_METER_1 = 90;
+    GENERIC_CONCRETE_PLANT_POT_2 = 91;
+    GENERIC_ASH_TRAY_1 = 92;
+    GENERIC_YELLOW_BOLLARD_1 = 93;
+    GENERIC_CEMENT_BARRIER_4 = 94;
+    GENERIC_BURGER_BOX_1 = 95;
+    GENERIC_BURGER_BOX_2 = 96;
+    GENERIC_TAKEOUT_BOX_1 = 97;
+    GENERIC_TAKEOUT_BOX_2 = 98;
+    GENERIC_CIGARETTE_BOX_1 = 99;
+    GENERIC_CIGARETTE_BOX_2 = 100;
+    GENERIC_STRIPED_ROADBLOCK_2 = 101;
+    GENERIC_STRIPED_ROADBLOCK_3 = 102;
+    GENERIC_ROAD_CLOSED_SIGN_1 = 103;
+    GENERIC_CINDER_BLOCKS_1 = 104;
+    GENERIC_CINDER_BLOCKS_2 = 105;
+    GENERIC_CINDER_BLOCKS_3 = 106;
+    GENERIC_CONCRETE_BAG_1 = 107;
+    GENERIC_CONCRETE_BAG_2 = 108;
+    GENERIC_CONCRETE_BAG_3 = 109;
+    GENERIC_WATER_TANK_1 = 110;
+    GENERIC_CANISTER_1 = 111;
+    GENERIC_CONCRETE_PIPE_SMALL = 112;
+    GENERIC_CONCRETE_PIPE_1 = 113;
+    GENERIC_CONCRETE_PIPE_2 = 114;
+    GENERIC_CONSTRUCTION_PYLON_1 = 115;
+    GENERIC_CONSTRUCTION_PYLON_2 = 116;
+    GENERIC_WOODEN_CRATE_1 = 117;
+    GENERIC_CONSTRUCTION_DUMPSTER = 118;
+    GENERIC_SPOOL_1 = 119;
+    GENERIC_LIGHT_GENERATOR_1 = 120;
+    GENERIC_PLASTIC_BARREL_1 = 121;
+    GENERIC_PORTA_POTTY_OPEN = 122;
+    GENERIC_PORTA_POTTY_CLOSED = 123;
+    GENERIC_REBAR_1 = 124;
+    GENERIC_CONCRETE_MIXER = 125;
+    GENERIC_CORD_WRAP_1 = 126;
+    GENERIC_LADDER_OPEN = 127;
+    GENERIC_LADDER_CLOSED = 128;
+    GENERIC_PAINT_BUCKET_1 = 129;
+    GENERIC_PROPANE_TANK_1 = 130;
+    GENERIC_PROPANE_TANK_2 = 131;
+    GENERIC_ROLLER_MACHINE = 132;
+    GENERIC_SURVEYOR_STAND = 133;
+    GENERIC_WHEEL_BARROW = 134;
+    GENERIC_SNOWMAN = 135;
+
+    GENERIC_FIR_1 = 136;
+    GENERIC_FIR_2 = 137;
+    GENERIC_FIR_3 = 138;
+    GENERIC_FIR_4 = 139;
+    GENERIC_FIR_5 = 140;
+    GENERIC_FIR_6 = 141;
+    GENERIC_FIR_7 = 142;
+
+    GENERIC_GRASS_BUSH_1 = 143;
+    GENERIC_CEMENT_BARRIER_5 = 144;
+
+    GENERIC_ELM_1 = 145;
+    GENERIC_ELM_2 = 146;
+    GENERIC_ELM_3 = 147;
+    GENERIC_ELM_4 = 148;
+    GENERIC_ELM_5 = 149;
+    GENERIC_ELM_6 = 150;
+    GENERIC_ELM_7 = 151;
+    GENERIC_ELM_8 = 152;
+    GENERIC_ELM_9 = 153;
+    GENERIC_ELM_10 = 154;
+    GENERIC_ELM_11 = 155;
+    GENERIC_ELM_12 = 156;
+    GENERIC_ELM_13 = 157;
+    GENERIC_ELM_14 = 158;
+    GENERIC_ELM_15 = 159;
+    GENERIC_ELM_16 = 160;
+
+    GENERIC_RACK_MID = 161;
+    GENERIC_RACK_BOT = 162;
+
+    // reserved 163 to 167;  // Reserved for the 4 street lights
+
+    GENERIC_MAPLE_1 = 168;
+    GENERIC_MAPLE_2 = 169;
+    GENERIC_MAPLE_3 = 170;
+    GENERIC_MAPLE_4 = 171;
+    GENERIC_MAPLE_5 = 172;
+    GENERIC_MAPLE_6 = 173;
+    GENERIC_MAPLE_7 = 174;
+    GENERIC_MAPLE_8 = 175;
+    GENERIC_MAPLE_9 = 176;
+    GENERIC_MAPLE_10 = 177;
+    GENERIC_MAPLE_11 = 178;
+    GENERIC_MAPLE_12 = 179;
+    GENERIC_MAPLE_13 = 180;
+    GENERIC_MAPLE_14 = 181;
+    GENERIC_MAPLE_15 = 182;
+    GENERIC_MAPLE_16 = 183;
+    GENERIC_MAPLE_17 = 184;
+    GENERIC_MAPLE_18 = 185;
+    GENERIC_MAPLE_19 = 186;
+    GENERIC_MAPLE_20 = 187;
+
+    GENERIC_BIRCH_1 = 188;
+    GENERIC_BIRCH_2 = 189;
+    GENERIC_BIRCH_3 = 190;
+    GENERIC_BIRCH_4 = 191;
+    GENERIC_BIRCH_5 = 192;
+    GENERIC_BIRCH_6 = 193;
+    GENERIC_BIRCH_7 = 194;
+    GENERIC_BIRCH_8 = 195;
+    GENERIC_BIRCH_9 = 196;
+    GENERIC_BIRCH_10 = 197;
+    GENERIC_BIRCH_11 = 198;
+    GENERIC_BIRCH_12 = 199;
+    GENERIC_BIRCH_13 = 200;
+
+    GENERIC_PINE_1 = 201;
+    GENERIC_PINE_2 = 202;
+    GENERIC_PINE_3 = 203;
+    GENERIC_PINE_4 = 204;
+    GENERIC_PINE_5 = 205;
+    GENERIC_PINE_6 = 206;
+    GENERIC_PINE_7 = 207;
+
+    GENERIC_POPLAR_1 = 208;
+    GENERIC_POPLAR_2 = 209;
+    GENERIC_POPLAR_3 = 210;
+    GENERIC_POPLAR_4 = 211;
+    GENERIC_POPLAR_5 = 212;
+    GENERIC_POPLAR_6 = 213;
+    GENERIC_POPLAR_7 = 214;
+    GENERIC_POPLAR_8 = 215;
+    GENERIC_POPLAR_9 = 216;
+    GENERIC_POPLAR_10 = 217;
+    GENERIC_POPLAR_11 = 218;
+    GENERIC_POPLAR_12 = 219;
+    GENERIC_POPLAR_13 = 220;
+    GENERIC_POPLAR_14 = 221;
+
+    GENERIC_AMUR_CORK_1 = 222;
+    GENERIC_AMUR_CORK_2 = 223;
+    GENERIC_AMUR_CORK_3 = 224;
+    GENERIC_AMUR_CORK_4 = 225;
+    GENERIC_AMUR_CORK_5 = 226;
+    GENERIC_AMUR_CORK_6 = 227;
+    GENERIC_AMUR_CORK_7 = 228;
+    GENERIC_AMUR_CORK_8 = 229;
+
+    GENERIC_PALM_SMALL_1 = 230;
+    GENERIC_PALM_SMALL_2 = 231;
+    GENERIC_PALM_SMALL_3 = 232;
+    GENERIC_PALM_SMALL_4 = 233;
+    GENERIC_PALM_1 = 234;
+    GENERIC_PALM_2 = 235;
+    GENERIC_PALM_3 = 236;
+
+    GENERIC_SMALL_ROCK_1 = 237;
+
+    GENERIC_GRASS_BUSH_2 = 238;
+    GENERIC_GRASS_BUSH_3 = 239;
+    GENERIC_GRASS_BUSH_4 = 240;
+    GENERIC_GRASS_BUSH_5 = 241;
+    GENERIC_GRASS_BUSH_6 = 242;
+    GENERIC_GRASS_BUSH_7 = 243;
+    GENERIC_GRASS_BUSH_8 = 244;
+    GENERIC_GRASS_BUSH_9 = 245;
+
+    GENERIC_GROUND_FOLIAGE_1 = 246;
+    GENERIC_GROUND_FOLIAGE_2 = 247;
+    GENERIC_GROUND_FOLIAGE_3 = 248;
+    // reserved 249 to 279;  // reserved for rest of foliage
+
+    GENERIC_RACK_NO_FLOOR_BOT = 280;
+    GENERIC_RACK_NO_FLOOR_MID = 281;
+
+    GENERIC_CASTOR_DECK = 282;
+    GENERIC_GATE_MOVEABLE = 283;
+    GENERIC_FENCE_MID = 284;
+    GENERIC_CARGO_CONTAINER = 285;
+
+    GENERIC_HOUSE_1 = 286;
+    GENERIC_HOUSE_2 = 287;
+    GENERIC_HOUSE_3 = 288;
+    GENERIC_HOUSE_4 = 289;
+    GENERIC_HOUSE_5 = 290;
+    GENERIC_HOUSE_6 = 291;
+    GENERIC_HOUSE_7 = 292;
+    GENERIC_HOUSE_8 = 293;
+    GENERIC_HOUSE_9 = 294;
+    GENERIC_HOUSE_10 = 295;
+    GENERIC_HOUSE_11 = 296;
+    GENERIC_HOUSE_12 = 297;
+    GENERIC_HOUSE_13 = 298;
+    GENERIC_HOUSE_14 = 299;
+    GENERIC_HOUSE_15 = 300;
+    GENERIC_HOUSE_16 = 301;
+
+    GENERIC_CONCRETE_BARRIER_BARE_1 = 302;
+    GENERIC_CONCRETE_BARRIER_END_1 = 303;
+    GENERIC_CONCRETE_BARRIER_INDENT_1 = 304;
+    GENERIC_BARRIER_METAL_PLATE_1 = 305;
+    GENERIC_BARRIER_METAL_PLATE_SMALL_1 = 306;
+    GENERIC_CONCRETE_BARRIER_ARROW_1 = 307;
+    GENERIC_CONCRETE_BARRIER_ARROW_FLIPPED_1 = 308;
+    GENERIC_CONCRETE_BARRIER_PANEL_2 = 309;
+    GENERIC_CONCRETE_BARRIER_MID_2 = 310;
+    GENERIC_CONCRETE_BARRIER_BARE_3 = 311;
+    GENERIC_CONCRETE_BARRIER_END_3 = 312;
+    GENERIC_CONCRETE_BARRIER_PANEL_3 = 313;
+    GENERIC_CONCRETE_BARRIER_SPLIT_3 = 314;
+
+    GENERIC_CONSTRUCTION_FENCE_END_1 = 315;
+    GENERIC_CONSTRUCTION_FENCE_FLAT_1 = 316;
+    GENERIC_CONSTRUCTION_FENCE_INDENT_1 = 317;
+    GENERIC_CONSTRUCTION_FENCE_LIGHTS_1 = 318;
+    GENERIC_CONSTRUCTION_FENCE_START_1 = 319;
+
+    GENERIC_GLASS_PANEL_END_1 = 320;
+    GENERIC_GLASS_PANEL_INDENT_1 = 321;
+    GENERIC_GLASS_PANEL_MID_1 = 322;
+    GENERIC_GLASS_PANEL_START_1 = 323;
+
+    GENERIC_METAL_PLATES_FLAT_1 = 324;
+    GENERIC_METAL_PLATES_FLAT_INDENT_1 = 325;
+    GENERIC_METAL_PLATES_RIM_1 = 326;
+    GENERIC_METAL_PLATES_RIM_INDENT_1 = 327;
+    GENERIC_METAL_PLATES_BEAMS_2 = 328;
+    GENERIC_METAL_PLATES_FLAT_2 = 329;
+    GENERIC_METAL_PLATES_FLAT_INDENT_2 = 330;
+
+    GENERIC_ROAD_REFLECTOR_1 = 331;
+
+    GENERIC_PARKED_BICYCLE_1 = 332;
+    GENERIC_PARKED_BICYCLE_2 = 333;
+
+    GENERIC_HELIPAD_HOSPITAL_1 = 334;
+    GENERIC_HELIPAD_HOSPITAL_2 = 335;
+    GENERIC_HELIPAD_NET_1 = 336;
+    GENERIC_HELIPAD_ROUND_1 = 337;
+    GENERIC_HELIPAD_SQUARE_1 = 338;
+
+    GENERIC_RADAR_TARGETS_SQ_PLATE = 339;
+    GENERIC_RADAR_TARGETS_TRIHEDRAL_085IN = 340;
+
+    GENERIC_GUARD_RAIL_ARROW_1 = 341;
+    GENERIC_GUARD_RAIL_ARROW_FLIPPED_1 = 342;
+    GENERIC_GUARD_RAIL_END_1 = 343;
+    GENERIC_GUARD_RAIL_MID_1 = 344;
+    GENERIC_GUARD_RAIL_SPEAKER_1 = 345;
+
+    GENERIC_GUARD_RAIL_ARROW_2 = 346;
+    GENERIC_GUARD_RAIL_ARROW_FLIPPED_2 = 347;
+    GENERIC_GUARD_RAIL_BOXES_2 = 348;
+    GENERIC_GUARD_RAIL_END_2 = 349;
+    GENERIC_GUARD_RAIL_MID_2 = 350;
+    GENERIC_GUARD_RAIL_POSTS_2 = 351;
+
+    GENERIC_GUARD_RAIL_MID_3 = 352;
+    GENERIC_GUARD_RAIL_START_3 = 353;
+    GENERIC_GUARD_RAIL_SIGN_3 = 354;
+
+    GENERIC_GUARD_RAIL_FENCE_END_4 = 355;
+    GENERIC_GUARD_RAIL_FENCE_MID_4 = 356;
+    GENERIC_GUARD_RAIL_FENCE_START_4 = 357;
+    GENERIC_GUARD_RAIL_MID_4 = 358;
+    GENERIC_GUARD_RAIL_START_4 = 359;
+
+    GENERIC_BLACK_BOLLARD_1 = 360;
+    GENERIC_UTILITY_BOX_1 = 361;
+    GENERIC_UTILITY_BOX_2 = 362;
+    GENERIC_UTILITY_BOX_3 = 363;
+    GENERIC_UTILITY_COVER_1 = 364;
+    GENERIC_VENDING_MACHINE_1 = 365;
+    GENERIC_VENDING_MACHINE_2 = 366;
+    GENERIC_FIRE_HYDRANT_1 = 367;
+    GENERIC_FIRE_HYDRANT_3 = 368;
+    GENERIC_FIRE_HYDRANT_4 = 369;
+    GENERIC_TRASH_BIN_BLACK_1 = 370;
+    GENERIC_TRASH_BIN_BLUE_1 = 371;
+    GENERIC_TRASH_BIN_GREEN_1 = 372;
+    GENERIC_PLANTER_1 = 373;
+    GENERIC_PLANTER_2 = 374;
+    GENERIC_PUMPKIN = 375;
+
+    GENERIC_RADAR_TARGETS_SQ_PLATE_DIELECTRIC = 376;
+
+    GENERIC_POTHOLE_1 = 377;
+    GENERIC_POTHOLE_2 = 378;
+    GENERIC_POTHOLE_3 = 379;
+    GENERIC_POTHOLE_4 = 380;
+    GENERIC_POTHOLE_5 = 381;
+    GENERIC_POTHOLE_6 = 382;
+    GENERIC_POTHOLE_7 = 383;
+    GENERIC_POTHOLE_8 = 384;
+    GENERIC_POTHOLE_9 = 385;
+    GENERIC_POTHOLE_10 = 386;
+    GENERIC_POTHOLE_11 = 387;
+    GENERIC_POTHOLE_12 = 388;
+    GENERIC_POTHOLE_13 = 389;
+    GENERIC_POTHOLE_14 = 390;
+    GENERIC_POTHOLE_15 = 391;
+    GENERIC_POTHOLE_16 = 392;
+
+    GENERIC_PARKED_TANKER_TRUCK = 393;
+    GENERIC_PARKED_SILVERADO = 394;
+    GENERIC_PARKED_SEDAN_SMALL = 395;
+    GENERIC_PARKED_PRIUS = 396;
+    GENERIC_PARKED_ODYSSEY = 397;
+    GENERIC_PARKED_MODEL_S = 398;
+    GENERIC_PARKED_EXPLORER = 399;
+    GENERIC_PARKED_CONVERTIBLE = 400;
+    GENERIC_PARKED_ALTIMA = 401;
+
+    GENERIC_SERVICE_TENT_CLOSED = 402;
+    GENERIC_SERVICE_TENT_OPEN_L = 403;
+    GENERIC_SERVICE_TENT_OPEN_R = 404;
+    GENERIC_SERVICE_TENT_OPEN_FULL = 405;
+
+    GENERIC_GUARD_RAIL_CABLE_1 = 406;
+    GENERIC_GUARD_RAIL_CABLE_2 = 407;
+
+    GENERIC_LARGE_LOG_1 = 408;
+    GENERIC_MEDIUM_LOG_1 = 409;
+    GENERIC_SMALL_LOG_1 = 410;
+    GENERIC_SMALL_LOG_2 = 411;
+
+    GENERIC_RADAR_TARGETS_CUBE_CONCRETE = 412;
+    GENERIC_RADAR_TARGETS_CUBE_FOLIAGE = 413;
+    GENERIC_RADAR_TARGETS_CUBE_ROCK = 414;
+    GENERIC_RADAR_TARGETS_CUBE_WOOD = 415;
+    GENERIC_RADAR_TARGETS_SPHERE_GLASS = 416;
+    GENERIC_RADAR_TARGETS_SPHERE_METAL = 417;
+    GENERIC_RADAR_TARGETS_SPHERE_PLASTIC = 418;
+    GENERIC_RADAR_TARGETS_SPHERE_STONE = 419;
+    GENERIC_RADAR_TARGETS_TRUCK_GLASS = 420;
+    GENERIC_RADAR_TARGETS_TRUCK_METAL = 421;
+    GENERIC_RADAR_TARGETS_TRUCK_PLASTIC = 422;
+    GENERIC_RADAR_TARGETS_TRUCK_RUBBER = 423;
+
+    GENERIC_FLASHING_LIGHT_1 = 424;
+    GENERIC_CONSTRUCTION_BARREL_1 = 425;
+    GENERIC_BASE_PLATE_1 = 426;
+    GENERIC_BARRIER_BEACON_1 = 427;
+    GENERIC_BARRIER_BEACON_2 = 428;
+    GENERIC_STRIPED_BARRIER_1 = 429;
+    GENERIC_STRIPED_BARRIER_2 = 430;
+    GENERIC_STRIPED_BARRIER_3 = 431;
+    GENERIC_WARNING_BEACON_1 = 432;
+    GENERIC_WARNING_BEACON_2 = 433;
+    GENERIC_WARNING_TRIANGLE_1 = 434;
+
+    GENERIC_SHIPPING_CONTAINER_1 = 435;
+    GENERIC_SHIPPING_CONTAINER_2 = 436;
+    GENERIC_CZECH_HEDGEHOG_1 = 437;
+    GENERIC_CONCRETE_BARRICADE_1 = 438;
+    GENERIC_CONCRETE_BARRICADE_2 = 439;
+    GENERIC_CONCRETE_BARRICADE_3 = 440;
+    GENERIC_CONCRETE_BARRICADE_4 = 441;
+    GENERIC_CONCRETE_BARRICADE_5 = 442;
+    GENERIC_CONCRETE_BARRICADE_6 = 443;
+    GENERIC_EURO_NCAP_PEDESTRIAN_1 = 444;
+    GENERIC_EURO_NCAP_PEDESTRIAN_2 = 445;
+    GENERIC_SMALL_LOG_3 = 446;
+    GENERIC_SMALL_LOG_4 = 447;
+    GENERIC_SMALL_LOG_5 = 448;
+    GENERIC_SMALL_LOG_6 = 449;
+    GENERIC_SMALL_LOG_7 = 450;
+    GENERIC_SMALL_LOG_8 = 451;
+    GENERIC_SMALL_LOG_9 = 452;
+    GENERIC_SMALL_LOG_10 = 453;
+    GENERIC_CONCERTINA_WOODEN_STAKES_1 = 454;
+    GENERIC_CONCERTINA_WOODEN_STAKES_2 = 455;
+    GENERIC_CONCERTINA_WOODEN_STAKES_3 = 456;
+    GENERIC_BARBED_WIRE_FENCE_1 = 457;
+    GENERIC_CONCERTINA_WIRE_1 = 458;
+    GENERIC_CONCERTINA_WIRE_2 = 459;
+
+    GENERIC_PARKED_COMMUTER_BUS = 460;
+    GENERIC_PARKED_CHR = 461;
+    GENERIC_PARKED_CRV = 462;
+    GENERIC_PARKED_ZOE_COMPACT = 463;
+    GENERIC_PARKED_NBOX = 464;
+    GENERIC_PARKED_SUV = 465;
+    GENERIC_PARKED_COPEN = 466;
+    GENERIC_PARKED_CRANE = 467;
+    GENERIC_PARKED_IONIQ = 468;
+    GENERIC_PARKED_LYRIQ = 469;
+    GENERIC_PARKED_ROBOT = 470;
+    GENERIC_PARKED_MOTORCYCLE_CB300R = 471;
+    GENERIC_PARKED_LEGEND_SEDAN = 472;
+    GENERIC_PARKED_SUPERSEVEN = 473;
+    GENERIC_PARKED_3HATCHBACK = 474;
+    GENERIC_PARKED_SIENNA = 475;
+    GENERIC_PARKED_MOTORCYCLE_SPYDER = 476;
+    GENERIC_PARKED_CHARGER = 477;
+    GENERIC_PARKED_TRANSIT_AMBULANCE = 478;
+    GENERIC_PARKED_AIRPLANE = 479;
+    GENERIC_PARKED_FORKLIFT = 480;
+    GENERIC_PARKED_SPRINTER = 481;
+    GENERIC_PARKED_AMBULANCE = 482;
+    GENERIC_PARKED_AVENTADOR = 483;
+    GENERIC_PARKED_EQS = 484;
+    GENERIC_PARKED_EXCAVATOR = 485;
+    GENERIC_PARKED_GOLF_CART = 486;
+    GENERIC_PARKED_ROAD_BICYCLE = 487;
+    GENERIC_PARKED_737 = 488;
+    GENERIC_PARKED_CARERRA = 489;
+    GENERIC_PARKED_F150 = 490;
+    GENERIC_PARKED_POLICECAR = 491;
+    GENERIC_PARKED_TR_7_TRACTOR = 492;
+    GENERIC_PARKED_CESSNA = 493;
+    GENERIC_PARKED_COASTER_BUS = 494;
+    GENERIC_PARKED_LS500 = 495;
+    GENERIC_PARKED_PANAMERA = 496;
+    GENERIC_PARKED_TRACTOR_8RT = 497;
+    GENERIC_PARKED_MUSTANG = 498;
+    GENERIC_PARKED_PROFIA = 499;
+    GENERIC_PARKED_VAN = 500;
+    GENERIC_PARKED_SAMBAR = 501;
+    GENERIC_PARKED_SKW475 = 502;
+    GENERIC_PARKED_STEAM_ROLLER = 503;
+    GENERIC_PARKED_MOTORCYCLE_KS750 = 504;
+    GENERIC_PARKED_AEROQUEEN = 505;
+    GENERIC_PARKED_ASPHALT_PAVER = 506;
+    GENERIC_PARKED_CANBUS = 507;
+    GENERIC_PARKED_CHARGER_POLICE = 508;
+    GENERIC_PARKED_QUADCOPTER = 509;
+    GENERIC_PARKED_FIESTA = 510;
+    GENERIC_PARKED_GRAND_CHEROKEE = 511;
+    GENERIC_PARKED_SEMI_TRUCK_CAB = 512;
+    GENERIC_PARKED_ALPHARD = 513;
+    GENERIC_PARKED_CROWN_POLICECAR = 514;
+    GENERIC_PARKED_HIACE_AMBULANCE = 515;
+    GENERIC_PARKED_TR_7_TRACTOR_TILL = 516;
+    GENERIC_PARKED_ELECTRIC_SCOOTER = 517;
+    GENERIC_PARKED_MINIVAN = 518;
+    GENERIC_PARKED_FUSOFIGHTER = 519;
+    GENERIC_PARKED_LC500 = 520;
+    GENERIC_PARKED_SEMI_TRAILER_48FT = 521;
+    GENERIC_PARKED_FIRETRUCK = 522;
+    GENERIC_PARKED_CARGO_PALLET_TRAILER = 523;
+    GENERIC_PARKED_CANTER_FIRETRUCK = 524;
+    GENERIC_PARKED_AUTO_HAULER = 525;
+    GENERIC_PARKED_54FT_TANKER = 526;
+    GENERIC_PARKED_LOWBOY_TRAILER = 527;
+    GENERIC_PARKED_SEMI_TRUCK_FULL = 528;
+    GENERIC_PARKED_TRAILER_RAILYARD = 529;
+    GENERIC_PARKED_28FT_TRUCK_TRAILER_COMPLEX = 530;
+
+    GENERIC_SHACK_1 = 531;
+    GENERIC_SHACK_2 = 532;
+    GENERIC_SHACK_3 = 533;
+    GENERIC_SHACK_4 = 534;
+    GENERIC_LARGE_CAMOUFLAGE_NETTING_1 = 535;
+    GENERIC_MEDIUM_CAMOUFLAGE_NETTING_1 = 536;
+    GENERIC_SMALL_CAMOUFLAGE_NETTING_1 = 537;
+    GENERIC_CONCRETE_WALL_3 = 538;
+    GENERIC_TALL_TRAFFIC_CONE_1 = 539;
+    GENERIC_STONE_WALL_1 = 540;
+    GENERIC_STONE_WALL_2 = 541;
+    GENERIC_BRICK_WALL_1 = 542;
+    GENERIC_METAL_DEBRIS_1 = 543;
+    GENERIC_METAL_DEBRIS_2 = 544;
+    GENERIC_METAL_DEBRIS_3 = 545;
+
+    GENERIC_RADAR_STATION_1 = 546;
+    GENERIC_RADAR_TARGETS_HEMISPHERE_METAL = 547;
+
+    GENERIC_PARKED_SEMI_TRUCK_TRAILER_COMPLEX = 548;
+    GENERIC_PARKED_SEMI_TRUCK_TRAILER_REEFER = 549;
+    GENERIC_PARKED_TRAILER_RAILYARD_CONTAINER = 550;
+    GENERIC_PARKED_48FT_TRUCK_TRAILER_COMPLEX = 551;
+    GENERIC_PARKED_SEMI_TRAILER_48FT_REEFER = 552;
+
+    GENERIC_CHECKERBOARD_91_45x76 = 554;  // intended to read as 91.45x76
+
+    GENERIC_LED_CONSTRUCTION_ARROW_LEFT = 555;
+    GENERIC_LED_CONSTRUCTION_ARROW_RIGHT = 556;
+
+    GENERIC_PLASTIC_CONSTRUCTION_BARRIER_1 = 557;
+    // reserved 558 to 999;  // reserve for more static GENERIC obstacles
+
+    CUSTOM_US_SIGN = 1000;
+    CUSTOM_SPOT_LIGHT = 1001;
+    CUSTOM_LAMBERTIAN_TARGET = 1002;
+    CUSTOM_MATERIAL_TARGET = 1003;
+    CUSTOM_RETROREFLECTOR_TARGET = 1004;
+    CUSTOM_ATTENUATION_VOLUME = 1005;
+    CUSTOM_WARNINGTRIANGLE_TARGET = 1006;
+    CUSTOM_SIGN = 1007;
+    CUSTOM_TRAFFIC_LIGHT_BLOCK = 1008;
+    CUSTOM_HEDGE_SHORT_1 = 1009;
+    CUSTOM_HEDGE_TALL_1 = 1010;
+    CUSTOM_WIRE_FENCE_1 = 1011;
+    CUSTOM_UTILITY_POLE_1 = 1012;
+    CUSTOM_CURB_1 = 1013;
+    CUSTOM_CONCRETE_WALL_1 = 1014;
+    CUSTOM_CONCRETE_WALL_2 = 1015;
+
+    // Road Markings
+    CUSTOM_ROAD_MARKING = 1016;
+
+    GENERIC_TORN_TIRE_1 = 1017;
+    GENERIC_PALLET_2 = 1018;
+    GENERIC_PALLET_3 = 1019;
+    GENERIC_PALLET_4 = 1020;
+    GENERIC_PALLET_5 = 1021;
+    GENERIC_PALLET_6 = 1022;
+    GENERIC_PALLET_7 = 1023;
+    GENERIC_PALLET_8 = 1024;
+    CUSTOM_TRAFFIC_CONE_1 = 1025;
+    CUSTOM_TRAFFIC_CONE_2 = 1026;
+    CUSTOM_TRAFFIC_CONE_3 = 1027;
+    CUSTOM_STREET_LIGHT_1 = 1028;
+    CUSTOM_STREET_LIGHT_2 = 1029;
+    CUSTOM_STREET_LIGHT_3 = 1030;
+    CUSTOM_STREET_LIGHT_4 = 1031;
+    // reserved 1032;
+
+    GENERIC_SNAKELINE_POST = 1033;
+    GENERIC_SNAKELINE_POST_WITH_ROPE = 1034;
+
+    GENERIC_EURO_NCAP_MOTORCYCLE = 1035;
+    GENERIC_EURO_NCAP_BICYCLE = 1036;
+
+    SPECIFIC_SPECTRAL_STATIC_MODEL = 10001;
+  }
+
+  // for internal use in Simian
+  map<string, double> simian_data_points = 11;
+
+  // Acceleration of section 0 (i.e. sections[0]) observed in world frame, expressed in world frame.
+  spatial.Screw acceleration = 13;
+
+  // Signal message for signals that are on
+  repeated SignalMessage signals_on = 25;
+  repeated ArticulationSignalMessage articulation_signals_on = 27;
+
+  // Logstream-specific data, never sent to stacks.
+  LogstreamActorData logstream = 16;
+
+  // 3D positions on the actor in local frame
+  repeated ReferencePoint reference_points = 18;
+  // reserved 17;
+
+  // Used for filtering out actors from another agent_awareness_group in behavior intelligence
+  // models.
+  int32 agent_awareness_group = 26;
+
+  // Used to send additional data from the YAML to the actor sensor.
+  oneof actor_sensor_data_type {
+    google.protobuf.Value actor_sensor_data = 28;
+  }
+}
+
+// <!-- Next ID: 5 -->
+message Actor2D {
+  int32 id = 1;
+  Actor.ObstacleType obstacle_type = 2;
+
+  // Only read when type is CUSTOM_OBSTACLE.
+  string custom_type = 3;
+
+  message Section2D {
+    // The spatial.Point proto describes a point in 3D Euclidian space, with x, y, and z fields. In
+    // the context of a 2D actor, we only need 2 of the 3 components. The z-component is ignored.
+    spatial.Point section_centroid = 1;
+
+    // The z-component is ignored. See comment above the `section_centroid` field.
+    repeated spatial.Point polygon_points = 2;
+  }
+
+  // Each actor may have multiple bounding boxes, representing multiple "sections" of the actor.
+  repeated Section2D sections2d = 5;
+
+  // The z-component is ignored. See comment above the `section_centroid` field.
+  spatial.Point centroid = 6;
+
+  // reserved 4;
+  // reserved "bounding_boxes";
+}
+
+message ActorFeedback {
+  // Used by Spectral to visualize (+) CCW tire rotation about the vehicle's +z axis in the vehicle
+  // frame. This is the angle that the tire makes with the longitudinal axis of the vehicle. It is
+  // expressed in vehicle frame.
+  simian_public.composite_vehicle.ScalarFeedback steer_angle = 1;
+}
+
+message SignalMessage {
+  string type = 1;
+  // Light signal fields
+  float frequency = 2;
+  int32 brightness = 3;
+}
+
+message ArticulationSignalMessage {
+  // Articulation signal fields
+  simian_public.spectral.VehicleArticulation articulation = 4;
+  // A signal message is sent each frame by an active signal (while true),
+  // this field gives a handle to identify messages sent by the same source signal.
+  uint64 identifier = 5;
+}
+
+// Configuration for custom spectral assets
+// <!-- Next ID: 34 -->
+message AssetConfig {
+  // Output state
+  simian_public.spectral.ActorOutputState output_state = 25;
+
+  // Used for scaling Static Obstacles and dynamic pedestrians
+  ScaleFactor scaling = 2;
+  message ScaleFactor {
+    double x = 1;
+    double y = 2;
+    double z = 3;
+  }
+  simian_public.spectral.SpectralUSSign us_sign_configuration = 3;
+  simian_public.spectral.TrailerConfiguration trailer_configuration = 4;
+  ImportedModelDescription import_model = 5;
+  message ImportedModelDescription {
+    string file = 1;
+    spatial.PoseSpec.RollPitchYaw vertex_rotation = 2;
+    simian_public.common.Vector3 vertex_scale = 3;
+    // converts data from right-handed coordinate system to left-handed coordinate system
+    bool convert_to_left_handed = 4;
+    // specifies which UV channel should be used for this mesh
+    int32 uv_channel = 5;
+    // resolves vertices to world space if set to true
+    bool pretransform_vertices = 6;
+  }
+  simian_public.spectral.VehicleHeadlights vehicle_headlights = 6;
+  simian_public.spectral.PedestrianCustomization pedestrian_customization = 7;
+  simian_public.spectral.SpectralSpotLight spot_light_configuration = 8;
+  simian_public.spectral.SpectralLambertianTarget lambertian_target_configuration = 9;
+  simian_public.spectral.WindshieldWipers windshield_wipers = 10;
+  simian_public.spectral.TrafficRobot traffic_robot = 11;
+  // Rotating and flashing lights currently only populated for actor type GENERIC_CROWN_POLICECAR
+  simian_public.spectral.EmergencyLightsRotating emergency_lights_rotating = 12;
+  simian_public.spectral.EmergencyLightsFlashing emergency_lights_flashing = 13;
+  simian_public.spectral.SpectralCustomMaterialTarget custom_material_target_configuration = 14;
+  simian_public.spectral.SpectralCustomRetroreflectorTarget retroreflector_configuration = 15;
+  simian_public.spectral.VehicleDirt vehicle_dirt = 16;
+  simian_public.spectral.SpectralAttenuationVolume attenuation_volume_configuration = 17;
+  // Reflectors will let you specify reflectivity values for specified vehicle.
+  simian_public.spectral.VehicleReflectors vehicle_reflectors = 18;
+  simian_public.spectral.BrakeLightsCustomization brakelights_customization = 19;
+  simian_public.spectral.TailLightsCustomization taillights_customization = 20;
+  simian_public.spectral.VehicleLicensePlate vehicle_license_plate = 21;
+  // Some vehicles have more than one carpaint, we can still opt to override just one (legacy) or
+  // specify multi (multi_carpaints actually works instead of main_carpaint too but it's less nice
+  // to write arrays of length 1)
+  oneof carpaint {
+    simian_public.spectral.VehicleCarPaintMaterial main_carpaint = 22;
+    MultiCarPaints multi_carpaints = 23;
+  }
+  message MultiCarPaints {
+    repeated simian_public.spectral.VehicleCarPaintMaterial carpaint = 1;
+  }
+  // Optional overrides for additional materials.
+  repeated simian_public.spectral.VehicleMaterialOverride material_overrides = 24;
+  // Optional settings for parts of a vehicle, e.g. opening doors, adding roof-racks, etc.
+  simian_public.spectral.VehicleArticulation vehicle_parts = 26;
+  repeated simian_public.spectral.CookedSpectralDecal decals = 27;
+  simian_public.spectral.SpectralSign sign_configuration = 28;
+  simian_public.spectral.SpectralTrafficLightBlock traffic_light_block = 29;
+  // Will let you set the material values of a given obstacle
+  simian_public.spectral.SpectralConfigurableMesh spectral_mesh_configuration = 30;
+  // Lets users configure road marking properties
+  simian_public.spectral.SpectralRoadMarking spectral_road_marking = 31;
+  simian_public.spectral.VehicleTireSpray vehicle_tire_spray = 32;
+  simian_public.sensor_sim.VehicleFragmentGeneration vehicle_fragment_generation = 33;
+  // Will let you set values for street lights
+  simian_public.spectral.SpectralStreetLight street_light_configuration = 34;
+}
+
+message LogstreamActorData {
+  bool removed = 1;
+  int32 log_id = 2;
+}
+
+message ReferencePoint {
+  string name = 1;
+  repeated simian_public.common.Vector3 points = 2;
+}
+
+message SpectralVehicles {
+  repeated simian_public.spectral.VehicleMaterialsOverride global_material_overrides = 1;
+}

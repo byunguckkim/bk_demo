@@ -1,0 +1,766 @@
+// Copyright (C) 2020 Applied Intuition, Inc. All rights reserved.
+// This source code file is distributed under and subject to the LICENSE in license.txt
+
+syntax = "proto3";
+
+package simian_public.scenario;
+
+import "google/protobuf/duration.proto";
+import "google/protobuf/empty.proto";
+import "applied/simian/public/proto/actor.proto";
+import "applied/simian/public/proto/common.proto";
+import "applied/simian/public/proto/composite_vehicle.proto";
+import "applied/simian/public/proto/field_options.proto";
+import "applied/simian/public/proto/geometry.proto";
+import "applied/simian/public/proto/interactive_field.proto";
+import "applied/simian/public/proto/motion_model.proto";
+import "applied/simian/public/proto/motion_state_modifier.proto";
+import "applied/simian/public/proto/physics_engine.proto";
+import "applied/simian/public/proto/planar.proto";
+import "applied/simian/public/proto/scenario/common.proto";
+import "applied/simian/public/proto/scenario/sensor_config.proto";
+import "applied/simian/public/proto/scenario/vehiclesim_config.proto";
+import "applied/simian/public/proto/sensor_sim/model_spec.proto";
+import "applied/simian/public/proto/shape.proto";
+import "applied/simian/public/proto/spatial.proto";
+import "applied/simian/public/proto/spectral_assets.proto";
+
+// <!-- Next ID: 43 [last modified: louis] -->
+// Collects all configuration settings for the simulated ego
+// vehicle. These are set in the `vehicle` top-level field of the
+// scenario description.
+//
+// See also the manual for
+//   "Ego > Vehicle Configuration" and
+//   "Object-level Sensors"
+message VehicleConfig {
+  // List of sensors attached to the vehicle.
+  // Includes both object-level (Simian) and sensor-level (Spectral) sensors.
+  // If left empty, a single all-around sensor with large max distance
+  // is used for actor sensors.
+  simian_public.scenario.SensorConfig sensors = 1;
+
+  // Description of the vehicle shape.
+  VehicleShape shape = 2 [(field_options.is_required) = true];
+
+  // Description of the mesh used to visualize the vehicle in simulation.
+  // If not specified, defaults to "applied:car".
+  string mesh_name = 11;
+
+  // <!-- Spectral-only fields. -->
+  simian_public.sensor_sim.models.SpectralModelSpec spectral_model_spec = 41;
+  string rendered_model_name = 14;
+  AssetDescription spectral_asset = 25;
+
+  // List of trailers attached to the ego vehicle.
+  repeated TrailerConfig trailers = 12;
+
+  // <!-- Fields for stats, should not follow this pattern. -->
+  // Setting this will populate ego.nearby_lane_ids, otherwise the list will not be populated.
+  // [DEPRECATED] Please use lane sensors instead.
+  NearbyLaneIdsQuery nearby_lane_ids_query = 17 [deprecated = true];
+  // If true, will use the hull (ego polygon) on the driveable region stat.
+  bool use_hull_for_driveable_surface = 21;
+  // If true, will error if the vehicle is on multiple lanes on the robust ego lane stat.
+  bool error_if_on_multiple_lanes = 23;
+
+  // If specified, allows trailers to be hitched.
+  Empty allow_hitching = 24;
+
+  /*  <!-- Simian expects wheels in the following order if a roll_pitch_suspension_modifier is
+     specified. wheel(n) refers to the nth wheel, where n corresponds to wheel number. Wheel number
+     can be determined by looking at the top view of a section with the (+x) positive longitudinal
+     axis of the section pointing upwards and counting row-wise in a top-down fashion. For example
+     if the section represents a 4-wheeled sedan, wheel(0) would represent the front-left wheel of
+     the vehicle, wheel(1) would represent the front-right wheel of the vehicle, wheel(2) would
+       represent the rear-left wheel of the vehicle, and wheel(3) would represent the rear-right
+     wheel of the vehicle.
+
+                        ^  (+x) longitudinal vehicle axis
+                             |
+                 #---#              #---#
+                 # 0 #--------------# 1 #
+                 #---#       |      #---#
+                             |
+                             |
+                             |
+                             |               Top down view of a 4-wheeled sedan
+                             |
+                             |
+                             |
+                 #---#       |       #---#
+                 # 2 #---------------# 3 #
+     (+y) <--    #---#               #---#
+     lateral vehicle
+     axis
+
+     --> */
+
+  // Specification for the wheels of the vehicle.
+  // Only currently used with the roll_pitch_suspension_modifier.
+  repeated simian_public.scenario.WheelConfig wheels = 22;
+
+  // Modifiers over the ego's unsprung motion state.
+  // These modifiers can allow you to smooth out the unsprung motion state (using the
+  // `first_order_backward_difference` filter).
+  simian_public.motion_state_modifier.MotionStateModifierSpec motion_state_modifier = 27;
+
+  // Modifiers over the ego's unsprung motion state.
+  // This allows you to modify the unsprung motion state to mimic the roll motion produced by
+  // suspension during cornering.
+  simian_public.motion_state_modifier.MotionStateModifierSpec suspended_body_motion_state_modifier =
+      28;
+
+  // Select the motion model of the vehicle.
+  // Motion models describe the overall motion of the vehicle, and will accept different types of
+  // controls input. The controls input sent from your stack interface must match the accepted input
+  // of the motion model.
+  oneof motion_model {
+    option (field_options.oneof_is_required) = true;
+    // This motion model performs idealized trajectory tracking based on a list of trajectory
+    // states. Accepts `motion_model.Input.trajectory`.
+    simian_public.motion_model.Description.PerfectTrajectoryTracking perfect_trajectory_tracking =
+        3;
+
+    // This motion model takes a desired planar screw motion, feeds it through a simplified
+    // controller to turn it into commands for an underlying purely kinematic bicycle model, and
+    // integrates that up. Accepts `motion_model.Input.acceleration_yawrate`.
+    google.protobuf.Empty rigid_body_integration = 4;
+
+    // This motion model integrates a given velocity and yaw rate over the simulator tick duration.
+    // Accepts motion_model.Input.velocity_yawrate.
+    simian_public.motion_model.Description.IntegrateVelocityYawrate integrate_velocity_yawrate = 15;
+
+    // This motion model integrates a planar screw motion (acceleration and yawrate) over the
+    // simulator tick duration. Accepts `motion_model.Input.acceleration_yawrate`.
+    simian_public.motion_model.Description.BicycleModel rigid_body_bicycle = 5;
+
+    // This motion model implements a kinematic bicycle with drive-by-wire signals for brake,
+    // throttle, and steering commands. Accepts `motion_model.Input.normalized_dbw`.
+    simian_public.motion_model.Description.BicycleModel kinematic_bicycle = 10;
+
+    // [DEPRECATED] Please use kinematic_bicycle_velocity_steering instead.
+    // Accepts motion_model.Input.velocity_steering.
+    simian_public.motion_model.Description.BicycleModel ackermann = 7
+        [deprecated = true, (field_options.ignore_in_autocomplete) = true];
+
+    // This motion model implements a kinematic bicycle with drive-by-wire signals for velocity,
+    // steering_angle commands. Accepts motion_model.Input.velocity_steering.
+    simian_public.motion_model.Description.BicycleModel kinematic_bicycle_velocity_steering = 37;
+
+    // This motion model implements longitudinal dynamics based on the friction data as determined
+    // by the EPA. Accepts `motion_model.Input.normalized_dbw`.
+    simian_public.motion_model.Description.CoastdownBicycleModel coastdown_bicycle = 9;
+
+    // This motion model has longitudinal dynamics appropriate for an electric powertrain,
+    // where the motor torque can be positive or negative.
+    // Accepts `motion_model.Input.normalized_torque_steering`.
+    simian_public.motion_model.Description.LongitudinalTorqueBicycleModel
+        longitudinal_torque_bicycle = 13;
+
+    // [DEPRECATED] Please use one of the kinematic_bicycle models instead.
+    // Accepts `motion_model.Input.force_brake_steering`.
+    simian_public.motion_model.Description.LagrangianBicycleWithTrailerModel
+        lagrangian_bicycle_with_trailer = 16
+        [deprecated = true, (field_options.ignore_in_autocomplete) = true];
+
+    // This motion model has dynamics appropriate for a small rover with four wheels.
+    // Accepts `motion_model.Input.rover_wheel_command`.
+    simian_public.motion_model.Description.FourWheelRover four_wheel_rover = 18;
+
+    // This motion model implements a kinematic model of a skid-steered vehicle.
+    // Accepts `motion_model.Input.skid_steer_command`.
+    simian_public.motion_model.Description.SkidSteer skid_steer = 29;
+
+    // This motion model follows a predefined path according to the commanded velocity or commanded
+    // total distance along path. Accepts `motion_model.Input.path_tracking_command`.
+    simian_public.motion_model.Description.PathTracking path_tracking = 19;
+
+    // This model simulates the vehicle motion by modeling subcomponents of the vehicle (e.g.
+    // powertrain, brake...). It is useful for more granular, higher-fidelity simulations. Accepts
+    // `motion_model.Input.composite_vehicle_command`.
+    simian_public.composite_vehicle.CompositeVehicleSpec composite_vehicle = 20;
+
+    // This motion model can be used to integrate with planar external motion models, and accepts
+    // a 2D state input. Accepts `motion_model.Input.override_state`.
+    simian_public.motion_model.Description.External external = 8;
+
+    // This motion model can be used to integrate with external motion models, and accepts a 3D
+    // state input. Accepts `motion_model.Input.override_state3d` (for vehicles with a single
+    // section) or `motion_model.Input.multi_section_override_states_3d` (for vehicles with multiple
+    // sections).
+    simian_public.motion_model.Description.External3d external_3d = 26;
+
+    // This is a high-fidelity motion model with 6 degrees of freedom for the chassis and 2 degrees
+    // of freedom (steering and suspension) for each wheel. Accepts
+    // `motion_model.Input.skid_steer_torque_command`.
+    simian_public.physics_engine.PhysicsEngine physics_engine = 32;
+
+    // This model allows you to switch between most Simian motion models during the course of a
+    // simulation. Accepts `motion_model.Input.switchable`.
+    simian_public.motion_model.Description.SwitchableModel switchable_model = 34;
+
+    // This motion model is appropriate for integrating with stacks testing planner output.
+    // Accepts `motion_model.Input.acceleration_lane_change_command`.
+    Empty acceleration_lane_change = 35;
+
+    // This model allows you to request the use of a customer-specific vehicle model.
+    // Accepts `motion_model.Input.private_model_3d_command`.
+    simian_public.motion_model.Description.PrivateModel3d private_model_3d = 38;
+
+    // This motion model should be used for cosimulation with VechicleSim. Accepts
+    // `motion_model.Input.vehiclesim_command`.
+    simian_public.motion_model.Description.VehiclesimModel vehiclesim = 42;
+  }
+
+  // Optionally specify a list of frames that can create a transform forest for sensor mounts.
+  // This can be used as an alternative to fixed sensor `mount` values.
+  repeated spatial.TransformNode frames = 30;
+
+  // Parameters that affect how Simian places the vehicle on terrain.
+  TerrainPlacementConfig terrain_placement = 31;
+
+  // Parameters that affect predicted controls (ego behaviors) outputs to the customer stack.
+  // Used as a default when running with VehicleSim.
+  PredictedControlConfig predicted_control_config = 33;
+
+  // Parameters that specify how to mount an articulated linkage (that is, a robot) to this vehicle.
+  ArticulationConfig articulation = 36;
+
+  // Parameters that specify how the vehicle will use and connect to VehicleSim.
+  simian_public.proto.scenario.vehiclesim_config.VehiclesimConfig vehiclesim_config = 39;
+
+  // Specify initial configurations for an interactive field transformer for each section of the
+  // ego. Each ego section only supports one config each.
+  repeated simian_public.interactive_field.InteractiveFieldTransformerConfig
+      interactive_field_transformers = 40 [(field_options.ignore_in_autocomplete) = true];
+
+  // reserved 6;
+  // reserved "drive_by_wire_bicycle";
+}
+
+message VehicleShape {
+  // <!-- Once *edge_to_center is deprecated, this should become a required field -->
+  // Different shape types to describe the vehicle shape.
+  oneof shape_type {
+    // Defines the ego's shape as a bounding box with edges defined relative to the ego's origin.
+    // The center of the ego's rear axle should be the reference point from which the ego shape is
+    // specified.
+    EdgeToOrigin edge_to_origin = 8;
+    // Defines the ego's shape as a base polygon with a height.
+    ExtrudedPolygon polygon = 9;
+  }
+
+  // <!-- All fields below are legacy; users should use the shape_type edge_to_origin field instead
+  // as the edges should not necessarily be defined relative to the center of the vehicle; rather,
+  // they should be defined relative to the vehicle's origin.
+  // These should ideally all be values > 0 and required, but this was not historically enforced.
+  // --> [LEGACY] Please use `edge_to_origin.front_edge_to_origin` instead. Defines the distance
+  // between the ego's center of rear axle and its front edge.
+  double front_edge_to_center = 1 [(field_options.units) = M];
+  // [LEGACY] Please use `edge_to_origin.back_edge_to_origin` instead.
+  // Defines the distance between the center of the ego's rear axle and its back edge.
+  double back_edge_to_center = 2 [(field_options.units) = M];
+  // [LEGACY] Please use `edge_to_origin.left_edge_to_origin` instead.
+  // Defines the distance between the ego's center of rear axle and its left edge.
+  double left_edge_to_center = 3 [(field_options.units) = M];
+  // [LEGACY] Please use `edge_to_origin.right_edge_to_origin` instead.
+  // Defines the distance between the ego's center of rear axle and its right edge.
+  double right_edge_to_center = 4 [(field_options.units) = M];
+  // [LEGACY] Only used in conjunction with legacy *_edge_to_center specification.
+  // Defines the height of the vehicle.
+  double height = 7 [(field_options.units) = M];
+
+  // <!-- These are redundant fields with the shape types above. Users must match the two-->
+  // [DEPRECATED] Defines the length of the vehicle.
+  // These parameters must match the length that can be computed from one of the above shape types.
+  double length = 5
+      [(field_options.units) = M, deprecated = true, (field_options.ignore_in_autocomplete) = true];
+  // [DEPRECATED] Defines the width of the vehicle.
+  // These parameters must match the width that can be computed from one of the above shape types.
+  double width = 6
+      [(field_options.units) = M, deprecated = true, (field_options.ignore_in_autocomplete) = true];
+}
+
+message ExtrudedPolygon {
+  // Defines the height of the vehicle.
+  // Defaults to 0.
+  double height = 1 [(field_options.units) = M, (field_options.greater_than_or_equal) = 0];
+  // <!-- Should have at least a length of 2 if mirrored, 3 if not.-->
+  // Vertices of the polygon expressed in the vehicle frame.
+  // Order matters: the polygon's edges are defined by adjacent vertices.
+  // The polygon is closed by an edge between the first and last vertices.
+  // Providing vertices that cause edges to intersect will not cause an error
+  // but may cause unexpected behavior.
+  repeated simian_public.planar.Point2d point = 2
+      [(field_options.minimum_repeated_length) = 2, (field_options.is_required) = true];
+  message Mirror {
+    // Set the axis for the polygon vertices to be mirrored.
+    enum Axis {
+      // Set option to mirror polygon vertices along the X axis (longitudinal axis of the vehicle).
+      // Points should all have positive Y values; otherwise, scenario will throw a compilation
+      // error.
+      LONGITUDINAL = 0;
+    }
+    // Specify the axis to which the polygon vertices should be mirrored.
+    Axis axis = 1;
+  }
+  // Optional specification to mirror the list of polygon points across a specified axis.
+  // Useful for defining highly specific vehicle shape (e.g. vehicle with a distinct bumper
+  // profile). Points will be mirrored in reverse order of the list of points in order to avoid
+  // producing intersecting edges.
+  Mirror mirror = 3;
+}
+
+// <!-- Same fields as in VehicleShape, but organized under the shape_type oneof field. -->
+message EdgeToOrigin {
+  // Defines the distance between the ego's origin (center of rear axle) and its front edge.
+  double front_edge_to_origin = 1 [
+    (field_options.units) = M,
+    (field_options.is_required) = true,
+    (field_options.greater_than) = 0
+  ];
+  // Defines the distance between the ego's origin (center of rear axle) and its back edge.
+  double back_edge_to_origin = 2 [
+    (field_options.units) = M,
+    (field_options.is_required) = true,
+    (field_options.greater_than) = 0
+  ];
+  // Defines the distance between the ego's origin (center of rear axle) and its left edge.
+  double left_edge_to_origin = 3 [
+    (field_options.units) = M,
+    (field_options.is_required) = true,
+    (field_options.greater_than) = 0
+  ];
+  // Defines the distance between the ego's origin (center of rear axle) and its right edge.
+  double right_edge_to_origin = 4 [
+    (field_options.units) = M,
+    (field_options.is_required) = true,
+    (field_options.greater_than) = 0
+  ];
+  // Defines the height of the vehicle.
+  double height = 5 [
+    (field_options.units) = M,
+    (field_options.is_required) = true,
+    (field_options.greater_than) = 0
+  ];
+}
+
+// <!-- Configuration of trailer -->
+// <!-- Next ID: 23 [last modified by: DayongTongAI] -->
+message TrailerConfig {
+  // Mesh name of the trailer.
+  // If not specified, defaults to "applied:trailer".
+  string mesh_name = 1;
+  // Shape of the trailer.
+  simian_public.shape.Shape shape = 2 [(field_options.is_required) = true];
+
+  // This is the location of the hitch point in the parent section frame whose origin is the
+  // center of the rear axle. Default value is at the origin of the parent frame (center of the rear
+  // of the parent section).
+  simian_public.spatial.Point parent_hitch = 18;
+  // [DEPRECATED] Use parent_hitch.x instead.
+  // Location of hitch point x relative to ego center in ego frame.
+  double ego_hitch_x = 3 [deprecated = true];
+  // [DEPRECATED] Use parent_hitch.y instead.
+  // Location of hitch point y relative to ego center in ego frame.
+  double ego_hitch_y = 4 [deprecated = true];
+  // [DEPRECATED] Use parent_hitch.z instead.
+  // Location of hitch point z relative to ego center in ego frame.
+  double ego_hitch_z = 8 [deprecated = true];
+
+  // Location of hitch point x relative to trailer origin (center of rear axle) in the trailer
+  // frame. Value must be non-zero.
+  double trailer_hitch_x = 5 [
+    (field_options.units) = M,
+    (field_options.is_required) = true,
+    (field_options.absolute_value_greater_than_or_equal) = .001
+  ];
+  // Location of hitch point y relative to trailer origin (center of rear axle) in the trailer
+  // frame. Default value is zero.
+  double trailer_hitch_y = 6 [(field_options.units) = M];
+  // Location of hitch point z relative to trailer origin (center of rear axle) in the trailer
+  // frame. Default value is zero.
+  double trailer_hitch_z = 9 [(field_options.units) = M];
+  // Initial hitch angle between the parent section and trailer observed in parent's frame.
+  double hitch_angle = 7 [(field_options.units) = RAD];
+
+  // Use this section to configure the trailer to be dynamic.
+  TrailerDynamicsConfig trailer_dynamics_config = 10;
+  // Specifies the tire model associated with the trailer.
+  simian_public.composite_vehicle.TireModelSpec trailer_tire = 11;
+  // Specifies the brake model associated with the trailer.
+  simian_public.composite_vehicle.BrakeModelSpec trailer_brake = 12;
+
+  // <!-- Spectral-only. -->
+  actor.Actor.SpectralModel spectral_model = 13;
+
+  // Use for any sensors mounted on this trailer.
+  simian_public.scenario.SensorConfig sensors = 14;
+
+  // Create a section of the `TransformForest` with nodes that can be referred to
+  // elsewhere by name.  See the manual for details of the naming scheme.
+  repeated spatial.TransformNode frames = 15;
+
+  // Specify a list of wheels on the trailer.
+  repeated simian_public.scenario.WheelConfig wheels = 17;
+  // Specify parameters that affect how Simian places the trailer on terrain.
+  TerrainPlacementConfig terrain_placement = 19;
+  // Specify parameters that affect the method in which Simian places trailers on terrain.
+  TrailerTerrainPlacementMethod terrain_placement_method = 20;
+
+  // Specify initial configurations for an interactive field transformer for each section of the
+  // ego. Each ego section only supports one config each.
+  repeated simian_public.interactive_field.InteractiveFieldTransformerConfig
+      interactive_field_transformers = 22 [(field_options.ignore_in_autocomplete) = true];
+}
+
+enum TrailerTerrainPlacementMethod {
+  // Orient the trailer on the terrain using the terrain normal at the trailer's rear axle (ignoring
+  // the fifth-wheel).
+  TRAILER = 0;
+  // Orient the trailer on the terrain based on the position of the fifth-wheel and the trailer's
+  // rear axle.
+  FIFTH_WHEEL = 1;
+  // Orient the trailer on the terrain based solely on the pose of the tractor (the trailer lies in
+  // the same horizontal plane as the tractor).
+  TRACTOR = 2;
+}
+
+message TrailerDynamicsConfig {
+  oneof trailer_type {
+    option (field_options.oneof_is_required) = true;
+    // Bicycle-model trailer type, where the rear axle is approximated as a single tire at the
+    // center of the axle and the kingpin is along the longitudinal axis of the trailer.
+    UniaxleBicycleTrailer uniaxle_bicycle_trailer = 1;
+  }
+
+  message UniaxleBicycleTrailer {
+    // Mass of the trailer.
+    double trailer_mass = 1 [
+      (field_options.is_required) = true,
+      (field_options.greater_than) = 0,
+      (field_options.units) = KG
+    ];
+    // Distance between the trailer's rear axle and the hitch point.
+    double rear_axle_to_kingpin = 2 [
+      (field_options.is_required) = true,
+      (field_options.greater_than) = 0,
+      (field_options.units) = M
+    ];
+    // Inertia parameters of the vehicle.
+    spatial.InertiaSpec trailer_inertia = 3 [(field_options.is_required) = true];
+    // Number of tires on the trailer's rear axle.
+    // If unspecified or 0, will default to 1.
+    uint32 num_tires = 4 [(field_options.recommended_greater_than_or_equal) = 1];
+    // Counter-clockwise rotation of the trailer's tandem axle about the trailer's vertical (+z)
+    // axis from its neutral position (i.e., parallel to the trailer's lateral (+y) axis). Tandem
+    // axles on well maintained trailers are oriented at 90 degrees with respect to the trailer's
+    // longitudinal axis when viewed from top, use this field to model poor servicing or wear and
+    // tear of the the tandem axle.
+    double tandem_axle_skew = 5 [(field_options.greater_than) = 0, (field_options.units) = RAD];
+  }
+}
+
+// Configuration of nearby_lane_ids lookup
+message NearbyLaneIdsQuery {
+  // Specify search distance for nearby_lane_ids.
+  // Defaults to 1 m.
+  double search_distance = 1 [deprecated = true];
+}
+
+// <!-- TODO: Spectral-only field -->
+message AssetDescription {
+  simian_public.spectral.VehicleHeadlights vehicle_headlights = 1;
+  simian_public.spectral.WindshieldWipers windshield_wipers = 2;
+  simian_public.spectral.VehicleDirt vehicle_dirt = 3;
+  // This scaling applies to the Spectral asset, NOT to anything in Simian.
+  simian_public.common.ScaleFactor scaling = 4;
+  simian_public.spectral.VehicleTireSpray vehicle_tire_spray = 5;
+}
+
+// Vehicle config proto for actor motion models, has a subset of motion model fields from the ego
+// vehicle config.
+message ActorVehicleConfig {
+  oneof motion_model {
+    // This motion model integrates a given velocity and yaw rate over the simulator tick duration.
+    // Accepts motion_model.Input.velocity_yawrate
+    simian_public.motion_model.Description.IntegrateVelocityYawrate integrate_velocity_yawrate = 1;
+
+    // This motion model implements a kinematic bicycle with drive-by-wire signals for brake,
+    // throttle, and steering commands. Accepts motion_model.Input.normalized_dbw
+    simian_public.motion_model.Description.BicycleModel kinematic_bicycle = 2;
+
+    // [DEPRECATED] Please use kinematic_bicycle_velocity_steering instead.
+    // Accepts motion_model.Input.velocity_steering
+    simian_public.motion_model.Description.BicycleModel ackermann = 3
+        [deprecated = true, (field_options.ignore_in_autocomplete) = true];
+
+    // This motion model is intended to integrating with planar external motion models, and accepts
+    // a 2D state input. Accepts motion_model.Input.override_state
+    simian_public.motion_model.Description.External external = 4;
+
+    // This motion model implements a kinematic bicycle with drive-by-wire signals for velocity,
+    // steering_angle commands. Accepts motion_model.Input.velocity_steering
+    simian_public.motion_model.Description.BicycleModel kinematic_bicycle_velocity_steering = 5;
+  }
+}
+
+message TerrainPlacementConfig {
+  // Select how Simian places points to configure a plane for terrain.
+  // The default is the `default` placement type.
+  // Simian places vehicles on terrain by fitting a plane to the terrain at 3 points around the
+  // vehicle. The three points are: longitudinal_step in front of the vehicle's origin, lateral_step
+  // to the left of the vehicle's origin, and lateral_step to the right of the vehicle's origin (all
+  // steps are parallel to the world's XY plane). Larger step values cause the vehicle to traverse
+  // the terrain more smoothly. The steps should not extend beyond the footprint of vehicle.
+  oneof placement_type {
+    // This is the default option which configures to a three_point_plane_fit with longitudinal_step
+    // = 1.5 m and lateral_step = 0.5 m.
+    google.protobuf.Empty default = 1;
+    // Configure the longitudinal and lateral steps used to configure the 3 points that create a
+    // plane around the vehicle.
+    ThreePointPlaneFit three_point_plane_fit = 2;
+  }
+
+  message ThreePointPlaneFit {
+    // Longitudinal step (in front of the vehicle origin).
+    // Defaults to 1.5 m.
+    double longitudinal_step = 1 [(field_options.units) = M, (field_options.greater_than) = 0];
+    // Lateral step (to the left and right of the vehicle origin).
+    // Defaults to 0.5 m.
+    double lateral_step = 2 [(field_options.units) = M, (field_options.greater_than) = 0];
+  }
+
+  // Select how the vehicle's elevation and orientation is smoothed when placed on terrain.
+  // The default is `no_smoothing`, which does not smooth.
+  oneof smoothing_type {
+    // Option to use terrain without smoothing.
+    google.protobuf.Empty no_smoothing = 3;
+    // Smoothing parameters for the vehicle's elevation and orientation when placing the vehicle on
+    // terrain. This smoothing mode reduces the vehicle's jitter by setting the vehicle's elevation
+    // and orientation using a weighted average with the previous elevation and orientation,
+    // respectively. Note that this introduces a delay in the vehicle's movement. The valid range
+    // for these fields is [0, 1]. The default is 0. 0: no smoothing 1: complete smoothing (the
+    // vehicle's elevation or orientation is constant) Does not apply to the external_3d motion
+    // model.
+    WeightedAverageSmoothing weighted_average_smoothing = 4;
+  }
+  message WeightedAverageSmoothing {
+    // Value between 0 and 1 that creates a weighted average between the previous and current
+    // elevation. A value of 0.5 provides useful smoothing without introducing too much of a delay
+    // for most terrains.
+    // Defaults to 0 (no smoothing).
+    double elevation_smoothing = 3 [
+      (field_options.greater_than_or_equal) = 0,
+      (field_options.less_than_or_equal) = 1,
+      (field_options.units) = NO_UNITS
+    ];
+    // Value between 0 and 1 that creates a weighted average between the previous and current
+    // orientation. A value of 0.8 provides useful smoothing without introducing too much of a delay
+    // for most terrains.
+    // Defaults to 0 (no smoothing).
+    double orientation_smoothing = 4 [
+      (field_options.greater_than_or_equal) = 0,
+      (field_options.less_than_or_equal) = 1,
+      (field_options.units) = NO_UNITS
+    ];
+  }
+}
+message PointSpecification {
+  // Specifies the type of desired reference point used for predicted controls.
+  // Defaults to `next_control_command`. For integrating with any external controllers or
+  // dynamics(including with VehicleSim), one of the lookahead types is recommended.
+  oneof point_specification_type {
+    // (Default) Generates a desired reference point for the next tick of the simulation, as
+    // given by the ego behavior.
+    Empty next_control_command = 1;
+    // Generate a point that's a distance [m] lookahead along the current behavior path from the
+    // ego's current pose.
+    double lookahead_distance = 2
+        [(field_options.greater_than_or_equal) = 0, (field_options.units) = M];
+    // Generate the point that's an estimated lookahead duration from current ego pose.
+    // Estimates the velocity of the previous state to calculate lookahead distance along the
+    // behavior path.
+    google.protobuf.Duration lookahead_duration = 3;
+  }
+  // Specifies the visualization options for the next desired point.
+  // Does not apply to the `next_control_command` option.
+  simian_public.scenario.VisualizationOptions visualization_options = 4;
+
+  message PointCalculationMethod {
+    enum PointCalculationMethodEnum {
+      // Invalid option, will get an error.
+      UNSET = 0;
+      // (Default) The lookahead point is based on the agent's current position along the
+      // path, and will keep the distance or duration consistent.
+      CLOSED_LOOP = 1;
+      // The reference point is only a function of time based on the open-loop
+      // motion profile perfectly following the path. This may introduce point tracking errors.
+      OPEN_LOOP = 2;
+    }
+  }
+  // Specifies which calculation method to use for lookahead module.
+  // Defaults to CLOSED_LOOP.
+  PointCalculationMethod.PointCalculationMethodEnum point_calculation_method = 5;
+
+  message ControlDirections {
+    enum ControlDirectionsEnum {
+      // Invalid option, will get an error.
+      UNSET = 0;
+      // (Default) The lookahead point will only be used to specify heading for lateral control,
+      // and longitudinal control will come from the next desired state.
+      LATERAL_ONLY = 1;
+      // The position and velocity from the lookahead point will be used for both lateral
+      // and longitudinal control.
+      LATERAL_AND_LONGITUDINAL = 3;
+    }
+  }
+  // Specifies which directions the lookahead module should override the control of.
+  // Defaults LATERAL_ONLY.
+  ControlDirections.ControlDirectionsEnum control_directions = 6;
+
+  enum LookaheadVelocityProfileEnum {
+    // Invalid option, will get an error.
+    UNSET = 0;
+    // <!-- (Default) Assumes a constant velocity over the lookahead duration and returns the
+    // lookahead state based on current_velocity * time. -->
+    CONSTANT_VELOCITY = 1;
+    // <!-- Calculates lookahead state by integrating the planned velocity profile over the
+    // lookahead duration. This gives better prediction of future states, particularly when agents
+    // are changing velocity. -->
+    PLANNED_VELOCITY_PROFILE = 2;
+  }
+  // <!-- Feature not currently used.
+  // Specifies whether to use the current velocity or the planned velocity profile for calculating
+  // the lookahead state. -->
+  LookaheadVelocityProfileEnum lookahead_velocity_profile = 7
+      [(field_options.ignore_in_autocomplete) = true];
+
+  // Defaults to be true. Flag to also include acceleration when projecting the lookahead point
+  // onto the path given a lookahead duration. Fixes bugs dealing with query time assertion issues
+  // and poor point tracking at starts and stops.
+  bool consider_acceleration_for_lookahead_duration = 8;
+}
+
+message PredictedControlConfig {
+  message PredictedControlCommandConfig {
+    // Defaults to match the input type of the agent's motion model.
+    oneof predicted_control_command_config {
+      // Parameters to configure velocity_yawrate output commands. (Integrate Velocity Yawrate)
+      simian_public.motion_model.Description.IntegrateVelocityYawrate velocity_yawrate_config = 1;
+
+      // Generates a brake, throttle, steering command, often used for integrating with external
+      // dynamics. Parameters to configure normalized_dbw output commands. (Kinematic Bicycle)
+      simian_public.motion_model.Description.BicycleModel normalized_dbw_config = 2;
+
+      // Parameters to configure velocity_steering output commands. (Kinematic Bicycle Velocity
+      // Steering)
+      simian_public.motion_model.Description.BicycleModel velocity_steering_config = 3;
+
+      // Generates a 2d state, often used for integrating external lateral controllers.
+      // Parameters to configure override_state output commands. (External)
+      simian_public.motion_model.Description.External override_state_config = 4;
+
+      // Parameters to configure perfect_trajectory_tracking output commands. (Perfect Trajectory
+      // Tracking)
+      simian_public.motion_model.Description.PerfectTrajectoryTracking
+          perfect_trajectory_tracking_config = 5;
+
+      // Parameters to configure acceleration_yawrate output commands. (Rigid Body Integration)
+      Empty acceleration_yawrate_config = 6;
+
+      // Generates a 3d state, often used for integrating external lateral controllers.
+      // Parameters to configure override_state3d output commands. (External3d)
+      simian_public.motion_model.Description.External3d override_state3d_config = 7;
+
+      // Use switchable motion model identified by this name to compute predicted controls.
+      // Allow for runtime changes of the output type, useful for simulations that will switch
+      // stacks / controllers during runtime.
+      string motion_model_name = 8;
+
+      // Generates a list of 2d state, often used for integrating external lateral controllers.
+      // Recommended format when using VehicleSim.
+      // Parameter to specify the rate for how many states are given to the external model.
+      simian_public.motion_model.Description.ExternalList override_state_list_config = 9;
+    }
+  }
+  // Specifies the configuration for the desired point used in the behaviors lookahead point
+  // controller. For the ego, this can affect the output value of predicted controls with ego
+  // behaviors. Defaults to using the next tick's desired point, through `next_control_command`.
+  PointSpecification point_specification = 1;
+
+  // Configures the generated predicted control command given through ego behaviors.
+  // By default, this will match the command type of the agent motion model, and should be left at
+  // the default if there are no additional controls in the loop. For integrating with external
+  // controllers or dynamics (including with VehicleSim), it's recommended to use desired reference
+  // states, through the `override_state_config`, `override_state_3d_config`, or
+  // `override_state_list_config`.
+  PredictedControlCommandConfig predicted_control_command_config = 2;
+}
+
+message ArticulationConfig {
+  // Specifies the type of articulation used.
+  oneof articulation_type {
+    option (field_options.oneof_is_required) = true;
+    // Mount a kinematically-driven articulated linkage (that is, a robot) to this vehicle.
+    // This describes an articulated linkage that is mounted to a vehicle and
+    // is controlled with joint angle/position (generalized coordinate) commands.
+
+    // If the motion model is private_model_3d, then the pose of the links in the articulation are
+    // simulated by the private_model_3d instead of being set by a kinematic articulation.
+    KinematicArticulationConfig kinematic = 1;
+  }
+
+  message KinematicArticulationConfig {
+    // Configuration types for kinematic articulation.
+    oneof config_type {
+      option (field_options.oneof_is_required) = true;
+      // The kinematic articulation is described by a Unified Robot Description Format file
+      // (URDF; http://wiki.ros.org/urdf).
+      Urdf urdf = 1;
+    }
+
+    message Urdf {
+      // Filepath of your URDF. This path must be relative to your workspace's scenario folder, and
+      // must start with `scenario://workspace`. Note: This file cannot be a XACRO
+      // (http://wiki.ros.org/xacro) file -- you must process your .urdf.xacro file into a plain
+      // .urdf file.
+      string urdf_filepath = 1 [(field_options.is_required) = true];
+      // The pose of the root link in the URDF relative to the ego frame. This pose is
+      // time-invariant.
+      // Defaults to the ego origin (center of rear axle).
+      simian_public.spatial.PoseSpec mount = 2;
+    }
+
+    // Set the kinematic articulation config version.
+    // Specify {major_version: 0, minor_version: 0} to use the default version.
+    // Available versions:
+    // - 0.1 (default): Initial implementation.
+    simian_public.common.VersionMajorMinor version = 2;
+
+    // Specify a prescribed motion to move all the joints in this articulation vehicle.
+    PrescribedMotion prescribed_motion = 3;
+
+    message PrescribedMotion {
+      // Specify the motion type to span all the joints in this articulation vehicle with the
+      // specified type/function.
+      oneof motion_type {
+        option (field_options.oneof_is_required) = true;
+        // Moves all joints sinusoidally, in the range defined by the joint limits in the Unified
+        // Robot Description Format file. For joints that do not have limits, we use
+        // amplitude as M_PI and offset as 0.
+        SinusoidMotion span_sinusoid = 1;
+      }
+
+      message SinusoidMotion {
+        // The frequency of the sinusoid function in [Hz].
+        double frequency = 1 [
+          (field_options.is_required) = true,
+          (field_options.greater_than_or_equal) = 0,
+          (field_options.units) = HERTZ
+        ];
+      }
+    }
+  }
+}

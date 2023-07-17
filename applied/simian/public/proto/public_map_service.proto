@@ -1,0 +1,427 @@
+// Copyright (C) 2020 Applied Intuition, Inc. All rights reserved.
+// This source code file is distributed under and subject to the LICENSE in
+// license.txt
+
+syntax = "proto3";
+
+package public_map_service;
+
+import "applied/simian/public/proto/common.proto";
+import "applied/simian/public/proto/geometry.proto";
+import "applied/simian/public/proto/map/map_lane.proto";
+import "applied/simian/public/proto/map/map_semantic.proto";
+import "applied/simian/public/proto/map/map_validation.proto";
+import "applied/simian/public/proto/map_config.proto";
+import "applied/simian/public/proto/routing/routing.proto";
+import "applied/simian/public/proto/scenario/common.proto";
+import "applied/simian/public/proto/spatial.proto";
+import "applied/simian/public/proto/terrain_config.proto";
+
+service SimianMapService {
+  rpc GetLaneById(GetLaneByIdRequest) returns (GetLaneByIdResponse) {}
+  rpc GetLaneProjection(GetLaneProjectionRequest) returns (GetLaneProjectionResponse) {}
+  // <!-- TODO(shrey): consolidate Get{Lanes, Regions, Signals, Lines, Signs} under GetElements. -->
+  rpc GetLanes(GetLanesRequest) returns (GetLanesResponse) {}
+  rpc GetRegions(GetRegionsRequest) returns (GetRegionsResponse) {}
+  rpc GetSignals(GetSignalsRequest) returns (GetSignalsResponse) {}
+  rpc GetLines(GetLinesRequest) returns (GetLinesResponse) {}
+  rpc GetSigns(GetSignsRequest) returns (GetSignsResponse) {}
+  rpc GetIntersections(GetIntersectionsRequest) returns (GetIntersectionsResponse) {}
+  rpc GetSemanticLaneById(GetSemanticLaneByIdRequest) returns (GetSemanticLaneByIdResponse) {}
+  rpc DownloadAnalysis(DownloadAnalysisRequest) returns (DownloadAnalysisResponse) {}
+  rpc GetLanesWithCurvature(GetLanesWithCurvatureRequest) returns (GetLanesWithCurvatureResponse) {}
+  rpc GetMapConfig(GetMapConfigRequest) returns (GetMapConfigResponse) {}
+  rpc GetNearestLanePoint(GetNearestLanePointRequest) returns (GetNearestLanePointResponse) {}
+  rpc GetNearestLaneId(GetNearestLaneIdRequest) returns (GetNearestLaneIdResponse) {}
+  rpc ValidateMap(ValidateMapRequest) returns (ValidateMapResponse) {}
+  rpc GetNearestLanePointsAcrossTerrain(GetNearestLanePointsAcrossTerrainRequest)
+      returns (GetNearestLanePointsAcrossTerrainResponse) {}
+  rpc SearchRoute(SearchRouteRequest) returns (SearchRouteResponse) {}
+  rpc TerrainRaycast(TerrainRaycastRequest) returns (TerrainRaycastResponse) {}
+}
+
+message MapLayer {
+  enum Selection {
+    UNUSED = 0;
+    VIZ = 1;
+    HDMAP = 2;
+    LDMAP = 3;
+  }
+
+  Selection selection = 1;
+}
+
+message CommonResponse {
+  enum Status {
+    UNUSED = 0;
+    ERROR = 1;      // Something went wrong. See error_message field for details.
+    TRY_AGAIN = 2;  // The requested info is still being loaded.
+    SUCCESS = 3;    // Everything went well.
+  }
+  Status status = 1;
+  string error_message = 2;  // Filled in when status == ERROR.
+  string output_message = 3;
+}
+
+message GetMapConfigRequest {
+  string map_key = 1;
+}
+
+message GetMapConfigResponse {
+  CommonResponse common = 1;
+  simian_public.map_config.MapConfig map_config = 2;
+}
+
+message GetNearestLaneIdRequest {
+  string map_key = 1;
+  MapLayer map_layer = 4;
+  simian_public.common.PointENU point = 3;
+  // Limits the radius of search to speed up the query
+  double search_radius = 5;
+}
+
+message GetNearestLaneIdResponse {
+  CommonResponse common = 1;
+  string lane_id = 2;
+  double distance = 3;
+}
+
+message GetLaneByIdRequest {
+  string map_key = 1;
+  string lane_id = 2;
+  MapLayer map_layer = 3;
+}
+
+message GetLaneByIdResponse {
+  CommonResponse common = 1;
+  simian_public.hdmap.Lane lane = 2;
+}
+
+message GetLaneProjectionRequest {
+  string map_key = 1;
+  MapLayer map_layer = 2;
+  double x = 3;
+  double y = 4;
+  double distance = 5;
+  simian_public.scenario.LaneSplitPreference.SplitPreference split_preference = 6;
+  bool allow_cycles = 7;
+  bool backwards = 8;
+
+  // When this flag is true include the distance from the given (x,y) to the nearest lane
+  // point in the total projection distance i.e. subtract distance to nearest lane point from
+  // the actual projection.
+  bool strict_start_point = 9;
+}
+
+message GetLaneProjectionResponse {
+  CommonResponse common = 1;
+
+  // The ending lane of the projection.
+  // Only filled when common.status == CommonResponse.SUCCESS.
+  simian_public.hdmap.Lane end_lane = 2;
+
+  // The index into the end_lane points that the projection ended in.
+  int32 end_index = 3;
+
+  // The distance that was projected. Always less than or equal to request distance.
+  double projected_distance = 4;
+
+  // The ending pose of the projection.
+  simian_public.spatial.Pose projected_pose = 5;
+
+  // The lane points traversed by this projection. The last point in this array
+  // has the same x-y coordinates as projected_pose.
+  repeated simian_public.common.PointENU lane_points = 6;
+
+  // Array of accumulating projection distance corresponding to each lane_point.
+  // The first value is necessarily 0 and the last value is the length of the projection.
+  // The size of this repeated field is always the same as the size of lane_points.
+  repeated double accumulate_s = 7;
+}
+
+message GetLanesWithCurvatureFilters {
+  double min_dist_between_points = 1;
+  double min_length_of_lane = 2;
+  bool has_single_neighbor_forward_lane = 3;
+  bool has_single_successor = 4;
+  double min_ratio_points_in_lane = 5;
+}
+
+message GetLanesWithCurvatureRequest {
+  // Uses oneof as a proxy for optional primitive
+  oneof optional_lower_bound {
+    double lower_bound = 1;
+  }
+  oneof optional_upper_bound {
+    double upper_bound = 2;
+  }
+  string map_key = 3;
+  GetLanesWithCurvatureFilters filters = 4;
+}
+
+message GetLanesWithCurvatureResponse {
+  CommonResponse common = 1;
+  repeated simian_public.hdmap.Lane lane = 2;
+}
+
+message GetLanesRequest {
+  string map_key = 1;
+  string query = 2;
+  // Extra fields to be returned with query summaries. Can be set via toggle box.
+  repeated string extra_summary_fields = 3;
+  // Start index for pagination. Return all results if no pagination specified.
+  int64 pagination_start = 4;
+  // End index for pagination. Return all results if no pagination specified.
+  int64 pagination_end = 5;
+  // Auth token for authentication.
+  string auth_token = 6;
+  // Source of the request (optional).
+  string source = 7;
+}
+
+message GetLanesResponse {
+  CommonResponse common = 1;
+  repeated string lane_ids = 2;
+  repeated QuerySummary query_summaries = 3;
+}
+
+message GetRegionsRequest {
+  string map_key = 1;
+  string query = 2;
+  // Extra fields to be returned with query summaries. Can be set via toggle box.
+  repeated string extra_summary_fields = 3;
+  // Start index for pagination. Return all results if no pagination specified.
+  int64 pagination_start = 4;
+  // End index for pagination. Return all results if no pagination specified.
+  int64 pagination_end = 5;
+  // Auth token for authentication.
+  string auth_token = 6;
+  // Source of the request (optional).
+  string source = 7;
+}
+
+message GetRegionsResponse {
+  CommonResponse common = 1;
+  repeated string region_ids = 2;
+  repeated QuerySummary query_summaries = 3;
+}
+
+message GetSignalsRequest {
+  string map_key = 1;
+  string query = 2;
+  // Extra fields to be returned with query summaries. Can be set via toggle box.
+  repeated string extra_summary_fields = 3;
+  // Start index for pagination. Return all results if no pagination specified.
+  int64 pagination_start = 4;
+  // End index for pagination. Return all results if no pagination specified.
+  int64 pagination_end = 5;
+  // Auth token for authentication.
+  string auth_token = 6;
+  // Source of the request (optional).
+  string source = 7;
+}
+
+message GetSignalsResponse {
+  CommonResponse common = 1;
+  repeated string signal_ids = 2;
+  repeated QuerySummary query_summaries = 3;
+}
+
+message GetLinesRequest {
+  string map_key = 1;
+  string query = 2;
+  // Extra fields to be returned with query summaries. Can be set via toggle box.
+  repeated string extra_summary_fields = 3;
+  // Start index for pagination. Return all results if no pagination specified.
+  int64 pagination_start = 4;
+  // End index for pagination. Return all results if no pagination specified.
+  int64 pagination_end = 5;
+  // Auth token for authentication.
+  string auth_token = 6;
+  // Source of the request (optional).
+  string source = 7;
+}
+
+message GetLinesResponse {
+  CommonResponse common = 1;
+  repeated string line_ids = 2;
+  repeated QuerySummary query_summaries = 3;
+}
+
+message GetSignsRequest {
+  string map_key = 1;
+  string query = 2;
+  // Extra fields to be returned with query summaries. Can be set via toggle box.
+  repeated string extra_summary_fields = 3;
+  // Start index for pagination. Return all results if no pagination specified.
+  int64 pagination_start = 4;
+  // End index for pagination. Return all results if no pagination specified.
+  int64 pagination_end = 5;
+  // Auth token for authentication.
+  string auth_token = 6;
+  // Source of the request (optional).
+  string source = 7;
+}
+
+message GetSignsResponse {
+  CommonResponse common = 1;
+  repeated string sign_ids = 2;
+  repeated QuerySummary query_summaries = 3;
+}
+
+message GetIntersectionsRequest {
+  string map_key = 1;
+  string query = 2;
+  // Extra fields to be returned with query summaries. Can be set via toggle box.
+  repeated string extra_summary_fields = 3;
+  // Start index for pagination. Return all results if no pagination specified.
+  int64 pagination_start = 4;
+  // End index for pagination. Return all results if no pagination specified.
+  int64 pagination_end = 5;
+  // Auth token for authentication.
+  string auth_token = 6;
+  // Source of the request (optional).
+  string source = 7;
+}
+
+message GetIntersectionsResponse {
+  CommonResponse common = 1;
+  repeated string intersection_ids = 2;
+  repeated QuerySummary query_summaries = 3;
+}
+
+message GetSemanticLaneByIdRequest {
+  string map_key = 1;
+  string lane_id = 2;
+}
+
+message GetSemanticLaneByIdResponse {
+  CommonResponse common = 1;
+  simian_public.hdmap.SemanticLane lane = 2;
+}
+
+message DownloadAnalysisRequest {
+  repeated QuerySummary query_summaries = 1;  // query summaries returned by GetLanes to download
+  string auth_token = 2;                      // Auth token for authentication.
+}
+
+message DownloadAnalysisResponse {
+  CommonResponse common = 1;
+  string csv_filepath = 2;  // path to downloaded CSV
+  string csv_uri = 3;
+}
+
+message ValidateMapRequest {
+  // If both map_key and map_keys are specified, the union of both will be used.
+  string map_key = 1;
+  repeated string map_keys = 3;
+  string auth_token = 2;  // Auth token for authentication.
+  oneof profile {
+    simian_public.hdmap.ValidationProfile validation_profile = 4;
+    // If a validation_profile_name is provided, then we query the database for a profile that
+    // matches the name.
+    string validation_profile_name = 6;
+  }
+  // Whether or not to generate a map validation report.
+  bool generate_report = 5;
+}
+
+message ValidateMapResponse {
+  CommonResponse common = 1;
+}
+
+message GetNearestLanePointRequest {
+  string map_key = 1;
+  MapLayer map_layer = 2;
+  simian_public.common.PointENU point = 3;
+}
+
+message GetNearestLanePointResponse {
+  CommonResponse common = 1;
+  LanePointInfo lane_point = 2;
+}
+
+message GetNearestLanePointsAcrossTerrainRequest {
+  string map_key = 1;
+  MapLayer map_layer = 2;
+  simian_public.common.PointENU point = 3;
+}
+
+message GetNearestLanePointsAcrossTerrainResponse {
+  CommonResponse common = 1;
+  repeated LanePointInfo lane_point = 2;
+}
+
+message LanePointInfo {
+  double heading = 1;
+  double distance = 2;
+  simian_public.common.PointENU point = 3;
+  string lane_id = 4;
+  double s = 5;
+  double t = 6;
+}
+
+message SearchRouteRequest {
+  string map_key = 1;
+  simian_public.routing.RoutingRequest request = 2;
+  MapLayer map_layer = 3;
+
+  // Limit max points returned;
+  int64 max_points = 4;
+}
+
+message SearchRouteResponse {
+  CommonResponse common = 1;
+  // Only filled when common.status == CommonResponse.SUCCESS
+  simian_public.routing.RoutingResponse response = 2;
+  bool max_reached = 3;
+}
+
+message Ray {
+  // The origin of the ray, expressed in the map frame.
+  simian_public.common.PointENU origin = 1;  // [m]
+  // The direction in which to cast the ray, expressed in the map frame.
+  // This vector does not need to be normalized.
+  simian_public.common.Vector3 direction = 2;
+  // The maximum distance to search along the ray for an intersection.
+  double max_distance = 3;  // [m]
+}
+
+message TerrainRaycastRequest {
+  string map_key = 1;
+  // Set this from CustomerStartupOptions.map_config.terrain_config (V1)
+  // or InterfaceStartupOptions.map_config.terrain_config (V2).
+  simian_public.common.TerrainConfig terrain_config = 2;
+  // The request supports multiple raycasts.
+  repeated Ray ray = 3;
+}
+
+message TerrainRaycastResponse {
+  CommonResponse common = 1;
+  // The intersections corresponding to each ray in the request
+  // (returned in the same order as the rays).
+  repeated Intersection intersection = 2;
+  message Intersection {
+    // The location of the intersection point between the ray
+    // and the terrain, expressed in the map frame.
+    // This field is empty if the ray did not intersect the terrain.
+    simian_public.common.PointENU point = 2;  // [m]
+  }
+}
+
+// Query summary for each lane that includes lane ID, start position
+// of lane, and list of summary items used by Map Query GUI.
+// <!-- Next ID: 5 -->
+message QuerySummary {
+  string element_id = 4;
+  simian_public.common.PointENU coordinates = 2;
+  message QuerySummaryItem {
+    string label = 1;
+    string value = 2;
+  }
+  repeated QuerySummaryItem query_summary_items = 3;
+
+  // Deprecated fields.
+  // reserved 1;
+  // reserved "lane_id";
+}

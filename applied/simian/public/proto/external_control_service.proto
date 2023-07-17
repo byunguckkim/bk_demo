@@ -1,0 +1,99 @@
+// Copyright (C) 2019 Applied Intuition, Inc. All rights reserved.
+// This source code file is distributed under and subject to the LICENSE in
+// license.txt
+
+syntax = "proto3";
+
+package simian_public.simulation;
+
+import "google/protobuf/duration.proto";
+import "applied/simian/public/proto/common.proto";
+import "applied/simian/public/proto/sim_data.proto";
+import "applied/simian/public/proto/v2/customer_service_v2.proto";
+
+service ExternalControlService {
+  rpc Heartbeat(HeartbeatRequest) returns (HeartbeatResponse);
+  rpc Tick(TickRequest) returns (TickResponse);
+  rpc Reset(ResetRequest) returns (ResetResponse);
+  rpc End(EndRequest) returns (EndResponse);
+}
+
+service ExternalControlServiceV2 {
+  // gRPC service for communicating with Simian externally in v2 API
+  rpc SimTick(SimTickRequest) returns (SimTickResponse) {}
+  rpc WriteChannel(WriteChannelRequest) returns (WriteChannelResponse) {}
+  rpc ReadChannel(ReadChannelRequest) returns (ReadChannelResponse) {}
+  rpc End(EndRequest) returns (EndResponse);
+  rpc GetExtras(GetExtrasRequest) returns (GetExtrasResponse);
+}
+
+message SimTickRequest {
+  // Ticks the simulation forward by tick_duration
+  google.protobuf.Duration tick_duration = 1;
+  string uuid = 2;
+}
+message SimTickResponse {
+  simian_public.common.CommonResponse common = 1;
+}
+
+message WriteChannelRequest {
+  // Writes a Simian channel to the simulator with associated data
+  // For more info on available channels, check out simian/public/proto/v2/io.proto
+  string ego_name = 1;  // To be used in multi-ego
+  string channel_name = 2;
+  bytes data = 3;
+  string uuid = 4;
+}
+message WriteChannelResponse {
+  simian_public.common.CommonResponse common = 1;
+}
+
+message ReadChannelRequest {
+  // Reads a Simian channel from the simulator with associated data
+  // For more info on available channels, check out simian/public/proto/v2/io.proto
+  string ego_name = 1;  // To be used for multi ego
+  string channel_name = 2;
+  string uuid = 3;
+}
+message ReadChannelResponse {
+  simian_public.common.CommonResponse common = 1;
+  bytes data = 2;
+}
+
+message EndRequest {
+  string uuid = 1;
+}
+message EndResponse {
+  simian_public.common.CommonResponse common = 1;
+}
+
+message GetExtrasRequest {
+  string ego_name = 1;  // To be used in multi-ego
+  string uuid = 2;
+}
+message GetExtrasResponse {
+  simian_public.common.CommonResponse common = 1;
+  simian_public.simulator.v2.Extras extras = 2;
+}
+
+message HeartbeatRequest {}
+message HeartbeatResponse {
+  string run_id = 1;
+  sim_data.SimulatorOutput sim_output = 2;
+}
+
+message TickRequest {
+  sim_data.SimulatorInput sim_input = 1;
+}
+message TickResponse {
+  string run_id = 1;
+  sim_data.SimulatorOutput sim_output = 2;
+}
+
+message GetObserverStateRequest {}
+
+message ResetRequest {}
+
+message ResetResponse {
+  sim_data.SimulatorOutput sim_output = 1;
+}

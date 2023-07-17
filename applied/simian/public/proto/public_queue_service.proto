@@ -1,0 +1,69 @@
+// Copyright (C) 2019 Applied Intuition, Inc. All rights reserved.
+// This source code file is distributed under and subject to the LICENSE in
+// license.txt
+
+syntax = "proto3";
+
+package simian_public.queue_service;
+
+import "applied/simian/public/proto/common.proto";
+
+service QueueService {
+  rpc PublicAddToQueue(AddToQueueRequest) returns (AddToQueueResponse) {}
+  rpc PublicStartNewEpoch(NewEpochRequest) returns (NewEpochResponse) {}
+  rpc GetRunStatus(GetRunStatusRequest) returns (GetRunStatusResponse) {}
+}
+
+message AddToQueueRequest {
+  string batch_name = 1;
+  string scenario_path = 2;
+  repeated string sim_flags = 3;
+  bool sim_api_call = 4;
+  bool is_lite_sim = 8;
+  string auth_token = 5;
+  repeated common.ScenarioConfig scenario_configs = 6;
+  bool is_adaptive_sampling_run = 7;
+}
+
+message AddToQueueResponse {
+  string uuid = 1;
+  int32 batch_request_id = 2;
+  int32 batch_run_id = 3;
+}
+
+// A request for starting a new epoch of a custom auto-sampling run
+message NewEpochRequest {
+  message ParameterSample {
+    // YAML strings representing the values of each parameter in a single concrete scenario
+    repeated string parameter_sweep_values = 1;
+  }
+
+  // ID for the auto-sampling run to start a new epoch for
+  uint32 autosampling_run_id = 1;
+
+  // State JSON associated with this next epoch. Will be reported by the results postback plugin
+  string state_json = 2;
+
+  // Parameter names for all the parameters in the logical scenario run by the auto-sampling run
+  repeated string parameter_sweep_names =
+      3;  // All samples must have the same parameter sweep names
+
+  // A list of parameter samples, with each sample representing a list of parameter values to use in
+  // a single concrete scenario in the next epoch
+  repeated ParameterSample parameter_samples = 4;
+}
+
+message NewEpochResponse {
+  uint32 batch_request_id = 1;
+  uint32 batch_run_id = 2;
+  uint32 autosampling_run_id = 3;
+}
+
+message GetRunStatusRequest {
+  string uuid = 1;
+}
+
+message GetRunStatusResponse {
+  string status = 1;
+  int32 queue_position = 2;
+}

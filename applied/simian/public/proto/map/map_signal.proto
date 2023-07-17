@@ -1,0 +1,125 @@
+// Copyright (C) 2019 Applied Intuition, Inc. All rights reserved.
+// This source code file is distributed under and subject to the LICENSE in
+// license.txt
+
+syntax = "proto2";
+
+package simian_public.hdmap;
+
+import "applied/simian/public/osi3/osi_trafficlight.proto";
+import "applied/simian/public/proto/geometry.proto";
+import "applied/simian/public/proto/map/map_common.proto";
+import "applied/simian/public/proto/map/map_geometry.proto";
+import "applied/simian/public/proto/map/map_id.proto";
+import "applied/simian/public/proto/map/map_validation.proto";
+import "applied/simian/public/proto/spatial.proto";
+
+// <!--Next ID: 7-->
+// A subsignal is a single unit or bulb of a dynamic traffic signal.
+message Subsignal {
+  // A unique identifier for the subsignal.
+  optional Id id = 1;
+
+  // <!--Must be in sync with map_enums.proto-->.
+  enum Type {
+    SUBSIGNAL_UNSPECIFIED = 0;
+    UNKNOWN = 1;
+    CIRCLE = 2;
+    ARROW_LEFT = 3;
+    ARROW_FORWARD = 4;
+    ARROW_RIGHT = 5;
+    ARROW_LEFT_AND_FORWARD = 6;
+    ARROW_RIGHT_AND_FORWARD = 7;
+    ARROW_U_TURN = 8;
+    PEDESTRIAN = 9;
+    BIKE = 10;
+    CUSTOM = 11;
+  }
+  // The type of the subsignal. See Subsignal.Type for enum values.
+  optional Type type = 2;
+
+  // Only populated when type is CUSTOM.
+  optional string custom_type = 5;
+
+  // Location of the center of the bulb.
+  optional simian_public.common.PointENU location = 3;
+
+  // The color of the subsignal light. See osi3.TrafficLight.Classification.Color for enum values.
+  optional osi3.TrafficLight.Classification.Color color = 4;
+
+  // Only populated when color is COLOR_OTHER.
+  optional string custom_color = 6;
+}
+
+// <!--Next ID: 15-->
+// A signal is a dynamic traffic signal that controls traffic.
+message Signal {
+  // DisplayType: Readonly.
+  // DisplayType: NestedToFlatten.
+  // Unique identifier for the traffic signal.
+  optional Id id = 1;
+
+  // The polygon boundary of the signal. To be deprecated in favor of pose.
+  optional Polygon boundary = 2;
+
+  // A list of the subsignals or bulbs that make up this signal.
+  repeated Subsignal subsignal = 3;
+
+  // <!--Must be in sync with map_enums.proto-->.
+  enum Type {
+    UNSET = 0;
+    UNKNOWN = 1;
+    MIX_2_HORIZONTAL = 2;
+    MIX_2_VERTICAL = 3;
+    MIX_3_HORIZONTAL = 4;
+    MIX_3_VERTICAL = 5;
+    SINGLE = 6;
+    CUSTOM = 7;
+  }
+
+  // DisplayType: Editable.
+  // The type of the signal. See Signal.Type for enum values.
+  optional Type type = 5;
+
+  // DisplayType: Editable.
+  // DisplayType: OnlyDisplayIf: type, CUSTOM.
+  // Only populated when type is CUSTOM.
+  optional string custom_type = 11;
+
+  // Stop line associated with this signal.
+  repeated Curve stop_line = 6;
+
+  // The lane to which this signal is associated.
+  // DisplayType: Readonly.
+  // DisplayType: NestedToFlatten.
+  // DisplayType: Association.
+  repeated Id associated_lane = 7;
+
+  // The lane for which we change colors in the ADP visualizer. Can be different than the associated
+  // lane.
+  repeated Id visualization_lane = 8;
+
+  // Position and orientation of the signal block. The +X axis of the signal
+  // points from the center of the signal "forward" in the direction the light
+  // is shining. The +Z axis is always vertically upward.
+  optional simian_public.spatial.Pose pose = 9;
+
+  // Custom tags that can be used to store semantic information about an element.
+  repeated CustomTag custom_tags = 10;
+
+  // Validation issues that were found during map conversion.
+  repeated ValidationCheck conversion_failures = 14;
+
+  // Deprecated fields.
+  // reserved 4;
+  // reserved "overlap_id";
+  // repeated Id overlap_id = 4;
+
+  // reserved 12;
+  // reserved "signal_error";
+  // repeated SignalError signal_error = 12;
+
+  // reserved 13;
+  // reserved "conversion_error";
+  // repeated SignalError conversion_error = 13;
+}

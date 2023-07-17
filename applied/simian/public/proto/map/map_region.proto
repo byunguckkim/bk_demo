@@ -1,0 +1,145 @@
+// Copyright (C) 2019 Applied Intuition, Inc. All rights reserved.
+// This source code file is distributed under and subject to the LICENSE in
+// license.txt
+
+syntax = "proto2";
+
+package simian_public.hdmap;
+
+import "applied/simian/public/proto/common.proto";
+import "applied/simian/public/proto/map/map_common.proto";
+import "applied/simian/public/proto/map/map_geometry.proto";
+import "applied/simian/public/proto/map/map_id.proto";
+import "applied/simian/public/proto/map/map_validation.proto";
+
+// A region is a generic polygon that can have a specified type.
+// Examples of regions include crosswalks, keep clear areas, junctions, driveable surfaces, and
+// more.
+// <!--Next ID: 32-->
+message Region {
+  // DisplayType: Readonly.
+  // DisplayType: NestedToFlatten.
+  // A unique identifier for the region.
+  optional Id id = 1;
+
+  // 3D bounding box of region. Uses same coordinates as map.
+  optional Polygon polygon = 2;
+
+  // Id of the lane to which the region corresponds. Optional.
+  // DisplayType: Readonly.
+  // DisplayType: NestedToFlatten.
+  // DisplayType: Association.
+  repeated Id associated_lane = 5;
+
+  // Semantic type of region taken from enumeration below.
+  // <!--Must be in sync with map_enums.proto-->.
+  enum RegionType {
+    GENERIC = 0;
+    CUSTOM = 1;
+    CLEAR_AREA = 2;
+    CROSSWALK = 3;
+    JUNCTION = 4;
+    PARKING_SPACE = 5;
+    PARKING_LOT = 6;
+    SIDEWALK = 7;
+    TRAVERSABLE_SURFACE = 8;
+    NO_GO_ZONE = 9;
+    PICKUP_DROPOFF = 10;
+    // A planar region representing the area around a speed bump curve.
+    SPEED_BUMP = 11;
+    // A planar region representing the area around a dip in the terrain.
+    DIP = 12;
+    // Unlike stop line, stop region encompasses arbitrary planar shapes.
+    // Make sure there is a STOP map feature pointing to this.
+    STOP_REGION = 13;
+    // For map-editing purposes, roads will usually be specified via
+    // simian_public.map_edits.RoadBlueprint. However, for other purposes, it can be convenient for
+    // roads to be regions, and in that case use the ROAD_SURFACE enum type.
+    ROAD_SURFACE = 14;
+    ROAD_MARK = 15;
+    TRAFFIC_LIGHT_REGION = 16;
+  }
+  // DisplayType: Editable.
+  // The type of the region. See RegionType for enum values.
+  optional RegionType type = 3;
+
+  // User defined string for the type of the region.
+  // Populated only when type is CUSTOM.
+  // DisplayType: Editable.
+  // DisplayType: OnlyDisplayIf: type, CUSTOM.
+  optional string custom_type = 4;
+
+  // Additional metadata or information that relates to a particular type of region.
+  // For a region of type "Foo", there will be a message "foo_details" of type "FooDetails".
+  oneof region_details {
+    // Parking-space details.
+    // Populated only when type is PARKING_SPACE.
+    // DisplayType: Editable.
+    // DisplayType: OnlyDisplayIf: type, PARKING_SPACE.
+    ParkingSpaceDetails parking_space_details = 31;
+  }
+
+  // Id of predecessor object in the map.
+  // Can be used to denote topological connections.
+  // DisplayType: Readonly.
+  // DisplayType: NestedToFlatten.
+  // DisplayType: Association.
+  repeated Id successor_id = 6;
+  // Id of predecessor object in the map.
+  // Can be used to denote topological connections.
+  // DisplayType: Readonly.
+  // DisplayType: NestedToFlatten.
+  // DisplayType: Association.
+  repeated Id predecessor_id = 7;
+
+  // Speed limit of the region, in meters per second.
+  // DisplayType: Editable.
+  optional double speed_limit = 8;
+
+  oneof semantic_orientation {
+    // Optional heading if the region has a semantic heading.
+    // We visualize this heading in the frontend with an arrow.
+    // This heading does not influence the vertices of the region,
+    // and does not affect geometry.
+    double heading = 29;
+  }
+
+  // Custom tags that can be used to store semantic information about an element.
+  repeated CustomTag custom_tags = 28;
+
+  // Validation issues that were found during map conversion.
+  repeated ValidationCheck conversion_failures = 30;
+
+  // Deprecated fields.
+  // reserved 26;
+  // reserved "conversion_error";
+  // repeated RegionError conversion_error = 26;
+
+  // reserved 27;
+  // reserved "conversion_warning";
+  // repeated RegionWarning conversion_warning = 27;
+}
+
+message ParkingSpaceDetails {
+  enum ParkingSpaceLocationType {
+    UNSET_LOCATION = 0;
+    STALL = 1;  // Example:  Head-in parking space in an outdoor lot.
+    DRIVEWAY = 2;
+    ROADSIDE = 3;  // Example:  Parking bay inset into sidewalk.
+    ONROAD = 4;    // Parking location on constant-width road.
+  }
+  enum ParkingSpaceEdgeType {
+    UNSET_EDGE_TYPE = 0;
+    UNPAINTED_EDGE = 1;
+    ROAD_EDGE_DASHED = 2;
+    ROAD_EDGE_SOLID = 3;
+    CORNER_EDGE = 4;
+    CORNER_TO_CURB_EDGE = 5;
+    THREE_EDGES = 6;
+  }
+  optional ParkingSpaceLocationType location_type = 1;
+  optional ParkingSpaceEdgeType edge_type = 2;
+  optional simian_public.common.RGBA parking_space_marking_color = 3;
+  // Should be populated only when the surface color is different from the drivable surface.
+  optional simian_public.common.RGBA parking_space_surface_color = 4;
+}

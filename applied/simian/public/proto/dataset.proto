@@ -1,0 +1,50 @@
+// Copyright (C) 2020 Applied Intuition, Inc. All rights reserved.
+// This source code file is distributed under and subject to the LICENSE in license.txt
+
+syntax = "proto3";
+
+package simian_public.dataset;
+
+import "google/protobuf/timestamp.proto";
+
+message DatasetImage {
+  // CreateDatasetItems plugin should populate this with the absolute path in the
+  // plugin container. Otherwise, this is a workspace URI.
+  string path = 1;
+  int32 height_pixels = 2;
+  int32 width_pixels = 3;
+}
+
+message DatasetInterval {
+  google.protobuf.Timestamp start_time_offset = 1;
+  google.protobuf.Timestamp end_time_offset = 2;
+}
+
+message CollectionEvent {
+  // Time of this dataset item relative to the start of the drive.
+  google.protobuf.Timestamp log_offset = 1;
+  DatasetInterval dataset_interval = 2;
+  string uuid = 3;
+  string drive_run_uuid = 4;
+  // The log_path key used to identify your log. This corresponds to
+  // log_path or drive_name that was used during ingestion.
+  string log_path = 5;
+}
+
+message Collection {
+  int32 id = 1;
+  string name = 2;
+  string author = 3;
+  int32 num_events = 4;
+}
+
+message DatasetItem {
+  // Time of this dataset item relative to the start of the drive.
+  google.protobuf.Timestamp log_offset = 1;
+  oneof dataset_item_type {
+    DatasetImage dataset_image = 2;
+    DatasetInterval dataset_interval = 5;
+  }
+  string uuid = 3;
+  string drive_run_uuid = 4;
+}

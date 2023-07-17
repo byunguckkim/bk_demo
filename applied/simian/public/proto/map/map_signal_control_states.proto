@@ -1,0 +1,22 @@
+syntax = "proto2";
+
+package simian_public.hdmap;
+
+import "applied/simian/public/proto/traffic_light.proto";
+
+// Collection of possible states the map traffic signals can have. Can compose phases/stages
+// from Bulbs and BlockStates which are inferred from the signals defined in the map.
+// Each bulb has an on and an off state generated.
+//
+// For example, adding a signal with id "100" that contains a green no-icon subsignal with
+// the id "0" will generate a bulb with the name "BULB_100_0" and the following bulb states:
+// - { color: COLOR_GREEN, icon: ICON_NONE, mode: MODE_CONSTANT, name: STATE_ON}
+// - { color: COLOR_GREEN, icon: ICON_NONE, mode: MODE_OFF, name: STATE_OFF}
+//
+// It will also generate a block with the name "BLOCK_100" with a block state for each subsignal
+// being in STATE_ON while the rest are in STATE_OFF. For the green subsignal in the example,
+// the block state where it is on would be named "COLOR_GREEN_ICON_NONE".
+message SignalControlStates {
+  repeated simian_public.traffic_light.Phase phases = 1;
+  repeated simian_public.traffic_light.Stage stages = 2;
+}

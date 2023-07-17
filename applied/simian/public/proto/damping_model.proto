@@ -1,0 +1,42 @@
+// Copyright (C) 2021 Applied Intuition, Inc. All rights reserved.
+// This source code file is distributed under and subject to the LICENSE in license.txt
+
+syntax = "proto3";
+
+package simian_public.damping_model;
+
+message DampingModelSpec {
+  oneof damping_model_type {
+    // ViscousDamping implements a viscous damper; i.e. a damping proportional to the relative
+    // velocity between objects. Examples of viscous damping in mechanical systems include fluid
+    // films between surfaces, fluid flow around a piston in a cylinder, fluid fluid within a
+    // bearing, suspension dampers, etc. You can also add an OPTIONAL bias term to ensure your
+    // system comes to rest in finite time. See https://en.wikipedia.org/wiki/Viscous_damping for
+    // details.
+    ViscousDampingSpec viscous_damping = 1;
+
+    // As the naming suggests this model is just passthrough, i.e., it generates zero damping force.
+    ZeroDampingSpec zero_damping = 2;
+  }
+}
+
+message ViscousDampingSpec {
+  // If used to model powertrain loss, it generates a force of magnitude
+  // "damping_bias + damping_linear * abs(longitudinal_velocity)", where longitudinal_velocity is
+  // the longitidinal (+x) velocity in the vehicle frame.
+  double damping_bias =
+      1;  // [N] OPTIONAL defaults to 0.0; Use this if you wish to see your system come to rest in
+  // finite time.
+  double damping_linear = 2;  // [N*s/m] Standard viscous damping coefficient
+  // If this field is set to ALWAYS, damping is applied at all times, i.e. even when the throttle
+  // input / motor torque demand is non-zero. If set to ONLY_WHEN_COASTING (default), damping only
+  // kicks in when there is 0.0 throttle input / motor torque demand.
+  DampingMode mode = 3;  // [-]
+}
+
+enum DampingMode {
+  ONLY_WHEN_COASTING = 0;
+  ALWAYS = 1;
+}
+
+message ZeroDampingSpec {}

@@ -1,0 +1,19 @@
+// Copyright (C) 2022 Applied Intuition, Inc. All rights reserved.
+// This source code file is distributed under and subject to the LICENSE in license.txt
+
+syntax = "proto3";
+
+package simian_public.sensor_sim.spectral_rendering;
+
+// Designate the wavelength channels as enumns that a given asset,
+// light source, or sensor exists in or is sensitive to.
+message SpectralWavelengthChannel {
+  enum Enum {
+    VISIBLE = 0;
+    NIR = 1;
+    SWIR = 2;
+    LWIR = 3;
+    MMW = 4;
+    ALL = 5;
+  }
+}

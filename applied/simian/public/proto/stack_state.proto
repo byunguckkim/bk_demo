@@ -1,0 +1,29 @@
+syntax = "proto3";
+
+package simian_public.stack_state;
+
+// NOTE: The StackState enum (simian_public.sim_data.SimulatorInput.StackState)
+// is defined in a separate file. All additional information about stack state
+// is contained in this message.
+message StackStateInformation {
+  // Supported set of colors. Must correspond to the set of COLORS known by
+  // the ADP frontend.
+  // Contact Applied to add support for additional colors.
+  enum StackStateColor {
+    WHITE = 0;
+    GRAY = 1;
+    PURPLE = 2;
+    BLUE = 3;
+    GREEN = 4;
+    YELLOW = 5;
+    ORANGE = 6;
+    RED = 7;
+    BROWN = 8;
+  }
+
+  // Text to display about current stack state.
+  string display_name = 1;
+  // Color to use for the display_name.
+  // Defaults to white if not set.
+  StackStateColor display_name_color = 2;
+}

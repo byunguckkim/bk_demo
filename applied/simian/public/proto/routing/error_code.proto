@@ -1,0 +1,57 @@
+syntax = "proto2";
+
+package simian_public.routing;
+
+// Error codes enum for API's categorized by modules.
+enum ErrorCode {
+  // No error, returned on success. This is a 200, except that
+  // protobuf's default behaviors work better with 0.
+  OK = 0;
+
+  // Common error codes with broad applicability. For more context, see:
+  //   https://en.wikipedia.org/wiki/List_of_HTTP_status_codes
+  BAD_REQUEST = 400;
+  UNAUTHORIZED = 401;
+  FORBIDDEN = 403;
+  NOT_FOUND = 404;
+  CONFLICT = 409;
+  PAYLOAD_TOO_LARGE = 413;
+  UPGRADE_REQUIRED = 426;
+  PRECONDITION_REQUIRED = 428;
+  TOO_MANY_REQUESTS = 429;
+
+  INTERNAL_ERROR = 500;
+  NOT_IMPLEMENTED = 501;
+  BAD_GATEWAY = 502;
+  SERVICE_UNAVAILABLE = 503;
+  GATEWAY_TIMEOUT = 504;
+
+  // Prefer to use standard error codes above rather than defining very
+  // specific codes to your service.  Callers may care about the category of
+  // error (e.g. can I retry later if I get this code?) but rarely care about
+  // the specific causes.  For debugging, use the error message.
+  //
+  // If you do find that you signal a condition with a specific code, consider
+  // a more expressive API to inform callers how their request was handled.
+
+  // HDMap module error codes start from here
+  HDMAP_DATA_ERROR = 7000;
+
+  // Routing module error codes
+  ROUTING_ERROR = 8000;
+  ROUTING_ERROR_REQUEST = 8001;
+  ROUTING_ERROR_RESPONSE = 8002;
+  ROUTING_ERROR_NOT_READY = 8003;
+
+  // Indicates an input has been exhausted.
+  END_OF_INPUT = 9000;
+
+  // Relative Map error codes.
+  RELATIVE_MAP_ERROR = 11000;  // general relative map error code
+  RELATIVE_MAP_NOT_READY = 11001;
+}
+
+message StatusPb {
+  optional ErrorCode error_code = 1 [default = OK];
+  optional string msg = 2;
+}

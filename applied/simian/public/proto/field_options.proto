@@ -1,0 +1,132 @@
+syntax = "proto3";
+
+package field_options;
+
+import "google/protobuf/descriptor.proto";
+
+// <!-- Next ID: 15 [last modified by: cynthia-tien] -->
+enum NumericalUnits {
+  // Should error if UNKNOWN
+  UNKNOWN = 0;
+  // Number has no units (e.g. ID).
+  NO_UNITS = 1;
+  // ====== DISTANCE METRICS =======
+  // Meters
+  // Display name: "m"
+  M = 2;
+  // Meters / second
+  // Display name: "m/s"
+  MPS = 3;
+  // Meters / second ^ 2
+  // Display name: "m/s^2"
+  MPS2 = 4;
+  // Meters / second ^ 3
+  // Display name: "m/s^3"
+  MPS3 = 14;
+
+  // ==== TIME METRICS ======
+  // Seconds
+  // Dislay name: "s"
+  S = 5;
+
+  // === ANGLE METRICS ===
+  // Radians
+  // Display name: "rad"
+  RAD = 6;
+  // Radians / second
+  // Display name: "rad/s"
+  RADPS = 10;
+  // Radians / second ^ 2
+  // Display name: "rad/s^2"
+  RADPS2 = 11;
+  // Radians / second ^ 3
+  // Display name: "rad/s^3"
+  RADPS3 = 12;
+
+  // == MASS METRICS =========
+  // Grams
+  // Display name: "g"
+  G = 7;
+  // Kilograms
+  // Display name: "kg"
+  KG = 8;
+
+  // === FREQUENCY METRICS ===
+  // Hertz (1 / seconds)
+  // Display name: "Hz"
+  HERTZ = 9;
+  // <!-- TODO(Cynthia): add more here -->
+}
+
+// <!-- Next ID: 50018 [last modified by: cynthia-tien] -->
+extend google.protobuf.FieldOptions {
+  // If true the field name won't show up in autocomplete options in the FE
+  // yaml editor.
+  bool ignore_in_autocomplete = 50000;
+
+  // is_required = true indicates that a field is required within its proto message.
+  // The value should be set to true if it is required by simulators (Simian, Spectral, Logstream).
+  // This currently only supports fields in the scenario description.
+  // <!-- TODO(Cynthia/Rami): Add additional requirements for specific simulators using a
+  // is_required_$PRODUCT schema. -->
+  bool is_required = 50001;
+
+  // Manual link for this field.
+  // Should always use the `/latest` release version.
+  string manual_link = 50015;
+
+  // ==== Field options specific to numerical values. ================
+  // Hard limits. Will error if surpassed.
+  // Should use one of the following greater than options:
+  // Any numerical value must be greater than this value.
+  double greater_than = 50002;
+  // Any numerical value must be greater than or equal to this value.
+  double greater_than_or_equal = 50003;
+
+  // Should use one of the following less than options:
+  // Any numerical value must be less than this value.
+  double less_than = 50004;
+  // Any numerical value must be less than or equal to this value.
+  double less_than_or_equal = 50005;
+
+  // Can use on of the following options to replace the greater_than* and less_than* options.
+  // Do not use in conjunction.
+  // Absolute value of the numerical value is greater than this value.
+  double absolute_value_greater_than = 50013;
+  // Absolute value of the numerical value is greater than or equal to this value.
+  double absolute_value_greater_than_or_equal = 50014;
+
+  // Absolute value of the numerical value is less than this value.
+  double absolute_value_less_than = 50016;
+  // Absolute value of the numerical value is less than or equal to this value.
+  double absolute_value_less_than_or_equal = 50017;
+
+  // Soft limits of recommended values. Will warn if surpassed.
+  // Should use one of the following recommended greater than options:
+  // Any numerical value must be greater than this value.
+  double recommended_greater_than = 50006;
+  // Any numerical value must be greater than or equal to this value.
+  double recommended_greater_than_or_equal = 50007;
+
+  // Should use one of the following recommended less than options:
+  // Any numerical value must be less than this value.
+  double recommended_less_than = 50008;
+  // Any numerical value must be less than or equal to this value.
+  double recommended_less_than_or_equal = 50009;
+
+  // Units of the numerical value.
+  NumericalUnits units = 50010;
+  // ========== End of field options specific to numerical values. ========
+
+  // ==== Field options specific to repeated values. ================
+  // Repeated list size must have value less than or equal to this positive integer.
+  int32 maximum_repeated_length = 50011;
+
+  // Repeated list size must have values greater than or equal to this positive integer.
+  int32 minimum_repeated_length = 50012;
+  // ========== End of field options specific to repeated values. ========
+}
+
+extend google.protobuf.OneofOptions {
+  bool oneof_is_required = 52000;
+}

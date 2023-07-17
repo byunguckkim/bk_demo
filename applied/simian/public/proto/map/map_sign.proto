@@ -1,0 +1,148 @@
+// Copyright (C) 2019 Applied Intuition, Inc. All rights reserved.
+// This source code file is distributed under and subject to the LICENSE in
+// license.txt
+
+syntax = "proto2";
+
+package simian_public.hdmap;
+
+import "applied/simian/public/proto/map/map_common.proto";
+import "applied/simian/public/proto/map/map_geometry.proto";
+import "applied/simian/public/proto/map/map_id.proto";
+import "applied/simian/public/proto/map/map_validation.proto";
+import "applied/simian/public/proto/spatial.proto";
+import "applied/simian/public/proto/spectral_assets.proto";
+
+// A generic proto for traffic signs.
+// <!--Next ID: 20-->
+message Sign {
+  // DisplayType: Readonly.
+  // DisplayType: NestedToFlatten.
+  // A unique identifier for the sign.
+  optional Id id = 1;
+
+  // Polygon sign points are ordered counterclockwise.
+  // They should correspond to the SignShape if it is specified.
+  optional Polygon polygon = 2;
+
+  // The pose describes the center point of the sign.
+  // The x-axis is normal to the sign's image and points toward the viewer.
+  // The z-axis is parallel to a vector from the bottom to the top of the sign's image.
+  // This convention is consistent with OSI.
+  // If pose and polygon are both specified, then polygon prevails.
+  optional simian_public.spatial.PoseSpec pose = 15;
+
+  // <!--Must be in sync with map_enums.proto-->.
+  enum SignType {
+    UNKNOWN = 0;
+    CUSTOM = 9;
+    STOP = 1;
+    YIELD = 2;
+    NO_PARKING_ANYTIME = 3;
+    GENERAL_SIGN = 4;
+    BIKE_LANE = 5;
+    SPEED_LIMIT = 6;
+    NO_STOPPING_ANYTIME = 7;
+    NO_PARKING = 8;
+    LEFT_LANE_CLOSED = 10;
+    RIGHT_LANE_CLOSED = 11;
+    ROAD_WORK_AHEAD = 13;
+    WORK_ZONE = 14;
+    TEMPORARY_SPEED_LIMIT = 15;
+    LANE_SHIFT = 16;
+    SHOULDER_CLOSED = 17;
+    EXIT_CLOSED = 18;
+    ROAD_CLOSED = 19;
+    END_ROAD_WORK = 20;
+    ROAD_WORK_ZONE = 21;
+  }
+
+  // DisplayType: Editable.
+  // The semantic type of this sign. See SignType for enum values.
+  optional SignType type = 3;
+
+  // User defined string representing the sign type.
+  // Only populated when type is CUSTOM.
+  // DisplayType: Editable.
+  // DisplayType: OnlyDisplayIf: type, CUSTOM.
+  optional string custom_type = 9;
+
+  // Unused. Please use map_line.proto instead.
+  repeated Curve stop_line = 4 [deprecated = true];
+
+  // A string message that is on the sign. Not visualized.
+  optional string sign_message = 6;
+
+  // Only set when type is SPEED_LIMIT.
+  // Units map directly to raw map data.
+  // DisplayType: Editable.
+  // DisplayType: OnlyDisplayIf: type, SPEED_LIMIT.
+  optional double speed_limit = 7;
+
+  // The ID of the lane that is associated with this sign.
+  // DisplayType: Readonly.
+  // DisplayType: NestedToFlatten.
+  // DisplayType: Association.
+  repeated Id associated_lane = 8;
+
+  // <!--Must be in sync with map_enums.proto-->.
+  enum SignColor {
+    UNKNOWN_COLOR = 0;
+    CUSTOM_COLOR = 6;
+    WHITE = 1;
+    RED = 2;
+    GREEN = 3;
+    BLUE = 4;
+    YELLOW = 5;
+  }
+  // The color of the sign. See SignColor for enum values.
+  optional SignColor color = 10;
+
+  // User defined string for color.
+  // Only populated when color is CUSTOM_COLOR.
+  optional string custom_color = 11;
+
+  // <!--Must be in sync with map_enums.proto-->.
+  enum SignShape {
+    UNKNOWN_SHAPE = 0;
+    CUSTOM_SHAPE = 6;
+    SQUARE = 1;
+    TRIANGLE = 2;
+    CIRCLE = 3;
+    OCTAGON = 4;
+    INVERTED_TRIANGLE = 5;
+  }
+  // The shape of the sign. See SignShape for enum values.
+  optional SignShape shape = 12;
+
+  // User defined string for shape.
+  // Only populated when shape is CUSTOM_SHAPE.
+  optional string custom_shape = 13;
+
+  // Currently should only point to STOP_REGION type regions.
+  repeated Id associated_region = 14;
+
+  // Custom tags that can be used to store semantic information about an element.
+  repeated CustomTag custom_tags = 16;
+
+  // Validation issues that were found during map conversion.
+  repeated ValidationCheck conversion_failures = 18;
+
+  // Deprecated fields.
+  // reserved 5;
+  // reserved "overlap_id";
+  // repeated Id overlap_id = 5;
+
+  // reserved 17;
+  // reserved "conversion_error";
+  // repeated SignError conversion_error = 17;
+
+  message PhysicalAttributes {
+    optional simian_public.spectral.SpectralSign.Preset preset = 1;
+    optional simian_public.spectral.SpectralSign.MaterialConfiguration material = 2;
+  }
+
+  // Physical representation of the traffic sign, used as parameters to
+  // spawn it in Spectral.
+  optional PhysicalAttributes physical_attributes = 19;
+}

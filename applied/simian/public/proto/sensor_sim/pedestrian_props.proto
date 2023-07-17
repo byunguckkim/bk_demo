@@ -1,0 +1,29 @@
+// Copyright (C) 2021 Applied Intuition, Inc. All rights reserved.
+// This source code file is distributed under and subject to the LICENSE in license.txt
+
+syntax = "proto3";
+
+package simian_public.proto.sensor_sim.pedestrian_props;
+
+// This is a list of meshes that can be
+// attatched to pedestrians as props
+
+// List of One handed props available
+enum OneHanded {
+  NO_ONE_HAND_PROP = 0;
+  UMBRELLA = 1;
+  PARAMEDIC_BAG = 2;
+  ROLLERSUITCASE_GREY = 3;
+}
+
+// List of Two handed props available
+// If both one and two handed props are enabled
+// we will default to using the two handed prop
+enum TwoHanded {
+  NO_TWO_HAND_PROP = 0;
+  SHOPPING_CART = 1;
+  WHEELCHAIR = 2;
+  BABY_STROLLER = 3;
+  BABY_STROLLER_EMPTY = 4;
+  WHEELCHAIR_OCCUPIED = 5;
+}

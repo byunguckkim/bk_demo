@@ -1,0 +1,17 @@
+// Copyright (C) 2021 Applied Intuition, Inc. All rights reserved.
+// This source code file is distributed under and subject to the LICENSE in license.txt
+
+syntax = "proto3";
+
+package simian_public.spline;
+
+message BivariateSplineCoefficients {
+  // Outputs of scipy.interpolate.bisplrep().tck
+  // Ref: https://docs.scipy.org/doc/scipy/reference/generated/scipy.interpolate.bisplrep.html
+  // Implements a bivariate spline, i.e. a regular 1-D spline extended to two dimensions.
+  repeated double knots_along_x = 1;
+  repeated double knots_along_y = 2;
+  repeated double coefficients = 3;
+  uint32 x_degree = 4;
+  uint32 y_degree = 5;
+}

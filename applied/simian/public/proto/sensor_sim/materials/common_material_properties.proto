@@ -1,0 +1,54 @@
+// Copyright (C) 2023 Applied Intuition, Inc. All rights reserved.
+// This source code file is distributed under and subject to the LICENSE in license.txt
+
+syntax = "proto3";
+
+import "applied/simian/public/proto/common.proto";
+package simian_public.sensor_sim.materials.common_material_properties;
+
+message FloatModifier {
+  oneof modifier_mode {
+    float override = 1;  // specify exact value to override previous value
+    float multiply = 2;  // multiplies against previous value
+    float add = 3;       // adds to previous value
+  }
+}
+
+message RGBAModifier {
+  oneof modifier_mode {
+    common.RGBA override = 1;  // specify exact value to override previous value
+    common.RGBA multiply = 2;  // multiplies against previous value
+    common.RGBA add = 3;       // adds to previous value
+  }
+}
+
+message SpectralBandProperties {
+  FloatModifier reflectivity = 1;
+  FloatModifier roughness = 2;
+  FloatModifier emissivity = 3;
+}
+
+message VisibleProperties {
+  float roughness_override = 1;  // deprecated
+  float metallic_override = 2;   // deprecated
+  FloatModifier roughness = 3;
+  FloatModifier metallic = 4;
+  RGBAModifier color = 5;
+}
+
+message MicrowaveProperties {
+  float rel_permittivity = 1;
+  float rel_permeability = 2;
+  float conductivity = 3;
+  bool is_conductor = 4;
+  float scattering_coefficient = 5;
+}
+
+// These material properties will be shared across all materials
+message CommonMaterialProperties {
+  VisibleProperties visible = 1;
+  MicrowaveProperties microwave = 2;
+  SpectralBandProperties nir = 3;
+  SpectralBandProperties swir = 4;
+  SpectralBandProperties lwir = 5;
+}

@@ -1,0 +1,155 @@
+// Copyright (C) 2023 Applied Intuition, Inc. All rights reserved.
+// This source code file is distributed under and subject to the LICENSE in license.txt
+
+syntax = "proto3";
+
+package simian_public.sensor_sim.pedestrians.clothing;
+
+import "applied/simian/public/proto/common.proto";
+
+message PedestrianClothingDescription {
+  oneof clothing_type {
+    OutfitComponentsDescription outfit_components = 1;
+    ClothingOutfitDescription outfit = 2;
+  }
+  ClothingShoesDescription shoes = 3;
+  AccessoriesDescription accessories = 4;
+}
+
+message OutfitComponentsDescription {
+  InteriorClothingTorsoDescription interior_torso_clothing = 1;
+  ExteriorClothingTorsoDescription exterior_torso_clothing = 2;
+  ClothingLegsDescription leg_clothing = 3;
+}
+
+message ClothingMaterialDescription {
+  simian_public.common.RGBA color_tint = 1;
+}
+
+message InteriorClothingTorsoDescription {
+  InteriorClothingTorsoEnum torso_type = 1;
+  ClothingMaterialDescription torso_material = 2;
+
+  // List of all available torso clothing
+  enum InteriorClothingTorsoEnum {
+    NO_CLOTHING = 0;
+    YOGA_TOP_1 = 1;
+    SLEEVELESS_SHIRT_1 = 2;
+    SLEEVELESS_COLLARED_SHIRT_1 = 3;
+    POLICE_SHIRT_1 = 4;
+  }
+}
+
+message ExteriorClothingTorsoDescription {
+  ExteriorClothingTorsoEnum torso_type = 1;
+  ClothingMaterialDescription torso_material = 2;
+
+  // List of all available torso clothing
+  enum ExteriorClothingTorsoEnum {
+    NO_CLOTHING = 0;
+    JACKET_CLOSED_1 = 1;
+    JACKET_OPEN_1 = 2;
+    BOMBER_JACKET_CLOSED_1 = 3;
+    HOODIE_CLOSED_1 = 4;
+    LONG_COAT_CLOSED_1 = 5;
+    COMBAT_JACKET_CLOSED_1 = 6;
+    POLICE_VEST_1 = 7;
+  }
+}
+
+message ClothingLegsDescription {
+  ClothingLegsEnum legs_type = 1;
+  ClothingMaterialDescription leg_material = 2;
+
+  // List of all available leg clothing
+  enum ClothingLegsEnum {
+    NO_PANTS = 0;
+    SUIT_PANTS_1 = 1;
+    JEANS_1 = 2;
+    JEANS_2 = 3;
+    JEAN_SHORTS_1 = 4;
+    SKIRT_1 = 5;
+    SKIRT_2 = 6;
+    SKIRT_3 = 7;
+    SUIT_PANTS_2 = 8;
+    SUIT_PANTS_3 = 9;
+    JEAN_SHORTS_2 = 10;
+    SHORTS_1 = 11;
+    JEAN_SHORTS_3 = 12;
+    SKIRT_4 = 13;
+    JEANS_3 = 14;
+    JEANS_4 = 15;
+    JEANS_5 = 16;
+    JEANS_6 = 17;
+    COMBAT_PANTS_1 = 18;
+    POLICE_PANTS_1 = 19;
+  }
+}
+
+message ClothingOutfitDescription {
+  ClothingOutfitEnum outfit_type = 1;
+  ClothingMaterialDescription outfit_material = 2;
+  enum ClothingOutfitEnum {
+    NO_OUTFIT = 0;
+    DRESS_1 = 1;
+    DRESS_2 = 2;
+    DRESS_3 = 3;
+    DRESS_4 = 4;
+    DRESS_5 = 5;
+    DRESS_6 = 6;
+    CASUAL_1 = 7;
+    CASUAL_2 = 8;
+    TRACKSUIT_1 = 9;
+    GYM_OUTFIT_1 = 10;
+    GYM_OUTFIT_2 = 11;
+    SUIT_1 = 12;
+    CHILD_BOY_OUTFIT_1 = 13;
+    CHILD_BOY_OUTFIT_2 = 14;
+    CHILD_GIRL_OUTFIT_1 = 15;
+    POLICE_OUTFIT_1 = 16;
+    COMBAT_OUTFIT_1 = 17;
+  }
+}
+
+message ClothingShoesDescription {
+  ShoesEnum shoes_type = 1;
+  ClothingMaterialDescription shoes_material = 2;
+
+  // List of all available shoes
+  enum ShoesEnum {
+    NO_SHOES = 0;
+    SNEAKERS_1 = 1;
+    SNEAKERS_2 = 2;
+    LEATHER_SHOES = 3;
+    SNEAKERS_3 = 4;
+    SNEAKERS_4 = 5;
+    HIGH_HEELS_1 = 6;
+    HIGH_HEELS_2 = 7;
+    COMBAT_BOOTS_1 = 8;
+    POLICE_BOOTS_1 = 9;
+  }
+}
+
+message AccessoriesDescription {
+  AccessoriesEnum accessory_type = 1;
+
+  enum AccessoriesEnum {
+    NO_ACCESSORY = 0;
+    BACKPACK_1 = 1;
+    BACKPACK_2 = 2;
+    BACKPACK_3 = 3;
+    HANDBAG_1 = 4;
+    HANDBAG_2 = 5;
+    HANDBAG_3 = 6;
+    SUNGLASSES_1 = 7;
+    SUNGLASSES_2 = 8;
+    BACKPACK_4 = 9;
+    BACKPACK_PRINTED_1 = 10;
+    BACKPACK_PRINTED_2 = 11;
+    BACKPACK_PRINTED_3 = 12;
+    BACKPACK_PRINTED_4 = 13;
+    BACKPACK_PRINTED_5 = 14;
+    BACKPACK_PRINTED_6 = 15;
+    POLICE_HAT_US_1 = 16;
+  }
+}

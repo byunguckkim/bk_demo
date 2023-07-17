@@ -1,0 +1,511 @@
+// Copyright (C) 2018 Applied Intuition, Inc. All rights reserved.
+// This source code file is distributed under and subject to the LICENSE in license.txt
+
+syntax = "proto3";
+
+package simian_public.simulator.v2;
+
+import "google/protobuf/duration.proto";
+import "google/protobuf/empty.proto";
+import "google/protobuf/struct.proto";
+import "google/protobuf/timestamp.proto";
+import "applied/simian/public/proto/actor.proto";
+import "applied/simian/public/proto/common.proto";
+import "applied/simian/public/proto/ego.proto";
+import "applied/simian/public/proto/integration_definition_compiled.proto";
+import "applied/simian/public/proto/map_config.proto";
+import "applied/simian/public/proto/scenario/scenario_digest.proto";
+import "applied/simian/public/proto/sim_data.proto";
+import "applied/simian/public/proto/stack_state.proto";
+import "applied/simian/public/proto/spatial.proto";
+
+// <!-- Next ID: 37 (last modified: louis) -->
+enum ChannelType {
+  // We'll treat this as a void* and not attempt to parse or visualize it in any way.
+  CUSTOM = 0;
+  // Timestamp (google.protobuf.Timestamp)
+  // Channel name: simian_time
+  TIME = 13;
+  // All sections pose message (simian_public.simulator.v2.Pose)
+  // Channel name: simian_pose for ego vehicle's pose
+  POSE = 1;
+  // simian_public.motion_model.Feedback
+  // Channel name: simian_motion_feedback for the feedback to the ego based on
+  // the previous controls.
+  MOTION_FEEDBACK = 2;
+  // Sim->Stack for L2-L3 systems, Stack->Sim usually
+  // (simian_public.motion_model.Input)
+  // Builtin channel: EGO_CONTROLS for ego's output controls
+  // Channel name: simian_behavior_predicted_control for Simian's predicted
+  // controls for the ego.
+  CONTROLS = 3;
+  // simian_public.simulator.v2.Trigger
+  // Channel name: simian_triggers for triggers on the ego itself (look in the
+  // message for the ACTORS channel(s) for actor triggers).
+  TRIGGER = 4;
+  // simian_public.common.TripAgentOutput
+  // Channel name: simian_trip_agent for the ego's trip agent commands.
+  // Currently updated as a normal channel with a rate.
+  TRIP_AGENT = 15;
+  // simian_public.simulator.v2.StackState
+  // Builtin channel: EGO_STACK_STATE for ego vehicle's stack state.
+  STACK_STATE = 16;
+  // simian_public.ego.OperatorOverrideState
+  // Channel name: <channel_name>_override to check the override status of
+  // a channel with name <channel_name> (e.g. simian_pose_override for ego pose)
+  OPERATOR_OVERRIDE_STATE = 29;
+  // simian_public.spatial.Trajectory
+  TRAJECTORY = 34;
+  // simian_public.common.VehicleData
+  VEHICLE_DATA = 36;
+
+  // Simian Sensors, channel names match the name of the sensor.
+  // simian_public.perception.PerceptionChannel.ActorSensor
+  // Builtin channel: GROUND_TRUTH_ACTORS for ground truth actors
+  // Channel name: simian_perceived_actors for ego's perceived actors
+  ACTORS = 5;
+  // simian_public.perception.PerceptionChannel.Actor2DSensor
+  ACTORS_2D = 35;
+  // simian_public.perception.PerceptionChannel.LaneSensor
+  LANE_SENSOR = 6;
+  // simian_public.perception.PerceptionChannel.TrafficLightSensor
+  TRAFFIC_LIGHTS = 7;
+  // simian_public.perception.PerceptionChannel.LocalizationSensor
+  LOCALIZATION_SENSOR = 18;
+  // simian_public.perception.PerceptionChannel.PlanarLidarSensor
+  PLANAR_LIDAR = 8;
+  // simian_public.perception.PerceptionChannel.PlanarOccupancyGridSensor
+  PLANAR_OCCUPANCY_GRID = 9;
+  // simian_public.perception.PerceptionChannel.OcclusionGridSensor
+  OCCLUSION_GRID = 25;
+  // simian_public.perception.PerceptionChannel.FreeSpaceSensor
+  FREE_SPACE_SENSOR = 19;
+  // simian_public.perception.PerceptionChannel.TrafficLightBlockSensor
+  TRAFFIC_LIGHT_BLOCKS = 20;
+  // simian_public.perception.PerceptionChannel.TrafficSignSensor
+  TRAFFIC_SIGN_SENSOR = 22;
+  // simian_public.perception.PerceptionChannel.IMUSensor
+  IMU_SENSOR = 23;
+  // simian_public.perception.PerceptionChannel.WheelSpeedSensor
+  WHEEL_SPEED_SENSOR = 24;
+  // simian_public.perception.PerceptionChannel.MapSensor
+  MAP_SENSOR = 26;
+  // simian_public.perception.PerceptionChannel.TerrainSensor
+  TERRAIN_SENSOR = 28;
+  // simian_public.perception.PerceptionChannel.WindSensor
+  WIND_SENSOR = 30;
+  // simian_public.perception.PerceptionChannel.PolarObstacleSensor
+  POLAR_OBSTACLE_SENSOR = 31;
+  // simian_public.perception.PerceptionChannel.AgentTrajectorySensor
+  AGENT_TRAJECTORY_SENSOR = 32;
+
+  // simian_public.sensor_model.SensorOutput.LidarCloud
+  LIDAR = 10;
+  // simian_public.sensor_model.SensorOutput.RadarTrack
+  RADAR = 11;
+  // simian_public.sensor_model.SensorOutput.CameraImage
+  CAMERA = 12;
+  // simian_public.sensor_model.SensorOutput.Range
+  ULTRASOUND = 17;
+  // simian_public.sensor_output.SensorOutputList
+  PERCEPTION_SENSOR = 33;
+
+  // reserved "METADATA_SENSOR";
+  // reserved 27;
+  // reserved "LOCALIZATION";
+  // reserved 14;
+  // reserved "LOCALIZATION_OBJECT_SENSOR";
+  // reserved 21;
+}
+
+// A channel for data to travel between the simulator and the customer interface.
+message Channel {
+  // The name of the channel.
+  string name = 1;
+  // The type of the data that is passed in the channel. See the ChannelType enum for more
+  // information.
+  ChannelType type = 2;
+}
+
+// A message that is sent from the simulator to the stack.
+message Trigger {
+  // A key/value pair of data that is sent from the simulator to the stack. Can contain string or
+  // numeric values.
+  repeated simian_public.common.DataPoint data_points = 1;
+  // A key/value pair of data that is sent from the simulator to the stack. Is a string/string pair.
+  repeated simian_public.common.Message messages = 2;
+}
+
+message Pose {
+  repeated simian_public.ego.EgoOutput.Section sections = 1;
+}
+
+// Information regarding the state that the AV stack is in.
+message StackState {
+  // The enum indicating which state the stack is in.
+  simian_public.sim_data.SimulatorInput.StackState stack_state = 1;
+  // All additional information about the stack state (e.g. display options).
+  simian_public.stack_state.StackStateInformation stack_state_info = 2;
+}
+
+// List of additional channels for an incremental log ingestion.
+// If these are available in set_startup_options_v2_1, then it indicates
+// that this is an incremental ingestion for these particular channels.
+// The type of the channel should indicate to the interface how this particular
+// channel of data should be ingested and sent to ADP. If there is any other
+// information needed, it can be specified inside the freeform extra_data field.
+// For example, the extra_data field can hold things like the source directory
+// of the channel or more information about the provider for the channel data.
+message IngestionParameters {
+  message IngestionChannel {
+    string name = 1;
+    ChannelType type = 2;
+    google.protobuf.Value extra_data = 3;
+  }
+
+  // Specifies the channels to ingest during a strada ingestion.
+  repeated IngestionChannel channels = 1;
+}
+
+// Metadata about the simulation sent to the interface at simulation start time.
+// <!-- Next ID: 19 [edited by Deepshika] -->
+message InterfaceStartupOptions {
+  // Filename of the launch file, as specified by the `--customer_launch_file` simulation flag.
+  string launcher_filename = 1;
+  google.protobuf.Value scenario_extra_data = 2;
+  google.protobuf.Value ego_extra_data = 3;
+  // Information about the map projection, geographic center, and other configuration options.
+  simian_public.map_config.MapConfig map_config = 4;
+  // Name of the map. If the map defined in the scenario is "sunnyvale@123",
+  // this field is set to "sunnyvale".
+  string map_key = 5;
+  // Version tag of the map. If the map defined in the scenario is "sunnyvale@123",
+  // this field is set to "123".
+  string map_version = 14;
+  // If true, Spectral is enabled.
+  bool perception_stack_startup = 6;
+
+  // If true, `VisualizationSetup()` will be called.
+  bool start_stack_visualization = 7;
+
+  // Path to record and write data from the stack.
+  string record_stack_data = 8;
+
+  // Describes all channels being run in the simulation.
+  ChannelSetupDescription channel_setup = 9;
+
+  // A short description containing useful information contained in the scenario for the stack.
+  simian_public.scenario.ScenarioDigest scenario_digest = 10;
+
+  // Use this address to connect to the public map service.
+  string map_service_address = 11;
+
+  // Used to pass customer_server_run_cmd to interface
+  repeated string argv = 12;
+
+  // Use this path to write all dataset artifacts
+  string record_spectral_dataset = 13;
+
+  // UUID of the simulation
+  string sim_uuid = 15;
+
+  // For internal service use only.
+  google.protobuf.Struct experimental_service_information = 16;
+
+  // Defines integration mappings for a stack.
+  repeated simian_public.integration_definition.IntegrationDefinitionCompiled
+      integration_definitions = 17;
+
+  IngestionParameters ingestion_parameters = 18;
+}
+
+// Determines the directions in which channel data flows between ADP, the stack, logs, and other
+// sources.
+message ChannelSetupDescription {
+  // All channels part of the current simulation, can be used to allocate
+  // memory slots for each type.
+  repeated Channel all_channels = 1;
+  // All channels sources from the stack with simian as a sink.
+  // These channels will get a call to listen_setup/teardown() and a
+  // convert_to_simian() call at its corresponding rate.
+  repeated Channel stack_to_simian = 2;
+  // All channels sourced from simian with the stack as the sink.
+  // These will get a call publish_setup/teardown() and a convert_from_simian()
+  // and publish_send() call at its corresponding rate.
+  repeated Channel simian_to_stack = 3;
+  // All channels sourced from a log to be sent directly to the stack.
+  // In V2.0, there will be a single log_read() call and a publish_send() call
+  // for each of these channels at their corresponding rate.
+  // In V2.1, log_read() can send these channels to the stack directly as
+  // they are read, and time is updated. This can be through direct calls to
+  // publish_send() or to its underlying functionality.
+  repeated Channel log_to_stack = 4;
+  // All channels sourced from a log to be sent only to Simian.
+  // In V2.0, after log_read(), a convert_to_simian() call would happen at each
+  // channel's corresponding rate.
+  // In V2.1, after log_read(), if these channels are mentioned in the output's
+  // `seen_channels` list, convert_to_simian() is called to let the simulator
+  // retrieve the data.
+  repeated Channel log_to_simian = 5;
+  // Remaining channels sourced from a log, to be sent to Simian, potentially
+  // patched, then sent to the stack. Only in V2.1.
+  // After a log_read() call mentions these channels in its return,
+  // convert_to_simian() may be called. Simian will then create a patch
+  // message to be sent to a call to the patch() function to modify the channel
+  // data in memory. After that, publish_send() will be called with the same
+  // channel to publish the data to the stack.
+  repeated Channel log_patched_to_stack = 6;
+  // All channels sourced from a previous simulation run or drive conversion
+  // with simian as the sink. These channels will not have any associated API calls.
+  repeated Channel reference_run_to_simian = 7;
+}
+
+message LogFetchOptions {
+  // Index that corresponds to the log for which the LogFetch request is made.
+  // The index order will match the order that the logs are listed in the scenario.
+  // If only 1 log is listed, the `slot` will be 0 by default.
+  int32 slot = 1;
+  // The path to the log to fetch. Use this path to download/copy the associated
+  // log into a location that the interface can access and open in LogOpen.
+  string path = 2;
+  // The name of the log to fetch.
+  string name = 3;
+  // Persistent directory to store fetched logs. If set, check this directory to see if a log has
+  // already been fetched before downloading or copying it in. Ignore this field if empty.
+  string cache_directory = 4;
+  // If multiple region clusters are enabled, the region where the simulation
+  // is running in.
+  // Use as an indicator to fetch logs data from close in proximity data stores.
+  string region = 5;
+  // Used for re-simulation chaining. The uuid corresponding to a parent sim.
+  string sim_run_uuid = 6;
+  // Used for re-simulation chaining. The uri corresponding to the stack output of a parent sim.
+  string customer_output_uri = 7;
+}
+
+// Data sent from the interface to ADP regarding logs fetched during the LogFetch API call.
+message LogFetchOutput {
+  // The path to the fetched log. If the log was cached, updated_path should be set
+  // to the location of the log in the cache.
+  // If updated_path is filled in, LogOpenOptions.path will be set to updated_path.
+  // If updated_path is not filled in, LogOpenOptions.path will remain unchanged.
+  string updated_path = 1;
+
+  // Metadata about the log cache.
+  message CacheInfo {
+    oneof cache_was_hit {
+      // If a cached version of the log was retrieved, set cache_hit.
+      google.protobuf.Empty cache_hit = 1;
+      // If the log was not previously cached, set download_duration to the amount of time it took
+      // to download the log.
+      google.protobuf.Duration download_duration = 2;
+    }
+  }
+  // Optional: Log caching metrics.
+  CacheInfo cache_info = 2;
+}
+
+message LogOpenOptions {
+  // `slot` always starts at 0, it may increase if multiple logs are used in
+  // the same simulation.
+  int32 slot = 1;
+  // The name of the log, and can be used to differentiate if there are multiple logs.
+  string name = 9;
+  // The path to the log (accessible to the interface) to open.
+  // This path will be equal to LogFetchOutput.updated_path if updated_path was
+  // specified during LogFetch.
+  string path = 2;
+  // The time in the log to skip to, this is in relation to epoch (not the
+  // beginning of the log).
+  google.protobuf.Duration start_offset = 3;
+  // The maximum time in the log that will be read into. The log may be closed
+  // earlier than this in case of an error or another termination reason.
+  google.protobuf.Duration max_duration = 5;
+  // The Channel(s) to read from the log when a later log_read() call is made.
+  repeated Channel channels = 4;
+  // If multiple region clusters are enabled, the region where the simulation
+  // is running in.
+  // Use as an indicator to fetch logs data from close in proximity data stores.
+  string region = 6;
+  // Used for re-simulation chaining. The uuid corresponding to a parent sim.
+  string sim_run_uuid = 7;
+  // Used for re-simulation chaining. The uri corresponding to the stack output of a parent sim.
+  string customer_output_uri = 8;
+}
+
+// Data sent from the interface to ADP regarding data received from the log during the LogOpen API
+// call.
+message LogOpenOutput {
+  // The starting timestamp of the log.
+  google.protobuf.Timestamp start_timestamp = 1;
+  // The name of the map in the log.
+  string map_key = 2;
+  // The name of the drive in the log.
+  string drive_name = 3;
+  // The version of the stack used to record the log.
+  string customer_stack_version_from_log = 4;
+  // The name of the vehicle used to record the log.
+  string vehicle_name = 5;
+}
+
+// Metadata sent to the interface on a LogRead API call.
+// This informs how the LogRead call should execute.
+message LogReadOptions {
+  // Index that corresponds to the log for which the LogRead request is made.
+  // The index order will match the order that the logs are listed in the scenario.
+  // If only 1 log is listed, the `slot` will be 0 by default.
+  int32 slot = 1;
+  // The name of the log for which the LogRead request is made.
+  string name = 5;
+  // The offset *from the beginning of the sim* to read until, this will start
+  // close to or at 0. Add to the `start_offset` given in LogOpenOptions to
+  // get the offset into the log.
+  // To support the Logstream `initial_pose_from_log` scenario option, check
+  // if `offset` is exactly 0 and 'simian_pose' is in `to_simian_channels` in
+  // `LogRead`. If so, find the initial pose of the ego from the log, save it
+  // in memory, and add 'simian_pose' to `seen_channel_names`.
+  google.protobuf.Duration offset = 2;
+  // In V2.1, these channels, once seen, should stop reading and allow Simian
+  // to retrieve the data. Otherwise, the data may be sent to the stack.
+  // Retrieved channels, will be converted to Simian's format, and if destined
+  // for the stack, it may be patched as a result.
+  // This will be a copy of the log_to_simian and log_patched_to_stack.
+  repeated Channel to_simian_channels = 3;
+  // Channels that we will only publish right away (in V2.1 only).
+  // This is an optional optimization for Logstream that the stack server can
+  // implement to call publish_send on these channels and skip sending them to
+  // us. The default C++ customer stack server implements this optimization.
+  repeated Channel channels_to_immediately_publish_send = 4;
+}
+
+// Data sent from the interface to ADP regarding data read from the log during the LogRead API call.
+message LogReadOutput {
+  // When the offset_reached is at or past the end of the log, set this to
+  // false and return 0.
+  bool data_remaining = 1;
+  // If offset_reached is less than the offset passed in, then seen_channels
+  // should be at least one or more channel mentioned in the to_simian_channels
+  // list. It will later be called again with the same offset, after other
+  // functions are called.
+  // Otherwise, it should be equal to the offset passed in. In this case,
+  // seen_channels may or may not have entries.
+  google.protobuf.Duration offset_reached = 2;
+  // Include any channels mentioned in to_simian_channels that were seen since
+  // the last call to log_read().
+  repeated string seen_channel_names = 3;
+}
+
+// Metadata sent to the interface on a LogClose API call.
+// This informs how the LogClose call should execute.
+message LogCloseOptions {
+  // Index that corresponds to the log for which the LogClose request is made.
+  // The index order will match the order that the logs are listed in the scenario.
+  // If only 1 log is listed, the `slot` will be 0 by default.
+  int32 slot = 1;
+  // The name of the log for which the LogClose request is made.
+  string name = 2;
+}
+
+// Metadata sent to the interface on a Patch API call. This informs how the Patch call should
+// execute.
+message PatchOptions {
+  message GenericAlteration {
+    // Which sub-field of the channel (e.g. pose.x) this alteration should apply
+    // to.
+    string field = 1;
+    oneof alteration_type {
+      // Add this value to the specified sub-field in the customer interface.
+      double bias = 2;
+      // Multiply the specified sub-field by this value in the customer
+      // interface.
+      double gain = 3;
+    }
+  }
+
+  // Metadata related to patching actor channels.
+  // This informs how the Patch function will operate on actors.
+  // <!-- Next ID: 5 -->
+  message PatchActorChannel {
+    message RemoveActor {
+      int32 id = 1;
+    }
+    message ActorAlteration {
+      int32 id = 1;
+      GenericAlteration generic_alteration = 2;
+    }
+    message ReplaceActor {
+      // Replace is different from a remove-and-add combination, because it
+      // allows more targeted replacement of data in the given actor.
+      // If the goal is to move an actor from one position to another, this
+      // allows only copying the pose from the given Actor object and keeping
+      // all the other information in-tact, such as extra information that your
+      // perception stack outputs that isn't input into Logstream.
+      int32 id = 1;
+      actor.Actor replacement = 2;
+    }
+    // First, remove the specified actors.
+    repeated RemoveActor remove_actors = 1;
+    // Second, add any Simian actors.
+    repeated actor.Actor add_actors = 2;
+    // Third, replace a log actor with a Simian actor.
+    repeated ReplaceActor replace_actors = 4;
+    // Finally, apply alterations to sub-fields of specific actors in order.
+    repeated ActorAlteration alterations = 3;
+  }
+
+  message PatchGenericChannel {
+    // The customer interface should apply alterations in order to ensure that
+    // additions and multiplications have the expected result.
+    repeated GenericAlteration alterations = 2;
+  }
+
+  oneof patch {
+    // Set when a patch should be applied to a channel with type ACTOR
+    PatchActorChannel actor = 2;
+    // Set when a patch should be applied to a channel with any other type
+    PatchGenericChannel generic = 3;
+  }
+}
+
+// Data provided to the interface during a LogRewind call, specifying which log to rewind to what
+// sim time.
+message LogRewindOptions {
+  int32 slot = 1;
+  string log_name = 2;
+
+  // Interpreted as a duration relative to the start of the sim, similar to `offset` in LogRead.
+  google.protobuf.Duration target_sim_time = 3;
+}
+
+// No output, but may be extended in a future API version.
+message LogRewindOutput {}
+
+message VehicleData {
+  message SharedVehicleData {
+    message Header {
+      // The id of the agent. This field is set by ADP when received by the stack, it is ignored
+      // when sent by the stack.
+      int32 agent_id = 1;
+      // Sim time at which the data was emitted. This field is set by ADP when received by the stack
+      // and it is ignored when sent by the stack.
+      google.protobuf.Timestamp time = 2;
+    }
+    // Header providing information on the stack that published this SharedVehicleData message.
+    Header header = 1;
+    // Built-in data types. You can use this field to share data with other egos using ADP protobuf
+    // types.
+    oneof data_type {
+      // ADP trajectory format. You can use this field to share a trajectory with other egos.
+      simian_public.spatial.Trajectory trajectory = 2;
+    }
+  }
+  // Data published by the ego.
+  // When sending to ADP, you can send as many shared_vehicle_data messages as desired on a single
+  // channel. This messages will be stored in the ADP to be later retrieved by other egos. When
+  // receiving from ADP, ADP will concatenate the shared_vehicle_data fields from different
+  // VEHICLE_DATA channels based on your channel configuration. The field
+  // `/v2_api_basic/vehicle_data_channel_config` in the scenario YAML describes the mapping used to
+  // concatenate the shared_vehicle_data from ADP-sinked VEHICLE_DATA channels into ADP-sourced
+  // VEHICLE_DATA channels.
+  repeated SharedVehicleData shared_vehicle_data = 1;
+}

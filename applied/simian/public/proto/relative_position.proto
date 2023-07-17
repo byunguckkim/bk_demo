@@ -1,0 +1,120 @@
+// Copyright (C) 2021 Applied Intuition, Inc. All rights reserved.
+// This source code file is distributed under and subject to the LICENSE in license.txt
+
+syntax = "proto3";
+
+package simian.relative_position;
+
+import "google/protobuf/duration.proto";
+import "applied/simian/public/proto/common.proto";
+import "applied/simian/public/proto/planar.proto";
+import "applied/simian/public/proto/scenario/common.proto";
+import "applied/simian/public/proto/spatial.proto";
+
+// Used to specify relative positioning based on bounding box points.
+enum SemanticReferencePoint {
+  // For egos, OBJECT_FRAME is the center of the rear axle. For actors, OBJECT_FRAME is the
+  // geometric center.
+  OBJECT_FRAME = 0;
+  REAR_BUMPER_CENTER = 1;
+  REAR_BUMPER_LEFT = 2;
+  REAR_BUMPER_RIGHT = 3;
+  FRONT_BUMPER_CENTER = 4;
+  FRONT_BUMPER_LEFT = 5;
+  FRONT_BUMPER_RIGHT = 6;
+  GEOMETRIC_CENTER = 7;
+}
+
+// <!-- Next ID: 6 -->
+message ReferenceObject {
+  oneof reference_point {
+    bool ego = 1;
+    int32 actor_id = 2;
+    PointDescriptionWithOrientationWithPose2dLegacyFields map_point = 3;
+    // Lane ID string, adds reference to the start of the lane.
+    string lane_id = 5;
+  }
+  SemanticReferencePoint reference_frame = 4;  // Sets the reference frame on the reference object
+}
+
+// <!-- Next ID: 5 -->
+message PointDescriptionWithOrientationWithPose2dLegacyFields {
+  // Either (x, y) or utm must be filled
+  double x = 1;
+  double y = 2;
+  double heading = 3;
+  simian_public.common.UTM utm = 4;
+}
+
+// Used by static Spectral actors
+// <!-- Next ID: 4 -->
+message ReferenceObject3D {
+  oneof reference_point {
+    bool ego = 1;
+    int32 actor_id = 2;
+    // Describe the agent's relative pose w.r.t. the world frame.
+    // We have it here to maintain parity with ReferenceObject which is used by non static obstacle
+    // agents.
+    simian_public.spatial.PoseSpec world_frame = 3;
+  }
+}
+
+// <!-- Next ID: 8 -->
+message LaneRelativeCoordinateDescription {
+  double t = 1;  // [m]
+  int32 relative_lane = 2;
+  double heading_relative_to_lane_central_curve = 3;  // [radians]
+  oneof longitudinal_offset {
+    double s = 4;                          // [m]
+    google.protobuf.Duration headway = 5;  // [seconds]
+  }
+  simian_public.scenario.LaneSplitPreference.SplitPreference lane_split_preference = 6;
+  SemanticReferencePoint reference_frame =
+      7;  // Sets the reference frame on the object being placed.
+
+  // Optional boolean flag, defaults to false. If set to true, the lateral distance between the
+  // reference pose and the lane center will be added to the overall lane relative placement.
+  bool apply_reference_lane_offset = 8;
+
+  simian_public.common.VersionMajorMinor version = 9;
+}
+
+// <!-- Next ID: 8 -->
+message LaneRelativeCoordinateDescription3D {
+  double t = 1;                                       // [m]
+  int32 relative_lane = 2;                            // [-]
+  double heading_relative_to_lane_central_curve = 3;  // [rad]
+  oneof longitudinal_offset {
+    double s = 4;  // [m]
+  }
+  simian_public.scenario.LaneSplitPreference.SplitPreference lane_split_preference = 5;  // [-]
+  double pz = 6;                                                                         // [m]
+  simian_public.spatial.PoseSpec.RollPitchYaw rpy = 7;                                   // [-]
+
+  simian_public.common.VersionMajorMinor version = 8;
+}
+
+// <!-- Next ID: 3 -->
+message PoseRelativeCoordinateDescription {
+  simian_public.planar.Pose2d additive_pose = 1;
+  SemanticReferencePoint reference_frame =
+      2;  // Sets the reference frame on the object being placed.
+}
+
+// <!-- Next ID: 4 -->
+message RelativePosition {
+  ReferenceObject to = 1;
+  oneof coordinate_system {
+    LaneRelativeCoordinateDescription lane_relative_coordinates = 2;
+    PoseRelativeCoordinateDescription pose_relative_coordinates = 3;
+  }
+}
+
+// <!-- Next ID: 4 -->
+message RelativePosition3D {
+  ReferenceObject3D to = 1;
+  oneof coordinate_system {
+    LaneRelativeCoordinateDescription3D lane_relative_coordinates = 2;
+    simian_public.spatial.PoseSpec transform_pose = 3;
+  }
+}

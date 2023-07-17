@@ -1,0 +1,201 @@
+// Copyright (C) 2020 Applied Intuition, Inc. All rights reserved.
+// This source code file is distributed under and subject to the LICENSE in license.txt
+
+syntax = "proto3";
+
+package simian_public.common;
+
+import "applied/simian/public/proto/common.proto";
+import "applied/simian/public/proto/field_options.proto";
+import "applied/simian/public/proto/spatial.proto";
+
+message TerrainProperties {
+  // Static friction coefficient to be applied to the terrain, defined as the ratio of the maximum
+  // static friction force to the normal (N) force between the surfaces in contact before movement
+  // begins.
+  double static_friction_coefficient = 1 [(field_options.units) = NO_UNITS];
+  // Dynamic friction coefficient to be applied to the terrain, defined as the ratio of the sliding
+  // friction force to the normal force exerted between the two bodies).
+  double dynamic_friction_coefficient = 2 [(field_options.units) = NO_UNITS];
+  // Restitution coefficient to be applied to the terrain, defined as the ratio of the final to
+  // initial relative speed between two objects after they collide).
+  double restitution_coefficient = 3 [(field_options.units) = NO_UNITS];
+  // Rolling resistance is computed as F / N where,
+  // F is the force required to pull a tire horizontally in the direction of travel for a given road
+  // material and N is the normal load on the tire. In simple terms, it is a measure of the tires
+  // resistance to roll.
+  double rolling_resistance = 4 [(field_options.units) = NO_UNITS];
+}
+
+message RegionDescription {
+  oneof region_type {
+    // Defines a cylindrically-shaped region for which to set rolling resistance.
+    VerticalCylinder vertical_cylinder = 1;
+  }
+}
+
+message VerticalCylinder {
+  // Center of the circular base of the cylindrical region for which rolling resistance will be
+  // applied.
+  simian_public.spatial.Point center = 1;
+  // Radius of the circular base of the cylindrical region for which rolling resistance will be
+  // applied.
+  double radius = 2 [(field_options.units) = M];
+  // Height of the cylindrical region for which rolling resistance will be applied.
+  double height = 3 [(field_options.units) = M];
+}
+
+message RegionPropertiesDescription {
+  // Specific region for which to apply terrain properties.
+  RegionDescription region = 1;
+  // Terrain properties for this particular region.
+  TerrainProperties properties = 2;
+}
+
+// <!-- Next ID: 10 -->
+message TerrainConfig {
+  oneof terrain_type {
+    // Triangular facets based on lane points in the map.  Default if
+    // nothing else is specified.  This is the first version of our
+    // terrain model based on just the data in the map.
+    LaneHeightDelaunay lane_height_delaunay = 1;
+
+    // Piecewise horizontal patches based on the height of the nearest
+    // lane point (which can come from the center or a boundary point).
+    // This is a reasonable and robust approximation if you are
+    // experiencing issues with wildly varying ego orientations
+    Empty lane_height = 2;
+
+    // Specifies a single plane to represent the entire terrain. This
+    // is mainly useful for controller tests (for instance braking
+    // behavior on specific road grades and banks) or to knock out
+    // all terrain modeling (for instance forcing everything to take
+    // place in the z==0 plane).  The normal vector need not have
+    // unit length, may point up or down, but cannot be zero.
+    PointAndNormal point_and_normal = 3;
+
+    // Use a pre-generated triangle mesh and transform.
+    TriangleMesh triangle_mesh = 4;
+
+    // Starting in release 1.13 we're working on enhanced terrain generation
+    // that avoids many of the pitfalls of the existing work.  We will
+    // periodically cut stable versions of this work as interfaces to support
+    // long term.
+    ExperimentalGeneratedTerrain experimental_generated_terrain = 5;
+  }
+
+  // Represents global terrain properties.
+  // These properties may be overriden by regions.
+  TerrainProperties global_properties = 8;
+
+  // Override global terrain properties for these specific regions.
+  repeated RegionPropertiesDescription regions = 9;
+  // The `strict` setting applies to the `lane_height_delaunay`, `triangle_mesh`, and
+  // `experimental_generated_terrain` configurations, which represent the terrain as a mesh.
+  // If `strict` is true, then a simulation fails if Simian cannot find an intersection with the
+  // terrain mesh above or below an agent.
+  // If `strict` is false, then Simian falls back on the `lane_height` configuration whenever
+  // Simian cannot find an intersection with the terrain mesh.
+  // Simian produces warning messages when falling back on `lane_height`.
+  simian_public.common.BoolValue strict = 6;
+
+  // This version field is currently unused.
+  // Applied may use this version field to handle future changes in functionality of terrain.
+  simian_public.common.VersionMajorMinor version = 7
+      [(field_options.ignore_in_autocomplete) = true];
+
+  message TriangleMesh {
+    // Either obj_file_name or mesh_file_name must be specified (but not both).
+
+    // [DEPRECATED] Please use `mesh_file_name` instead.
+    // This file name must have an .obj extension.
+    string obj_file_name = 1 [deprecated = true];
+    // This file name can have an .obj or .glb extension.
+    // ADP's frontend and simulations can load GLB2 (binary GLTF2) files 5-10x faster than OBJ
+    // files, and are 2-3x smaller on disk than OBJ files. Furthermore, generating a .vsterrain file
+    // (for a VehicleSim model) is faster with GLB2 files, which means loading a map for the first
+    // time is faster. NOTE: If using a GLB2 file, the GLB2 file must contain exactly 1 mesh. NOTE:
+    // You can use mesh_file_name whether or not the configuration option
+    // `fast_terrain_mesh_loading` is enabled.
+    string mesh_file_name = 5;
+
+    // Scaling factor between mesh coordinates and world coordinates.
+    // Should be expressed in meters per mesh unit.
+    // Each 3D point in mesh will be transformed to world coordinates:
+    //
+    //   world_point = world_t_scaled_mesh * mesh_scale * mesh_point
+    //
+    // If unspecified, defaults to identity scaling.
+    double mesh_scale = 2 [(field_options.greater_than) = 0];
+    // Transform to convert mesh geometry to world coordinates.
+    // <!-- The comment below applies only when using this field in the scenario YAML. -->
+    // This transform replaces the map level transform specified within map_config.pb.txt.
+    // Note that we use the map coordinate system for the world frame, which is typically UTM.
+    // Each 3D point in mesh will be transformed to the world frame in the map coordinate system:
+    //
+    //   world_point = world_t_scaled_mesh * mesh_scale * mesh_point
+    //
+    // If unspecified, defaults to identity transform.
+    // <!-- The comment below applies only when using this field in the scenario YAML. -->
+    // Ensure this transform is consistent with the coordinate system specified in the
+    // map_config.pb.txt.
+    simian_public.spatial.PoseSpec world_t_scaled_mesh = 3;
+    // Defines the precision of floating point numbers used to represent the terrain.
+    Precision precision = 4;
+  }
+
+  message ExperimentalGeneratedTerrain {
+    // Defines the source of the points used to generate terrain.
+    GeneratedTerrainSource source = 1;
+    // Defines the precision of floating point numbers used to represent the terrain.
+    Precision precision = 2;
+  }
+
+  message LaneHeightDelaunay {
+    // Defines the source of the points used to generate terrain.
+    GeneratedTerrainSource source = 1;
+    // Defines the precision of floating point numbers used to represent the terrain.
+    Precision precision = 2;
+  }
+
+  message PointAndNormal {
+    // X coordinate of a point on the plane.
+    double px = 1 [(field_options.units) = M];
+    // Y coordinate of a point on the plane.
+    double py = 2 [(field_options.units) = M];
+    // Z coordinate of a point on the plane.
+    double pz = 3 [(field_options.units) = M];
+    // X component of a normal vector to the plane. Does NOT need to have unit length.
+    double nx = 4 [(field_options.units) = NO_UNITS];
+    // Y component of a normal vector to the plane. Does NOT need to have unit length.
+    double ny = 5 [(field_options.units) = NO_UNITS];
+    // Z component of a normal vector to the plane. Does NOT need to have unit length.
+    double nz = 6 [(field_options.greater_than) = 0, (field_options.units) = NO_UNITS];
+  }
+
+  message Precision {
+    oneof precision_level {
+      // Use single-precision floating point numbers to represent the terrain.
+      // This implementation may be up to 2 times faster than `high`.
+      Empty medium = 1;
+      // Use double-precision floating point numbers to represent the terrain.
+      // This is the default setting.
+      Empty high = 2;
+    }
+  }
+}
+
+message GeneratedTerrainSource {
+  // Defines the source of the points used to generate terrain.
+  // Only used for LaneHeightDelaunay and ExperimentalGeneratedTerrain.
+  oneof source {
+    // Default option.
+    // Generate terrain using the downsampled viz map so that the resulting terrain file is not too
+    // large. Use base_map if you need higher terrain resolution.
+    Empty viz_map = 7;
+    // Generate the mesh from the base map instead of the lower-resolution viz map.
+    // Use this when the viz map does not have enough points to provide the desired terrain
+    // resolution.
+    Empty base_map = 8;
+  }
+}

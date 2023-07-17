@@ -1,0 +1,106 @@
+// Copyright (C) 2018 Applied Intuition, Inc. All rights reserved.
+// This source code file is distributed under and subject to the LICENSE in license.txt
+
+syntax = "proto3";
+
+package simian_public.traffic_light;
+
+import "applied/simian/public/proto/common.proto";
+import "applied/simian/public/proto/spatial.proto";
+
+// Simulator representation
+message TrafficLightBulb {
+  int64 id = 1;
+  spatial.Pose pose = 2;
+  string color = 3;
+  string icon = 4;
+  string mode = 5;
+  float counter = 6;
+  repeated string lanes = 7;
+  string name = 8;
+  repeated BulbState bulb_states = 9;
+  string id_str = 10;
+}
+
+// Wiki page: https://en.wikipedia.org/wiki/Traffic_light_control_and_coordination
+message TrafficLight {
+  string name = 1;
+  repeated Bulb bulbs = 2;
+  repeated Block blocks = 3;
+  repeated Phase phases = 4;
+  repeated Stage stages = 5;
+}
+
+message Bulb {
+  string name = 1;
+  Pose pose = 2;
+  repeated string lanes = 3;
+  repeated BulbState bulb_states = 4;
+  // If you set a non-zero id, then the Simian Traffic Light Sensor
+  // populates the OSI TrafficLight.id.value integer field with this id.
+  // Otherwise, the Simian Traffic Light Sensor populates the
+  // OSI TrafficLight.id.value_text string field with the bulb's name.
+  int64 id = 5;
+  string id_str = 6;
+}
+
+message BulbState {
+  string name = 1;
+  string color = 2;
+  string icon = 3;
+  string mode = 4;
+  string bulb_state_name = 5;
+}
+
+message Block {
+  string name = 1;
+  spatial.Pose pose = 2;
+  repeated string lanes = 3;
+  repeated BlockState block_states = 4;
+}
+
+message BlockState {
+  string name = 1;
+  repeated BulbState bulb_states = 2;
+  string block_state_name = 3;
+}
+
+message Phase {
+  string name = 1;
+  repeated PhaseState phase_states = 2;
+}
+
+message PhaseState {
+  string name = 1;
+  repeated BlockState block_states = 2;
+  string phase_state_name = 3;
+}
+
+message Stage {
+  string name = 1;
+  repeated StageState stage_states = 2;
+}
+
+message StageState {
+  string name = 1;
+  repeated PhaseState phase_states = 2;
+  string stage_state_name = 3;
+}
+
+// <!-- TODO(Jonathan): Temporary Pose msg -->
+message Pose {
+  simian_public.common.Point point = 1;
+  double heading = 2;
+}
+
+message TrafficLightOutput {
+  int32 id = 1;
+  string color = 2;
+  string icon = 3;
+  string mode = 4;
+  spatial.Pose pose = 5;
+  string name = 6;
+  repeated string lanes = 7;
+  string id_str = 8;
+  string bulb_state_name = 9;
+}

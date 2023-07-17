@@ -1,0 +1,86 @@
+// Copyright (C) 2019 Applied Intuition, Inc. All rights reserved.
+// This source code file is distributed under and subject to the LICENSE in
+// license.txt
+
+syntax = "proto2";
+
+package simian_public.hdmap;
+
+import "applied/simian/public/proto/map/map_geometry.proto";
+import "applied/simian/public/proto/map/map_id.proto";
+
+message BoundaryEdge {
+  // The actual curve representing the curve for this boundary.
+  optional Curve curve = 1;
+  enum Type {
+    UNKNOWN = 0;
+    NORMAL = 1;
+    LEFT_BOUNDARY = 2;
+    RIGHT_BOUNDARY = 3;
+  }
+  // The type of this boundary edge. See BoundaryEdge.Type for enum values.
+  optional Type type = 2;
+}
+
+message BoundaryPolygon {
+  // The edges of the boundary polygon.
+  repeated BoundaryEdge edge = 1;
+}
+
+// A boundary, potentially with holes on the inside to denote islands or other obstacles.
+message RoadBoundary {
+  // The outer boundary polygon of the road surface.
+  optional BoundaryPolygon outer_polygon = 1;
+  // Polygons representing islands or other obstacles in the middle of the road that are
+  // non-drivable.
+  repeated BoundaryPolygon hole = 2;
+}
+
+// The road section defines a road cross-section. At least one section must be
+// defined in order to
+// use a road, If multiple road sections are defined, they must be listed in
+// order along the road.
+message RoadSection {
+  // A unique identifier for the road section.
+  optional Id id = 1;
+  // The ids of the lanes contained in this section.
+  repeated Id lane_id = 2;
+  // Geometric boundary of section. Currently unused for simulation.
+  optional RoadBoundary boundary = 3;
+
+  // Refers to predecessor roads that are connected to this road section.
+  // Optional.
+  repeated Id predecessor_id = 4;
+  // Refers to successor roads that are connected to this road section.
+  // Optional.
+  repeated Id successor_id = 5;
+}
+
+// The road is a collection of traffic elements, such as lanes, road boundary
+// etc.
+// It provides general information about the road.
+message Road {
+  // A unique identifier for the road section.
+  optional Id id = 1;
+  // The road sections, which contain the lane ids and geometries of the road.
+  repeated RoadSection section = 2;
+
+  // if lane road not in the junction, junction id is null.
+  optional Id junction_id = 3;
+
+  enum Type {
+    UNKNOWN = 0;
+    HIGHWAY = 1;
+    CITY_ROAD = 2;
+    PARK = 3;
+  }
+  // The type of the road. See Road.Type for enum values.
+  optional Type type = 4;
+
+  // Refers to predecessor roads that are connected to this road.
+  // Optional.
+  repeated Id predecessor_id = 5;
+  // Refers to successor roads that are connected to this road.
+  // Optional.
+  repeated Id successor_id = 6;
+}

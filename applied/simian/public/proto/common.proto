@@ -1,0 +1,357 @@
+// Copyright (C) 2018 Applied Intuition, Inc. All rights reserved.
+// This source code file is distributed under and subject to the LICENSE in license.txt
+
+syntax = "proto3";
+
+package simian_public.common;
+
+import "google/protobuf/struct.proto";
+import "google/protobuf/timestamp.proto";
+
+message Empty {}
+
+// <!-- Should only be used for output protos, do not use for internal scenario description.
+// Use simian.scenarios.proto.scenario_point.PointDescription instead. -->
+// Point (captures different types of points)
+message Point {
+  oneof point_type {
+    LatLngAlt lat_lng = 1;
+    UTM utm = 2;
+    LanePoint lane_relative = 3;
+  }
+}
+
+// Lat/Lng/Alt type of point
+message LatLngAlt {
+  double lat = 1;
+  double lng = 2;
+  double alt = 3;
+}
+
+// UTM type of point
+message UTM {
+  double x = 1;
+  double y = 2;
+  double z = 3;
+  UTMProjection proj = 4;
+}
+
+// Builtin Coordinate System Description for World Geodetic System 1984.
+// This is a geodetic coordinate system (lat, lng, alt).
+message WGS84 {
+  // (OPTIONAL): specify a lat/long area of interest to make optimizations in the simulator.
+  Range64 latitude_range = 1;
+  Range64 longitude_range = 2;
+}
+
+// Builtin Coordinate System Description for Universal Transverse Mercator system.
+// This is a projected coordinate system (x, y, z).
+message UTMProjection {
+  // The UTM zone number.
+  int32 zone = 1;
+  // Flag indicating whether or not this UTM zone is in the northern hemisphere.
+  bool north = 2;
+}
+
+// Builtin Coordinate System Description for GeographicLib LocalCartesian system.
+// This is a projected coordinate system (x, y, z).
+message LocalCartesianProjection {
+  double latitude_origin = 1;   // degrees, in WGS 84 coordinate reference system.
+  double longitude_origin = 2;  // degrees, in wGS 84 coordinate reference system.
+  // Altitude above the WGS84 reference ellipsoid (meters).
+  double altitude_origin = 3;
+}
+
+// Builtin Coordinate System Description for a Lambert Conformal Conic projection.
+// This is a projected coordinate system (x, y, z).
+// These parameters should match the parameters defined by the proj4js library,
+// which can be referenced at https://proj.org/operations/projections/lcc.html.
+message LambertConformalConicProjection {
+  double standard_latitude_1 = 1;
+  double standard_latitude_2 = 2;
+  double central_meridian = 3;
+
+  // (OPTIONAL) False easting value added to x coordinates. Defaults to 0.
+  double false_easting = 4;
+
+  // (OPTIONAL) False northing value added to y coordinates. Defaults to 0.
+  double false_northing = 5;
+
+  // (OPTIONAL) Value used to defined the latitude of the origin together with false northing.
+  // Only used in proj, do not use if using geographiclib.
+  double latitude_origin = 6;
+}
+
+// Builtin Coordinate System Description for a Transverse Mercator projection.
+// This is a projected coordinate system (x, y, z).
+message TransverseMercatorProjection {
+  // (REQUIRED) Longitude origin of the transverse mercator projection.
+  double central_meridian = 1;
+
+  // (OPTIONAL) Scale factor. Defaults to 0.9996 to match UTM projection scale factor.
+  double scale_factor = 2;
+
+  // (OPTIONAL) False easting value added to x coordinates. Defaults to 0.
+  double false_easting = 3;
+
+  // (OPTIONAL) False northing value added to y coordinates. Defaults to 0.
+  double false_northing = 4;
+}
+
+// Specification of a coordinate reference system.
+message CoordinateSystemDescription {
+  oneof coordinate_system {
+    // Geodetic Coordinate Reference Systems.
+    WGS84 wgs84 = 1;
+
+    // Projected Coordinate Reference Systems.
+    // NOTE: Currently all projected systems are with respect to the WGS84 datum.
+    UTMProjection utm = 2;
+    LocalCartesianProjection local_cartesian = 3;
+    LambertConformalConicProjection lcc = 4;
+    TransverseMercatorProjection tmerc = 5;
+  }
+}
+
+// Topological point
+message LanePoint {
+  // The lane on which to place the point at the given s and t.
+  string lane_id = 1;
+  // Length along lane central curve.
+  double s = 2;
+  // Lateral offset from the lane central curve. Left is positive.
+  double t = 3;
+}
+
+message Vector2 {
+  double x = 1;
+  double y = 2;
+}
+
+message Vector3 {
+  double x = 1;
+  double y = 2;
+  double z = 3;
+}
+
+// A 3D vector with single-precision floating point components.
+message Vector3f {
+  float x = 1;
+  float y = 2;
+  float z = 3;
+}
+
+message RGB {
+  float r = 1;
+  float g = 2;
+  float b = 3;
+}
+
+message RGBA {
+  float r = 1;
+  float g = 2;
+  float b = 3;
+  float a = 4;
+}
+
+message Range {
+  float min = 1;
+  float max = 2;
+}
+
+// Same as Range but with 64 bit precision.
+message Range64 {
+  double min = 1;
+  double max = 2;
+}
+
+message CommonResponse {
+  enum Status {
+    UNDEFINED = 0;  // Sentinel. You should never see this.
+    SUCCESS = 1;    // Everything went well.
+    EXCEPTION = 2;  // An exception occured. See exception field for details.
+  }
+
+  message Exception {
+    string type_name = 1;
+    string exception_message = 2;
+    string traceback = 3;
+  }
+
+  Status status = 1;
+  Exception exception = 2;  // Filled in when status == EXCEPTION.
+}
+
+// A key/value pair of data that is sent from the simulator to the stack. Can contain string or
+// numeric values.
+message DataPoint {
+  // The name of the data point.
+  string name = 1;
+  oneof value_type {
+    // A float value for the data point.
+    double value = 2;
+    // A string value for the data point.
+    string string_value = 3;
+  }
+  // If true, send a data point every time step. ONLY used in ego triggered data points.
+  // If false, will send a data point once or turn off an already "on" persistent data point.
+  // In V1 API, sends a data point on every simulation tick.
+  // In V2 API, sends a data point at same rate as TRIGGERS channel.
+  // In order to turn off a persistent data point, send a data point with the same
+  // "name" field with persistent set to false.
+  bool persistent = 4;
+
+  // The units of the data point.
+  oneof unit_type {
+    string string_unit = 5;
+  }
+}
+
+message TimestampedDataPoint {
+  DataPoint data_point = 1;
+  google.protobuf.Timestamp sim_time = 2;
+}
+
+// A (string/string) message that can be sent from the simulator to the stack.
+message Message {
+  // The name of the message.
+  string name = 1;
+  // The value contained in the message.
+  string value = 2;
+  // If true, send message every time step. ONLY used in ego triggered messages.
+  // If false, will send message once or turn off already "on" persistent message.
+  // In V1 API, sends message on every simulation tick.
+  // In V2 API, sends message at same rate as TRIGGERS channel.
+  // In order to turn off a persistent message, send a message with the same
+  // "name" field with persistent set to false.
+  bool persistent = 3;
+}
+
+message ObserverEvent {
+  string name = 1;
+  double value = 2;
+  bool passed = 3;
+  double threshold = 4;
+  bool override_timestamp = 5;
+  double timestamp = 6;
+  bool is_optional = 7;
+}
+
+// The status of an observer run during the sim
+message ObserverResult {
+  string name = 1;       // Name of the observer
+  bool passed = 2;       // True if the observer passed
+  bool is_optional = 3;  // True if the observer is optional
+}
+
+// Sent to the interface at the end of a sim (but before Finalize)
+message SimulationSummary {
+  repeated ObserverResult observer_results = 1;  // List of observer statuses
+}
+
+message ScenarioMetadata {
+  string filename = 1;
+  string metadata_name = 2;
+}
+
+message CustomDataPointMetadata {
+  string name = 1;
+  EnumPlotMetadata enum_plot_metadata = 2;
+  string units = 3;
+
+  enum DataPointLevel {
+    // This data point will be reported many times in a simulation,
+    // and should be associated with the current sim time.
+    // If not specified, DataPointLevel will be PER_TICK by default.
+    PER_TICK = 0;
+    // This data point will be reported one time in a simulation,
+    // and should be associated with the overall simulation.
+    // If reported multiple times, an error will be raised.
+    PER_SIM = 1;
+  }
+  DataPointLevel data_point_level = 4;
+}
+
+message EnumPlotMetadata {
+  map<int32, string> enum_mapping = 1;
+}
+
+// Use this message for bool fields that can be unset.
+// (Note: the alternative, google.protobuf.BoolValue, is not compatible
+// with Simian's scenario parsing).
+message BoolValue {
+  bool value = 1;
+}
+
+// Use this message to send time-series struct data for message timing and hierarchical plots.
+message TimestampedStruct {
+  string name = 1;
+  google.protobuf.Struct struct = 2;
+
+  oneof time {
+    // This provides a specific sim_time to associate this struct to. May be used when we know the
+    // exact sim time, e.g. a log message.
+    google.protobuf.Timestamp sim_time = 3;
+
+    // This tells the simulator to associate this struct to the latest simulator tick. May be used
+    // when sending a TimestampedStruct to ADP in a middleware listener for a Stack -> ADP message.
+    Empty infer_sim_time = 4;
+  }
+}
+
+// <!-- Next ID: 8 -->
+message CustomField {
+  string name = 1;
+  oneof value {
+    string string_value = 2;
+    double number_value = 3;
+    bool bool_value = 4;
+    RepeatedString repeated_string_value = 7;
+  }
+  bool is_user_editable = 5;
+
+  enum SourceType {
+    INVALID = 0;
+    DRIVE = 1;
+    SIMULATION = 2;
+  }
+  SourceType source_type = 6;
+
+  message RepeatedString {
+    repeated string values = 1;
+  }
+}
+
+message KeyValuePair {
+  string key = 1;
+  oneof value {
+    string string_value = 2;
+    double double_value = 3;
+  }
+}
+
+// Selects a value for a key in the scenario configuration (runtime-configuration) for a scenarios,
+// defined in the scenario_configs section in the .scn.yaml. To run a scenario that uses this
+// feature, you need to provide a value for each key defined in the scenario_configs section,
+// otherwise the scenario cannot be executed.
+message ScenarioConfig {
+  string config_key = 1;
+  string config_value = 2;
+}
+
+// Selects a value for a key in the test configuration for a scenario, which is specified in the
+// test_config_mapping section in the .scn.yaml. To run a scenario that uses this feature,
+// you need to provide a scenario config preset value, which enumerates each key defined in the
+// scenario_configs section, otherwise the scenario cannot be executed.
+message TestConfigurationIdentifier {
+  string name = 1;
+}
+
+message VersionMajorMinor {
+  int32 major_version = 1;
+  int32 minor_version = 2;
+}
+
+message IsServingRequest {}
+
+message IsServingResponse {}

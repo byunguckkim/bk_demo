@@ -1,0 +1,363 @@
+// Copyright (C) 2021 Applied Intuition, Inc. All rights reserved.
+// This source code file is distributed under and subject to the LICENSE in
+// license.txt.
+
+syntax = "proto3";
+
+package simian_public.hdmap;
+
+import "applied/simian/public/proto/geometry.proto";
+import "applied/simian/public/proto/map/map_enums.proto";
+import "applied/simian/public/proto/map/map_validation.proto";
+import "applied/simian/public/proto/spatial.proto";
+
+message SemanticMapHeader {
+  uint64 base_map_hash = 1;
+  // Version of the release in which this semantic map was generated, e.g. 1.29.26.
+  string release_version = 2;
+}
+
+// <!--Next ID: 6-->
+message SemanticPoint {
+  simian_public.common.PointENU point = 1;
+  // Curvature of lane, as 1/radius in inverse meters.
+  // Should range [0, 1], where 0 is completely straight and > 0.033 is relatively curvy.
+  double curvature = 2;
+  // Radius of curvature, in meters.
+  // This value is equivalent to 1/curvature above.
+  double curvature_radius = 5;
+  // Longitudinal grade, as a decimal (i.e. longitudinal_grade = 0.2 -> 20%).
+  double longitudinal_grade = 3;
+  // Lateral grade, as a decimal (i.e. lateral_grade = 0.2 -> 20%).
+  double lateral_grade = 4;
+}
+
+// <!--Next ID: 57-->
+message SemanticLane {
+  /* MAP ANALYSIS
+   * Fields that are relevant for map analysis. */
+  string lane_id = 1;
+  repeated SemanticPoint point = 2;
+  // Length, in meters.
+  double length = 3;
+  // Speed limit, in meters/second.
+  double speed_limit = 4;
+  repeated string predecessor_id = 5;
+  repeated string successor_id = 6;
+  // Immediately connected neighbors to left.
+  repeated string left_forward_id = 7;
+  // Recursively connected neighbors to left.
+  repeated string left_connected_forward_id = 19;
+  // Immediately connected neighbors to right.
+  repeated string right_forward_id = 8;
+  // Recursively connected neighbors to right.
+  repeated string right_connected_forward_id = 20;
+  repeated string left_reverse_id = 9;
+  repeated string right_reverse_id = 10;
+  // Closest merging lane for split type JOIN lanes.
+  repeated string join_adjacent_id = 47;
+  // Adjacent lanes for left and right turn lanes.
+  repeated string turn_lane_adjacent_id = 53;
+  // Number of lanes in the lane's "lane group".
+  // All lanes in the lane group are adjacent and in the same direction as the lane, including the
+  // lane itself.
+  uint32 num_lanes = 27;
+  simian_public.hdmap.LaneTypeEnum.LaneType type = 11;
+  string custom_type = 41;
+  simian_public.hdmap.LaneTurnEnum.LaneTurn turn = 12;
+  /**
+   * Populated only if intersection
+   * Let theta be the angle between the successor heading and the predecessor heading,
+   * offset to be between 0 and 360 deg
+   * If 0 < theta < 30 or 330 < theta < 360, turn is marked as no turn
+   * If 30 <= theta <= 150 then it is a left turn
+   * If 150 < theta < 210 then it is a U turn
+   * If 210 <= theta < 330 then it is a right turn
+   */
+  simian_public.hdmap.LaneTurnEnum.LaneTurn computed_turn = 52;
+  string custom_turn = 42;
+  // <!-- TODO(shrey): add custom tags as custom filters. -->
+  repeated string tag = 13;
+  // <!-- TODO(shrey): represent boundary type as list. -->
+  simian_public.hdmap.LaneBoundaryTypeEnum.LaneBoundaryType left_boundary_type = 14;
+  simian_public.hdmap.LaneBoundaryTypeEnum.LaneBoundaryType right_boundary_type = 15;
+  // Reference position used in query summary, computed from the first point on the central curve.
+  simian_public.common.PointENU start_position = 18;
+  double start_heading = 35;
+  // Width, in meters.
+  repeated double width = 21;
+  // Angle between lane and its left neighbors, in radians.
+  repeated double left_forward_angle = 22;
+  // Angle between lane and its right neighbors, in radians.
+  repeated double right_forward_angle = 23;
+  // Distance to next merge, in meters.
+  double distance_to_merge = 24;
+  // Distance to next branch, in meters.
+  double distance_to_branch = 25;
+  // Distance to next fork, in meters.
+  double distance_to_fork = 28;
+  // Distance to next join, in meters.
+  double distance_to_join = 29;
+  // Distance to next intersection, in meters.
+  double distance_to_intersection = 38;
+  enum SplitType {
+    // No split of type BRANCH, MERGE, FORK, or JOIN was detected.
+    NO_SPLIT = 0;
+    // All lanes in the current lane group are connected, and all lanes in the successor lane group
+    // are connected. The number of lanes in the current lane group is less than the number of
+    // lanes in the successor lane group.
+    BRANCH = 1;
+    // All lanes in the current lane group are connected, and all lanes in the successor lane group
+    // are connected. The number of lanes in the current lane group is greater than the number of
+    // lanes in the successor lane group.
+    MERGE = 2;
+    // All lanes in the current lane group are connected, but all lanes in the successor lane group
+    // are not connected.
+    FORK = 3;
+    // All lanes in the current lane group are not connected, but all lanes in the successor lane
+    // group are connected.
+    JOIN = 4;
+  }
+  SplitType split_type = 26;
+  bool intersection = 37;
+  // Angle of intersection. Only populated if intersection is true.
+  repeated double intersection_angle = 39;
+  bool non_autonomous_driving = 30;
+  // Id of lane(s) which overlap with the lane.
+  // Overlaps are computed during semantic map generation.
+  repeated string overlapping_lane = 36;
+  // Id of region(s) which correspond to the lane.
+  // Associations are directly populated in the region proto.
+  repeated string associated_region = 31;
+  // Id of region(s) which overlap with the lane.
+  // Overlaps are computed during semantic map generation.
+  repeated string overlapping_region = 32;
+  // Id of signal(s) which correspond to the lane.
+  // Associations are directly populated in the signal proto.
+  repeated string associated_signal = 33;
+  // Id of sign(s) which correspond to the lane.
+  // Associations are directly populated in the sign proto.
+  repeated string associated_sign = 34;
+  // Associations are directly populated in the line proto.
+  repeated string associated_line = 49;
+  simian_public.hdmap.LaneSurfaceEnum.LaneSurface lane_surface = 40;
+  string custom_lane_surface = 43;
+  // The minimum cumulative distance succeeding the lane segment, not including the length of the
+  // lane segment. For example, a succeeding distance of 100m would mean that there is 100 meters
+  // of total lane segment length succeeding the lane segment.
+  double succeeding_distance = 44;
+  // The minimum cumulative distance preceding the lane segment, not including the length of the
+  // lane segment. For example, a preceding distance of 100m would mean that there is 100 meters
+  // of total lane segment length preceding the lane segment.
+  double preceding_distance = 45;
+  // The sum of the length of the lane segment and succeeding distance. Conceptually, this is
+  // the "runway" to place obstacles relative to the start of the lane segment (i.e. how far
+  // a vehicle could drive if placed at the start of the lane segment).
+  double runway_distance = 46;
+  // Ids of the georegions that the lane belongs to.
+  repeated string associated_georegion = 48;
+  // The bounding box for the lane.
+  message Bounds {
+    double min_x = 1;
+    double min_y = 2;
+    double max_x = 3;
+    double max_y = 4;
+  }
+  Bounds bounds = 50;
+
+  /* MAP VALIDATION
+   * Fields that are relevant for map validation. */
+  repeated LaneError lane_error = 16;
+  repeated LaneWarning lane_warning = 17;
+  repeated CustomCheck custom_lane_check = 51;
+  // The semantic lane group that this lane belongs to.
+  // A lane group is a bi-directional collection of lanes,
+  // e.g. all the lanes of a 2-way street.
+  string lane_group_id = 54;
+  // The semantic intersection that this lane belongs to.
+  string intersection_id = 55;
+  // Whether or not this lane is part of a junction.
+  bool is_junction = 56;
+}
+
+// <!--Next ID: 3-->
+message SemanticLaneGroup {
+  string lane_group_id = 1;
+  // All lanes in this lane group (bi-directional).
+  repeated string lane_id = 2;
+}
+
+// <!--Next ID: 9-->
+message SemanticIntersection {
+  string intersection_id = 1;
+  // All lanes that are part of this intersection.
+  repeated string lane_id = 2;
+  // All incoming/outgoing lane groups for this intersection.
+  repeated string lane_group_id = 3;
+  // All incoming lane groups for this intersection.
+  repeated string incoming_lane_group_id = 5;
+  // All outgoing lane groups for this intersection.
+  repeated string outgoing_lane_group_id = 6;
+  // Whether or not this intersection is a junction.
+  // Determined by a heading angle heuristic on the lane groups.
+  bool is_junction = 4;
+  enum IntersectionType {
+    // For backward compatibility, reserve 0 for when no type has been set.
+    UNSET = 0;
+    // Default if no specific type has been detected.
+    UNKNOWN = 1;
+    // Custom type to be specified by user in custom_type.
+    CUSTOM = 2;
+    // Three-leg intersection with near right angles (+/- 30 degrees).
+    THREE_WAY = 3;
+    // Four-leg intersection with near right angles (+/- 30 degrees).
+    FOUR_WAY_CROSS = 4;
+    // Four-leg intersection where two opposite legs are offset (not collinear).
+    FOUR_WAY_STAGGERED = 5;
+    // Five-leg intersection.
+    FIVE_WAY = 6;
+    // Six-leg intersection.
+    SIX_WAY = 7;
+    // Three-leg intersection where two angles between legs are >= 120 degrees.
+    Y_TYPE = 8;
+    // Four-leg intersection where two angles between legs are >= 120 degrees.
+    X_TYPE = 9;
+    // Traffic circle.
+    ROUNDABOUT = 10;
+  }
+  IntersectionType type = 7;
+  // User-defined string for the type when IntersectionType.CUSTOM is specified above.
+  string custom_type = 8;
+}
+
+// <!--Next ID: 15-->
+message SemanticRegion {
+  string region_id = 1;
+  // Points that store semantic information about the region boundary.
+  repeated SemanticPoint point = 9;
+  // Semantic type of region taken from enumeration in map_enums.proto.
+  simian_public.hdmap.RegionTypeEnum.RegionType type = 2;
+  // Name of custom region type if using region type CUSTOM.
+  string custom_type = 3;
+  // Id of lane(s) which correspond to the region.
+  // Associations are directly populated in the region proto.
+  repeated string associated_lane = 4;
+  // Id of lane(s) which overlap with the region.
+  // Overlaps are computed during semantic map generation.
+  repeated string overlapping_lane = 8;
+  // Id of predecessor regions.
+  repeated string predecessor_id = 5;
+  // Id of successor regions.
+  repeated string successor_id = 6;
+  // Speed limit of the region, in meters per second.
+  double speed_limit = 7;
+  repeated string tag = 12;
+  // Reference position used in query summary, computed from the first point of the polygon.
+  simian_public.common.PointENU reference_position = 13;
+
+  /* MAP VALIDATION
+   * Fields that are relevant for map validation. */
+  repeated RegionError region_error = 10;
+  repeated RegionWarning region_warning = 11;
+  repeated CustomCheck custom_region_check = 14;
+}
+
+// <!--Next ID: 6-->
+message SemanticSubsignal {
+  string subsignal_id = 1;
+  simian_public.hdmap.SubsignalTypeEnum.SubsignalType type = 2;
+  string custom_type = 4;
+  simian_public.hdmap.SubsignalColorEnum.SubsignalColor color = 3;
+  string custom_color = 5;
+}
+
+// <!--Next ID: 9-->
+message SemanticSignal {
+  string signal_id = 1;
+  // Semantic type of signal taken from enumeration in map_enums.proto.
+  simian_public.hdmap.SignalTypeEnum.SignalType type = 2;
+  string custom_type = 6;
+  // Associations are directly populated in the signal proto.
+  repeated string associated_lane = 3;
+  // Position and orientation of the signal block. The +X axis of the signal
+  // points from the center of the signal "forward" in the direction the light
+  // is shining. The +Z axis is always vertically upward.
+  simian_public.spatial.Pose pose = 4;
+  repeated SemanticSubsignal subsignal = 5;
+  repeated string tag = 7;
+  // Reference position used in query summary, computed from the pose.
+  simian_public.common.PointENU reference_position = 8;
+}
+
+// <!--Next ID: 13-->
+message SemanticSign {
+  string sign_id = 1;
+  // Semantic type of sign taken from enumeration in map_enums.proto.
+  simian_public.hdmap.SignTypeEnum.SignType type = 2;
+  // Name of custom sign type if using sign type CUSTOM.
+  string custom_type = 3;
+  // Message that appears on the sign.
+  string sign_message = 4;
+  // Speed limit only set when type is SPEED_LIMIT.
+  // Units map directly to raw map data.
+  double speed_limit = 5;
+  // Associations are directly populated in the sign proto.
+  repeated string associated_lane = 6;
+  // Semantic color of sign taken from enumeration in map_enums.proto.
+  simian_public.hdmap.SignColorEnum.SignColor color = 7;
+  // Name of custom sign color if using sign color CUSTOM_COLOR.
+  string custom_color = 8;
+  // Semantic shape of sign taken from enumeration in map_enums.proto.
+  simian_public.hdmap.SignShapeEnum.SignShape shape = 9;
+  // Name of custom sign shape if using sign type CUSTOM_SHAPE.
+  string custom_shape = 10;
+  repeated string tag = 11;
+  // Reference position used in query summary, computed from the first point of the polygon.
+  simian_public.common.PointENU reference_position = 12;
+}
+
+// <!--Next ID: 7-->
+message SemanticLine {
+  string line_id = 1;
+  simian_public.hdmap.LineTypeEnum.LineType type = 2;
+  // Name of custom line type if using line type CUSTOM.
+  string custom_type = 3;
+  repeated string tag = 4;
+  // Reference position used in query summary, computed from the first point on the curve.
+  simian_public.common.PointENU reference_position = 5;
+  // Associations are directly populated in the line proto.
+  repeated string associated_lane = 6;
+}
+
+// <!--Next ID: 9-->
+message SemanticMap {
+  SemanticMapHeader header = 2;
+  repeated SemanticLane lane = 1;
+  repeated SemanticRegion region = 3;
+  repeated SemanticSignal signal = 4;
+  repeated SemanticSign sign = 5;
+  repeated SemanticLine line = 6;
+  repeated SemanticLaneGroup lane_group = 7;
+  repeated SemanticIntersection intersection = 8;
+}
+
+message SemanticMapObject {
+  oneof object {
+    SemanticLane lane = 1;
+    SemanticRegion region = 2;
+    SemanticSignal signal = 3;
+    SemanticSign sign = 4;
+    SemanticLine line = 5;
+  }
+}
+
+message SemanticMapStatus {
+  enum Status {
+    UNKNOWN = 0;
+    NOT_GENERATED = 1;
+    GENERATING = 2;
+    GENERATED = 3;
+    ERROR = 4;
+  }
+  Status status = 1;
+}

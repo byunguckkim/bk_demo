@@ -1,0 +1,43 @@
+// Copyright (C) 2020 Applied Intuition, Inc. All rights reserved.
+// Copyright (C) 2020 Applied Intuition, Inc. All rights reserved.
+// This source code file is distributed under and subject to the LICENSE in
+// license.txt
+
+syntax = "proto3";
+
+package public_query;
+
+import "google/protobuf/struct.proto";
+
+service QueryService {
+  rpc Query(QueryRequest) returns (QueryResponse) {}
+}
+
+message QueryRequest {
+  string graphql_query = 1;
+  string auth_token = 2;     // This is needed for rainbow query.
+  bool struct_response = 3;  // Respond with protobuf struct rather than JSON.
+  // A map from variable names to values.
+  // Names must be strings, but values can be numbers, strings, booleans, or enums or objects
+  // defined by our schema. For example { "yamlFileName": "test.scn.yaml", "batchRunId": 5 }.
+  google.protobuf.Struct graphql_variables = 4;
+  string origin = 5;  // The origin of this QueryRequest, usually the "class/function_name" (e.g.
+  // Workspace/getWorkspaces)
+}
+
+message QueryResponse {
+  repeated string error_message = 2;
+  oneof result {
+    string result_json = 3;
+    google.protobuf.Struct result_struct = 4;
+  }
+  // reserved 1;
+}
+
+message PaginationRequest {
+  string before = 1;
+  string after = 2;
+  int32 first = 3;
+  int32 last = 4;
+  bool skip_total_count = 5;
+}

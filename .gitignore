@@ -1,0 +1,27 @@
+
+# build output
+*.so
+*.o
+*.a
+*.gch
+bazel-bin/
+bazel-simian/
+bazel-testlogs/
+bazel-out/
+build/
+mounted_build/
+
+# temporary files
+*~
+
+/.idea
+/.docker_start_config
+/.vscode
+/.vs
+
+# Do not version control generated code
+*.pb.cc
+*.pb.h
+
+# For ROS integrations, ignore symlinked top-level CMake.
+src/CMakeLists.txt

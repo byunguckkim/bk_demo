@@ -1,0 +1,84 @@
+// Copyright (C) 2020 Applied Intuition, Inc. All rights reserved.
+// This source code file is distributed under and subject to the LICENSE in license.txt
+
+syntax = "proto3";
+
+package simian_public.scenario;
+
+import "applied/simian/public/proto/environment.proto";
+import "applied/simian/public/proto/helix_common.proto";
+import "applied/simian/public/proto/motion_model.proto";
+import "applied/simian/public/proto/scenario/common.proto";
+import "applied/simian/public/proto/scenario/sensor_config.proto";
+import "applied/simian/public/proto/scenario/simulink_config.proto";
+import "applied/simian/public/proto/scenario/vehicle_config.proto";
+import "applied/simian/public/proto/scenario/vehiclesim_config.proto";
+import "applied/simian/public/proto/sensor_sim/image_mapping.proto";
+import "applied/simian/public/proto/sensor_sim/labels.proto";
+import "applied/simian/public/proto/shape.proto";
+import "applied/simian/public/proto/spatial.proto";
+
+// A short description containing useful information contained in the scenario for the stack.
+// <!-- Next id: 18 -->
+message ScenarioDigest {
+  ScenarioMetadata scenario_metadata = 1;
+  SensorConfig sensor_config = 2;
+
+  // The selected motion model for the simulation run.
+  simian_public.motion_model.Description motion_model = 3;
+  // The vehicle shape polygon specified in the scenario.
+  simian_public.shape.Shape vehicle_shape = 4;
+  // The configuration of any trailers for the vehicle that the scenario specified.
+  repeated simian_public.scenario.TrailerConfig trailers = 5;
+  // The weather specified in the scenario for Spectral.
+  simian_public.environment.Weather weather = 6;
+
+  // Represents which sample (a.k.a. leaf or child) from a parameter
+  // sweep this scenario is.
+  ParameterSweep parameter_sweep = 7;
+
+  repeated simian_public.sensor_sim.labels.LabelRequest label_requests = 8;
+
+  // Info from configured observers from the scenario
+  repeated ObserverInfo observers = 9;
+
+  // Set to true if the scenario has sandbox mode enabled
+  bool sandbox_mode = 10;
+  repeated simian_public.sensor_sim.ImageMapping image_mappings = 11;
+
+  // File name of scenario for external simulator. Empty when using Simian.
+  string external_filename = 12;
+  // Configuration used to configure Simulink co-sim startup.
+  simian_public.proto.scenario.simulink_config.SimulinkConfig simulink_config = 13;
+  // Compiled configuration of CarSim models, based on the scenario YAML.
+  simian_public.proto.scenario.vehiclesim_config.CompiledVehiclesimConfig vehiclesim_config = 14;
+
+  // The stack modules that are under test in the current simulation.
+  repeated ModuleUnderTest stack_modules_under_test = 15;
+  // Contains configuration for Helix when Helix Scenarios are run, otherwise empty
+  simian_public.helix_common.HelixFields helix = 16;
+
+  // Transform Forest frames defined for the ego under vehicle: frames:.
+  repeated simian_public.spatial.TransformNode ego_frames = 17;
+}
+
+message ScenarioMetadata {
+  string filename = 1;
+  string metadata_name = 2;
+
+  // If this scenario extracted from a Strada event, the
+  // extracted event's uuid will be included in the scenario metadata.
+  string event_uuid = 3;
+
+  // List of scenario tags.
+  // Populated through the scenario description, under `metadata.tags`.
+  repeated string tags = 4;
+}
+
+message ObserverInfo {
+  string name = 1;
+}
+
+message ModuleUnderTest {
+  string name = 1;
+}

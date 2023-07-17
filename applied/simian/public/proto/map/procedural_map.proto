@@ -1,0 +1,183 @@
+// Copyright (C) 2021 Applied Intuition, Inc. All rights reserved.
+// This source code file is distributed under and subject to the LICENSE in
+// license.txt
+
+syntax = "proto3";
+
+package simian_public.procedural_map;
+
+import "applied/simian/public/proto/actor.proto";
+import "applied/simian/public/proto/common.proto";
+import "applied/simian/public/proto/drawing.proto";
+import "applied/simian/public/proto/geometry.proto";
+import "applied/simian/public/proto/scenario/common.proto";
+import "applied/simian/public/proto/sensor_sim/models.proto";
+import "applied/simian/public/proto/spatial.proto";
+
+message ProceduralMapMetadata {
+  // The simian version that the procedural map was originally created in.
+  // Looks something like "1.37.23". This value will be used in order to ensure
+  // backwards compatibility with Applied assets. This value should not change
+  // once it is set, as it may affect the look of the objects in procedural map.
+  string version_created = 1;
+}
+
+// List of objects to spawn in the scene
+message ProceduralMap {
+  repeated SpawnableObject objects = 1;
+  // These zones are ingested from Houdini .geo files. Procedural objects can be
+  // placed in these zones using the map edits proto.
+  repeated ProceduralZone procedural_zones = 6;
+  // This is filled in the procedural_map_editor with the UTM information
+  // from the map_service.
+  simian_public.common.UTM world_p_map_origin = 3;
+
+  ProceduralMapMetadata map_metadata = 5;
+
+  // Generators should not be used. They are not supported.
+  repeated Generator generators = 2;
+  // reserved 4;  // Removed field, do not use.
+}
+
+// Minimum data needed to spawn an object in the scene
+message SpawnableObject {
+  // This should be uint32 but to not to break compatibility with already
+  // generated files, we will just use the positive values.
+  // This must be a unique id for each object in the scene.
+  int64 id = 1;
+
+  // The asset identifier is used to identify the asset that should be spawned.
+  oneof asset_identifier {
+    // Enum with all the spectral models available in our database. Must use the
+    // spectral_metadata_service to fetch information associated with this identifier.
+    simian_public.sensor_sim.models.SpectralModel.SpectralModelEnum spectral_model = 7;
+
+    // Unique identifier attached to each asset. Must use the new asset database to
+    // fetch information associated with the guid.
+    string guid = 8;
+
+    // Path to asset in unreal. This will be populated when running a spectral sim.
+    // This should not be saved to disk so that we do not have any unintentional
+    // dependencies on assets when we start to update assets.
+    string path_to_asset = 9;
+  }
+
+  // <!-- TODO(marc): "pose" and "scale" should be replaced by ScaledPose -->
+  // Pose local to the map frame (the "start_location" in "map_config.pb.txt").
+  simian_public.spatial.Pose pose = 4;
+  float scale = 5;
+
+  // Some assets require additional configuration to be spawned. This is
+  // not required for all assets.
+  simian_public.actor.AssetConfig asset_config = 10;
+
+  //
+  // All fields below this point are unused.
+  //
+
+  int32 generator_id = 2 [deprecated = true];
+
+  // Do not use this field. This will be deprecated in favor of asset_identifier.
+  string asset_id = 3;
+
+  // Currently not used. Object's attribute: color, state, material...
+  map<string, string> attributes = 6;
+}
+
+message ProceduralZone {
+  repeated ProceduralZoneTag zone_tags = 1;
+  simian_public.scenario.Region geometry = 2;
+  simian_public.drawing.Color color = 3;
+}
+
+enum ProceduralZoneTag {
+  // <!-- TODO(divi): Move this into its own file -->
+  _UNUSED = 0;
+
+  // Road zones.
+  ROAD_SURFACE = 1;
+  SHOULDER = 2;
+  DRIVEABLE_SURFACE = 3;
+  KEEP_OFF_SURFACE = 4;
+  // reserved 5 to 999;
+
+  // Parking zones.
+  PARKING_LOT = 1000;
+  PARKING_SPACE = 1001;
+  // reserved 1002 to 1999;
+
+  // Mixed use zones.
+  CROSSWALK = 2000;
+  GUTTER = 2001;
+  // reserved 2002 to 2999;
+
+  // Pedestrian Zones.
+  SIDEWALK = 3000;
+  CURB = 3001;
+  PLANTER = 3002;
+  MEDIAN = 3003;
+  // reserved 3004 to 3999;
+
+  // Structure zones.
+  Building = 4000;
+  // reserved 4001 to 4999;
+
+  // Nature Zones.
+  FOREST = 5000;
+  GRASS = 5001;
+  FIELD = 5002;
+  WATER = 5003;
+  // reserved 5004 to 9999;
+
+  // Splines zones.
+  ROAD_EDGE = 10000;
+  GUTTER_EDGE = 10001;
+  CURB_EDGE = 10002;
+  SIDEWALK_EDGE = 10003;
+  BARRIER_EDGE = 10004;
+  GUARDRAIL = 10005;
+  // reserved 10006 to 10999;
+}
+
+//
+// ALL MESSAGES BELOW THIS POINT ARE UNUSED.
+//
+
+// Selectors should not be used. They are not supported.
+message ObjectSelector {
+  repeated string wildcards = 1;
+}
+
+// Generators should not be used. They are not supported.
+message Generator {
+  int32 id = 1;
+  oneof generator {
+    GeneratorAddObjectInTransform add_object_in_transform = 2;
+    GeneratorDelObjectById delete_objects_by_id = 3;
+    GeneratorAddObjectsInPolygon add_objects_in_polygon = 4;
+    GeneratorDelObjectsInPolygon delete_objects_in_polygon = 5;
+  }
+}
+
+// Generators should not be used. They are not supported.
+message GeneratorAddObjectInTransform {
+  ObjectSelector object_selection = 1;
+  simian_public.spatial.Pose pose = 2;
+}
+
+// Generators should not be used. They are not supported.
+message GeneratorDelObjectById {
+  int32 object_id = 1;
+}
+
+// Generators should not be used. They are not supported.
+message GeneratorAddObjectsInPolygon {
+  ObjectSelector object_selection = 1;
+  repeated simian_public.common.PointENU polygon = 2;
+}
+
+// Generators should not be used. They are not supported.
+message GeneratorDelObjectsInPolygon {
+  ObjectSelector object_selection = 1;
+  repeated simian_public.common.PointENU polygon = 2;
+}

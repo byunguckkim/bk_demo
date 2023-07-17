@@ -1,0 +1,104 @@
+// Copyright (C) 2022 Applied Intuition, Inc. All rights reserved.
+// This source code file is distributed under and subject to the LICENSE in license.txt
+
+syntax = "proto3";
+
+package simian_public.proto.scenario.vehiclesim_config;
+
+import "applied/simian/public/proto/common.proto";
+import "applied/simian/public/proto/field_options.proto";
+
+// <!-- Next ID: 5 -->
+// User-facing scenario YAML
+message VehiclesimConfig {
+  // Specify the carsim.adp file used to specify the CarSim vehicle model.
+  string vehicle_model_name = 1;
+  // Specify the VS variables to override vehicle parameters.
+  map<string, double> variable_overrides = 2;
+  // HPC licensing address configuration. This field is optional.
+  oneof hpc_licensing {
+    // HPC licensing address: an empty string indicates no HPC license and would remove the
+    // HPC_LICENSING_ADDRESS field in your Vehiclesim model if one is defined.
+    string hpc_licensing_address = 3;
+  }
+  // Terrain version 0.1:
+  //   - If using Simulink, the terrain is sent to VehicleSim using import variables at a slower
+  //   rate.
+  //   - Otherwise, VehicleSim models drive on flat terrain.
+  // Terrain version 0.2 (default):
+  //   - VehicleSim models drive on VS terrain.
+  simian_public.common.VersionMajorMinor terrain_version = 4;
+}
+
+message DriverModels {
+  // Available longitudinal driver models implicitly compiled through the predicted control config.
+  enum LongitudinalDriverModels {
+    NONE_LONG = 0;
+    // Outputs simian_public.motion_model.NormalizedDBW output, using Simian predicted controls as
+    // the driver model.
+    SIMIAN_NORMALIZED_DBW_LONG = 1;
+    // Outputs a preview point, in the format of planar.State2d, and uses the CarSim target speed
+    // longitudinal driver model.
+    VEHICLESIM_TARGET_SPEED = 2;
+  }
+
+  // Available lateral driver models implicitly compiled through the predicted control config.
+  enum LateralDriverModels {
+    NONE_LAT = 0;
+    // Outputs simian_public.motion_model.NormalizedDBW output, using Simian predicted controls as
+    // the driver model.
+    SIMIAN_NORMALIZED_DBW_LAT = 1;
+    // Outputs a preview point, in the format of planar.State2d, and uses the CarSim preview point
+    // lateral driver model.
+    VEHICLESIM_PREVIEW_POINT = 2;
+  }
+  LongitudinalDriverModels longitudinal_model = 1;
+  LateralDriverModels lateral_model = 2;
+}
+
+message NamedVehiclesimVariableOverride {
+  // Name of the VehicleSim variable to override.
+  string name = 1;
+  // Value of the VehicleSim variable to override.
+  double value = 2;
+}
+
+// <!-- Next ID: 15 [last modified: louis] -->
+message CompiledVehiclesimConfig {
+  // carsim.adp file, as chosen above.
+  string vehicle_model_name = 1;
+  DriverModels driver_models = 2;
+  // Path of the simfile.sim. This path could be either in the customer container, on host, or in
+  // the simulator container depending on the platform and the vehiclesim configuration.
+  string simfile_path = 14;
+  // URI of staging dir zip (for cloud case)
+  string staging_zip_uri = 12;
+  // Path of the .vsterrain file. This path could be either in the customer container, on host, or
+  // in the simulator container depending on the platform and the vehiclesim configuration.
+  string vs_terrain_path = 9;
+  // List of VS variables to override: the values of these variables will not be defined in the
+  // Simfile but in the scenario YAML file instead.
+  repeated NamedVehiclesimVariableOverride override_variables = 13;
+  // [DEPRECATED] List of VS variables to override: the values of these variables will not be
+  // defined in the Simfile but will be defined in the scenario YAML file instead.
+  map<string, double> variable_overrides = 4
+      [deprecated = true, (field_options.ignore_in_autocomplete) = true];
+  // Rate at which the external model is run. This is matched from the yaml so that the number of
+  // states given to the external model matches the number of external ticks per simian tick.
+  double external_rate_hz = 6;
+  // HPC licensing address configuration.
+  oneof hpc_licensing {
+    // HPC licensing address.
+    string hpc_licensing_address = 8;
+  }
+  // Terrain version 0.1 (default):
+  //   - If using Simulink, the terrain is sent to VehicleSim using import variables at a slower
+  //   rate.
+  //   - Otherwise, VehicleSim models drive on flat terrain.
+  // Terrain version 0.2:
+  //   - VehicleSim models drive on VS terrain.
+  simian_public.common.VersionMajorMinor terrain_version = 10;
+  // reserved 3, 5, 7, 11;
+  // reserved 'simfile_location_on_host', 'simfile_location_in_container', 'simfile_location_in_optic';
+  // reserved 'vs_terrain_path_on_host';
+}

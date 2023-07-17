@@ -1,0 +1,353 @@
+// Copyright (C) 2019 Applied Intuition, Inc. All rights reserved.
+// This source code file is distributed under and subject to the LICENSE in
+// license.txt
+
+syntax = "proto2";
+
+package simian_public.hdmap;
+
+import "applied/simian/public/proto/map/map_common.proto";
+import "applied/simian/public/proto/map/map_geometry.proto";
+import "applied/simian/public/proto/map/map_id.proto";
+import "applied/simian/public/proto/map/map_validation.proto";
+
+// <!-- TODO(marc): remove after demo
+// Workaround to allow use the Enum from proto3. -->
+message TempLaneBoundaryType {
+  optional LaneBoundaryType.Type type = 1;
+}
+
+// Specifies the color and type of a particular lane boundary.
+message LaneBoundaryType {
+  // <!--Must be in sync with map_enums.proto-->.
+  // <!--Next ID: 25.-->
+  enum Type {
+    UNKNOWN = 0;
+    DOTTED_YELLOW = 1;
+    DOTTED_WHITE = 2;
+    SOLID_YELLOW = 3;
+    SOLID_WHITE = 4;
+    DOUBLE_YELLOW = 5;
+    DOUBLE_WHITE = 7;
+    CURB = 6;
+    ROAD_EDGE = 8;
+    DOUBLE_DOTTED_WHITE = 9;
+    DOUBLE_DOTTED_YELLOW = 24;
+
+    // In DOUBLE_{1}_{2}, {1} is leftmost lane boundary type, and {2} is rightmost
+    // based on the following direction of the lane. The same rule is applied to
+    // TRIPLE_{1}_{2}_{3} and QUARTET_{1}_{2}_{3}_{4}.
+    //
+    // For {1}-{4}, we use the following abbreviations for each boundary lane type.
+    //   SW := SOLID_WHITE
+    //   SY := SOLID_YELLOW
+    //   DW := DOTTED_WHITE
+    //   DY := DOTTED_YELLOW
+    //
+    // Note that when the lane boundary DOUBLE_SW_DW is located between the following
+    // lane and the opposite lane, the overlapping lane boundary for the opposite lane should
+    // set to DOUBLE_DW_SW.
+
+    DOUBLE_SW_DW = 10;
+    DOUBLE_DW_SW = 11;
+    DOUBLE_SW_SY = 12;
+    DOUBLE_SY_SW = 13;
+    DOUBLE_DW_SY = 14;
+    DOUBLE_SY_DW = 15;
+    DOUBLE_SY_DY = 22;
+    DOUBLE_DY_SY = 23;
+    TRIPLE_SW_SW_SY = 16;
+    TRIPLE_SY_SW_SW = 17;
+    TRIPLE_SY_SW_SY = 18;
+    TRIPLE_SY_DW_SY = 19;
+    QUARTET_SY_SW_SW_SY = 20;
+
+    // Virtual lane boundaries are places where there are no markings on the road, but where
+    // we may need a concept of lane boundary nonetheless. For instance, where two lanes merge,
+    // there can be a sub-segment of virtual boundary on the left side of the lane that is merging
+    // from the right. And vice-versa.
+    //
+    // Note that the older LaneBoundary.virtual flag can only express virtuality for an entire
+    // segment. With the VIRTUAL type enum, virtuality can be expressed for sub-segments.
+    VIRTUAL = 21;
+  }
+
+  // Note that we can in principle represent multiple type entries for a given (sub-) segment here.
+  // But in practice, only one type at a time really makes sense. Specifying multiple types here can
+  // lead to undefined behavior, with implementations picking up the first, the last, or some other
+  // entry. DisplayType: Editable. DisplayType: RepeatedToSingle. DisplayType: BlueprintName: type.
+  // DisplayType: HideName.
+  repeated Type types = 2;
+
+  // Offset relative to the starting point of boundary.
+  optional double s = 1;
+
+  // Free-form type information. The string values that are put in here will be reported back as-is
+  // by the lane sensor in the corresponding fields with the same names. Using strings is much more
+  // flexible for representing types in a customer map that do not have a corresponing enum value
+  // here or in the OSI classification.
+  optional string custom_type = 3;
+  // A custom string representing the color of the lane boundary type. Can be reported through the
+  // lane sensor.
+  optional string custom_color = 4;
+}
+
+// The outer bound of a lane. Can either be on the left or the right.
+// Contains geometric and visual information.
+message LaneBoundary {
+  // Contains geometric information about the shape of the lane boundary.
+  optional Curve curve = 1;
+
+  // Units: meters.
+  optional double length = 2;
+
+  // Indicates whether the lane boundary exists in real world.
+  //
+  // Note that this older flag applies to the entire lane segment. To express virtuality in a more
+  // fine-grained manner, set this flag to false and use the newer LaneBoundaryType.Type.VIRTUAL
+  // enum that can be stored in the repeated boundary_type field below.
+  optional bool virtual = 3;
+
+  // A list of the boundary types specified by their arc length along the boundary.
+  // Ordered by ascending s-value.
+  // DisplayType: NestedToFlatten.
+  // DisplayType: RepeatedToSingle.
+  // DisplayType: BlueprintName: type.
+  repeated LaneBoundaryType boundary_type = 4;
+
+  // Id assignment (road grouping, de-duping) handled case-by-base by map converters.
+  optional Id id = 5;
+}
+
+// Used to determine if an actor is on a merge lane. Not required to be filled in for querying for
+// merges.
+message MergeInfo {
+  // Indicator if this is the lane that transitions into another.
+  // The on_merge_lane trigger can be used when this is set to true.
+  optional bool is_transition_lane = 1;
+
+  // The distance from the start of this lane to the merge.
+  // The on_merge_lane trigger requires this value to be populated.
+  optional float distance_to_merge = 2;
+}
+
+// Represents the distance between a boundary of a lane and the centerline at a particular arc
+// length.
+message LaneSampleAssociation {
+  // The arc length along the lane.
+  optional double s = 1;
+  // The distance from the centerline to the point on the boundary.
+  optional double width = 2;
+}
+
+// A lane is part of a roadway, designated for use by a single line of vehicles.
+// Most public roads (include highways) have more than two lanes.
+// <!--Next ID: 35-->
+message Lane {
+  // DisplayType: Readonly.
+  // DisplayType: NestedToFlatten.
+  // A unique identifier for the lane.
+  optional Id id = 1;
+
+  // Central line as reference trajectory, not necessary to be the true center of the lane.
+  optional Curve central_curve = 2;
+
+  // Lane boundary curves. See the LaneBoundary message for enum values.
+  // DisplayType: NestedToFlatten.
+  optional LaneBoundary left_boundary = 3;
+  // Lane boundary curves. See the LaneBoundary message for enum values.
+  // DisplayType: NestedToFlatten.
+  optional LaneBoundary right_boundary = 4;
+
+  // Length of the lane in meters.
+  // DisplayType: Readonly.
+  optional double length = 5;
+
+  // Speed limit of the lane, in meters per second.
+  // DisplayType: Editable.
+  optional double speed_limit = 6;
+
+  // All lanes from which this lane can be driven into.
+  // DisplayType: Readonly.
+  // DisplayType: NestedToFlatten.
+  // DisplayType: Association.
+  repeated Id predecessor_id = 8;
+  // All lanes to which one can drive from this lane.
+  // DisplayType: Readonly.
+  // DisplayType: NestedToFlatten.
+  // DisplayType: Association.
+  repeated Id successor_id = 9;
+
+  // Neighboring lanes in the same direction on the left.
+  // DisplayType: Readonly.
+  // DisplayType: NestedToFlatten.
+  // DisplayType: Association.
+  repeated Id left_neighbor_forward_lane_id = 10;
+  // Neighboring lanes in the same direction on the right.
+  // DisplayType: Readonly.
+  // DisplayType: NestedToFlatten.
+  // DisplayType: Association.
+  repeated Id right_neighbor_forward_lane_id = 11;
+
+  // Specifies the semantic type of the lane.
+  // <!-- Must be in sync with map_enums.proto. -->
+  enum LaneType {
+    NONE = 1;
+    CITY_DRIVING = 2;
+    BIKING = 3;
+    SIDEWALK = 4;
+    PARKING = 5;
+    SHOULDER = 6;
+    BUS_ONLY = 7;
+    CUSTOM = 8;
+    ON_RAMP = 9;
+    EMERGENCY = 10;
+    HIGHWAY = 11;
+    SUBURBAN = 12;
+  }
+  // Specifies the semantic type of the lane.
+  // DisplayType: Editable.
+  optional LaneType type = 12;
+
+  // A user-defined string representing the type of the lane.
+  // Only populated when type is `CUSTOM`.
+  // DisplayType: Editable.
+  // DisplayType: OnlyDisplayIf: type, CUSTOM.
+  optional string custom_type = 29;
+
+  // Indicates if this lane is a turning lane.
+  // <!-- Must be in sync with map_enums.proto. -->
+  enum LaneTurn {
+    NO_TURN = 1;
+    LEFT_TURN = 2;
+    RIGHT_TURN = 3;
+    U_TURN = 4;
+    CUSTOM_TURN = 5;
+  }
+  // Indicates if this lane is a turning lane.
+  // DisplayType: Readonly.
+  optional LaneTurn turn = 13;
+
+  // Only populated when turn is `CUSTOM_TURN`.
+  // DisplayType: Readonly.
+  // DisplayType: OnlyDisplayIf: turn, CUSTOM_TURN.
+  optional string custom_turn = 30;
+
+  // Neighbor lanes in the opposite direction on the left.
+  // DisplayType: Readonly.
+  // DisplayType: NestedToFlatten.
+  // DisplayType: Association.
+  repeated Id left_neighbor_reverse_lane_id = 14;
+  // Neighbor lanes in the opposite direction on the right.
+  // DisplayType: Readonly.
+  // DisplayType: NestedToFlatten.
+  // DisplayType: Association.
+  repeated Id right_neighbor_reverse_lane_id = 15;
+
+  // Associated junction id.
+  // DisplayType: Readonly.
+  // DisplayType: NestedToFlatten.
+  // DisplayType: Association.
+  optional Id junction_id = 16;
+
+  // Association between central point to the left lane boundary.
+  // Typically left blank.
+  repeated LaneSampleAssociation left_sample = 17;
+  // Association between central point to the right lane boundary.
+  // Typically left blank.
+  repeated LaneSampleAssociation right_sample = 18;
+
+  // <!-- Must be in sync with map_enums.proto. -->
+  // Specifies the lane direction.
+  // FORWARD means that the lane's direction of travel is the same as the orientation of its
+  // centerline. BACKWARD means that the lane's direction of travel is the opposite as the
+  // orientation of its centerline. BIDIRIECTION means that an actor can travel in both directions
+  // along the centerline.
+  enum LaneDirection {
+    UNSET_DIRECTION = 0;
+    FORWARD = 1;
+    BACKWARD = 2;
+    BIDIRECTION = 3;
+    CUSTOM_DIRECTION = 4;
+  }
+  // DisplayType: Editable.
+  optional LaneDirection direction = 19;
+
+  // Only populated when direction is `CUSTOM_DIRECTION`.
+  // DisplayType: Editable.
+  // DisplayType: OnlyDisplayIf: direction, CUSTOM_DIRECTION.
+  optional string custom_direction = 34;
+
+  // Association between central point to the left road boundary.
+  // Typically left blank.
+  repeated LaneSampleAssociation left_road_sample = 20;
+  // Association between central point to the right road boundary.
+  // Typically left blank.
+  repeated LaneSampleAssociation right_road_sample = 21;
+
+  // The id of the lane that is on top of this lane but going in the opposite direction.
+  // Can be used to represent bidirectional lanes, but it is preferred to use type = BIDIRECTION.
+  repeated Id self_reverse_lane_id = 22;
+
+  // Information about the merge that this lane is a part of. Only considered for certain observers.
+  optional MergeInfo merge_info = 23;
+
+  // Custom tags that can be used to store semantic information about an element.
+  repeated CustomTag custom_tags = 24;
+
+  // <!--Must be in sync with map_enums.proto-->.
+  enum LaneSurface {
+    UNSET = 0;
+    UNKNOWN = 1;
+    ASPHALT = 2;
+    UNPAVED = 3;
+    PAVED = 4;
+    GROUND = 5;
+    CONCRETE = 6;
+    DIRT = 7;
+    STONE = 8;
+    SETT = 9;
+    COBBLESTONE = 10;
+    PEBBLESTONE = 11;
+    PAVING_STONES = 12;
+    UNHEWN_COBBLESTONE = 13;
+    CUSTOM_LANE_SURFACE = 14;
+  }
+  // The kind of surface that is on top of the lane. See LaneSurface for enum values.
+  // DisplayType: Editable.
+  // DisplayType: BlueprintName: surface.
+  optional LaneSurface lane_surface = 25;
+
+  // Only populated when lane_surface is `CUSTOM_LANE_SURFACE`.
+  // DisplayType: Editable.
+  // DisplayType: BlueprintName: custom_surface.
+  // DisplayType: OnlyDisplayIf: lane_surface, CUSTOM_LANE_SURFACE.
+  optional string custom_lane_surface = 31;
+
+  // Validation issues that were found during map conversion.
+  repeated ValidationCheck conversion_failures = 33;
+
+  // If true, this lane is one where an AV is not allowed to drive.
+  // DisplayType: Editable.
+  // DisplayType: BlueprintName: non_autonomous_driving/value.
+  optional bool non_autonomous_driving = 28;
+
+  // Represents the road that encompasses this lane.
+  // DisplayType: Readonly.
+  // DisplayType: NestedToFlatten.
+  // DisplayType: Association.
+  repeated Id road_id = 32;
+
+  // Deprecated fields.
+  // reserved 7;
+  // reserved "overlap_id";
+  // repeated Id overlap_id = 7;
+
+  // reserved 26;
+  // reserved "conversion_error";
+  // repeated LaneError conversion_error = 26;
+
+  // reserved 27;
+  // reserved "conversion_warning";
+  // repeated LaneWarning conversion_warning = 27;
+}

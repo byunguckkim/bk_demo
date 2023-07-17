@@ -1,0 +1,22 @@
+// Copyright (C) 2021 Applied Intuition, Inc. All rights reserved.
+// This source code file is distributed under and subject to the LICENSE in license.txt
+
+syntax = "proto3";
+
+package simian_public.osc;
+
+import "applied/simian/public/proto/actor.proto";
+
+// Defines the structure of the OSC importer config JSON.
+message OSCImportConfig {
+  // Map between categoryName of entities to ObstacleType.
+  map<string, simian_public.actor.Actor.ObstacleType> entity_category_to_obstacle_type = 1;
+  // Default ObstacleType when given OSC categoryName not found.
+  simian_public.actor.Actor.ObstacleType default_obstacle_type = 2;
+  // Map between model3d vehicle type to SpectralModel type.
+  map<string, simian_public.actor.Actor.SpectralModel> model3d_to_spectral_model = 3;
+  // Default SpectralModel when given OSC model3d not found.
+  simian_public.actor.Actor.SpectralModel default_spectral_model = 4;
+  // Name used to specify the ego vehicle in OSC scenarios.
+  string default_ego_name = 5;
+}

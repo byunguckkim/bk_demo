@@ -1,0 +1,220 @@
+// Copyright (C) 2018 Applied Intuition, Inc. All rights reserved.
+// This source code file is distributed under and subject to the LICENSE in license.txt
+
+syntax = "proto3";
+
+package simian_public.sim_data;
+
+import "google/protobuf/timestamp.proto";
+import "applied/simian/public/proto/actor.proto";
+import "applied/simian/public/proto/common.proto";
+import "applied/simian/public/proto/custom_actor.proto";
+import "applied/simian/public/proto/drawing.proto";
+import "applied/simian/public/proto/ego.proto";
+import "applied/simian/public/proto/motion_model.proto";
+import "applied/simian/public/proto/perception.proto";
+import "applied/simian/public/proto/route.proto";
+import "applied/simian/public/proto/sensor_model.proto";
+import "applied/simian/public/proto/sensor_output.proto";
+import "applied/simian/public/proto/sim_command.proto";
+import "applied/simian/public/proto/spatial.proto";
+import "applied/simian/public/proto/stack_logs.proto";
+import "applied/simian/public/proto/stack_state.proto";
+import "applied/simian/public/proto/traffic_light.proto";
+import "applied/simian/public/proto/triage.proto";
+
+// <!-- Next ID: 25 -->
+message SimulatorInput {
+  StackState state = 5;
+  motion_model.Input ego = 1;
+  bool abort = 4;
+  enum StackState {
+    INVALID = 0;     // Sentinel
+    NOT_READY = 1;   // Initializing/never engaged
+    ENGAGED = 2;     // Engaged (outputting commands)
+    DISENGAGED = 3;  // No longer engaged (commands are blank/invalid)
+    READY = 4;       // Ready to engage but not yet engaged.
+    // <!-- TODO(fahhem): Support partial engage levels, like LATERAL_ENGAGED and
+    // LONGITUDINAL_ENGAGED. -->
+  }
+  repeated simian_public.common.DataPoint data_points = 6;
+  // Custom actors are deprecated in favor of plugin behaviors/actors.
+  repeated custom_actor.ActorToSim custom_actors = 7 [deprecated = true];
+  repeated simian_public.stack_logs.StackLogLine logs = 8;
+  repeated drawing.Drawing drawings = 9;
+  repeated sim_command.SimCommand sim_commands = 10;
+  repeated common.ObserverEvent custom_observer_events = 11;
+  repeated actor.Actor external_actors = 12;
+  bool warm_start_ego_ready = 13;
+  repeated simian_public.common.Message messages = 14;
+  // This field has been moved to sim_commands.set_sensor_model
+  // repeated sensor_model.Description sensor_models = 16;
+  repeated simian_public.common.CustomDataPointMetadata custom_data_point_metadatas = 17;
+
+  repeated simian_public.common.TimestampedStruct timestamped_structs = 24;
+
+  repeated public_triage.TriageEvent triage_events = 19;
+  repeated simian_public.common.TimestampedDataPoint timestamped_data_points = 20;
+  repeated simian_public.common.CustomField custom_fields = 22;
+
+  // reserved 15, 16, 18, 23;
+  // reserved "ego_perception", "sensor_models", "struct_data";
+}
+
+// <!-- Next ID: 39 -->
+message SimulatorOutput {
+  // The amount of time (seconds) that has elapsed since the
+  // beginning of the simulation.
+  // Use sim_timestamp to avoid floating-point approximations (see ID 25 below).
+  double sim_time = 10;
+
+  ego.EgoOutput ego = 1;
+
+  // These are "ground truth". See also ego.perceived_actors
+  repeated actor.Actor actors = 2;
+
+  // These are actors that are currently "hiding", i.e. in a hide behavior.
+  // With the exception of hide behavior termination triggers, they are ignored by stats and
+  // sensors.
+  repeated actor.Actor hidden_actors = 32;
+
+  // Custom actors are deprecated in favor of plugin behaviors/actors.
+  repeated custom_actor.SimToActor custom_actors = 9 [deprecated = true];
+
+  // Ground truth state of all traffic light states
+  repeated traffic_light.TrafficLightOutput traffic_lights = 8;
+  repeated simian_public.common.DataPoint data_points = 11;
+
+  // Piped directly from SimulatorInput since we want to write these into the bag.
+  // <!-- TODO(rolo) This should not be here. -->
+  repeated drawing.Drawing drawings = 12;
+  // Drawings created by the simulator as opposed to inputted by SimulatorInput.
+  repeated drawing.Drawing simulator_drawings = 28;
+
+  repeated string triggered_messages = 13;
+
+  // Simulated sensor outputs from Unreal
+  // Note: Need to split up sensor outputs or gRPC max
+  // will be exceeded.
+  repeated sensor_model.SensorOutput lidar_outputs = 14;
+  repeated sensor_model.SensorOutput radar_outputs = 15;
+  repeated sensor_model.SensorOutput camera_outputs = 16;
+  repeated sensor_model.SensorOutput ultrasound_outputs = 17;
+  repeated sensor_model.SensorOutput thumbnail_images = 18;
+  repeated sensor_output.SensorOutputList perception_sensor_outputs = 34;
+
+  // --------------------------------------------------
+  //
+  // <!-- TODO(roland) clean up more things and pull them above this line
+  // when that happens. -->
+
+  simian_public.common.TripAgentOutput tripagent = 3;
+  bool kill = 4;
+
+  // Accessible to the customer interface in simian_public.simulator.v2.InterfaceStartupOptions.
+  // Used internally by legacy code within Applied.
+  string map_key = 5 [deprecated = true];
+
+  Runlevel runlevel = 7;
+
+  // Certain levels of runlevel are deprecated, please do not depend/recreate them.
+  // Currently this enum is only used for observers on sim start and end.
+  enum Runlevel {
+    NOT_INIT = 0;  // Deprecated
+    INIT = 1;
+    ROUTING_AVAILABLE = 2;  // Deprecated
+    EGO_AVAILABLE = 3;      // Deprecated
+    EGO_ENGAGED = 4;
+    COMPLETED = 5;
+    CRASHED = 6;  // Deprecated
+
+    // <!-- TODO(roland) move INVALID to position 0 so we can use it as
+    // an effective sentinel against inadvertent use of proto
+    // default values.  But there are places that use integer
+    // comparisons between runlevel enum values, so we need to be
+    // careful. Frozensets would be more robust. -->
+    INVALID = 7;
+  }
+
+  map<string, LoggedEgoPose> logged_egos = 20;
+
+  // LocalizationSensor data sent from the stack or log -> ADP.
+  // Maps "<endpoint_name>/channels/<channel_name>" keys to their LocalizationSensor protos.
+  map<string, simian_public.perception.PerceptionChannel.LocalizationSensor> localization_sensors =
+      38;
+
+  // <!-- Next ID: 7. -->
+  message LoggedEgoPose {
+    // <!-- TODO(fahhem): Deprecate this in favor of the stack_state enum. -->
+    bool engaged = 1;
+    repeated ego.EgoOutput.Section sections = 2;
+    string channel_name = 3;
+    SimulatorInput.StackState stack_state = 4;
+    stack_state.StackStateInformation stack_state_info = 6;
+    // The ID reserved (at scenario compilation time) for this logged ego.
+    int64 id = 5;
+  }
+
+  WarmStartState warm_start_state = 22;
+
+  enum WarmStartState {
+    INACTIVE = 0;  // warm start is not engaged; ego stack is in control
+    STANDBY = 1;   // warm start is engaged; waiting on stack signal to become INACTIVE
+    ACTIVE = 2;    // warm start is engaged; ego stack is not in control
+  }
+
+  message TriggeredMessageMetadata {
+    string name = 1;
+    message ObstacleIdsInRegion {
+      repeated int32 obstacle_id = 1;
+    }
+    oneof metadata {
+      ObstacleIdsInRegion obstacle_ids_in_region = 2;
+    }
+  }
+
+  repeated TriggeredMessageMetadata triggered_messages_metadata = 23;
+
+  // Sim commands and interactive events from the previous timestep
+  repeated sim_command.SimCommand sim_commands = 24;
+
+  // The amount of time that has elapsed since the beginning of the
+  // simulation.
+  // This timestamp provides a higher precision than the floating-point
+  // representation above.
+  // https://developers.google.com/protocol-buffers/docs/reference/google.protobuf#google.protobuf.Timestamp
+  google.protobuf.Timestamp sim_timestamp = 25;
+
+  // Maps between a channel name and the override state for that channel.
+  // If a channel name + "_override" is not present as a key, it is not
+  // overriden (override state is OPERATOR_OVERRIDE_DISENGAGED).
+  // Only filled when using the V2 API.
+  map<string, ego.OperatorOverrideState> channel_overrides = 29;
+
+  message StackStateWrapper {
+    SimulatorInput.StackState state = 1;
+    stack_state.StackStateInformation stack_state_info = 2;
+  }
+
+  // Map between a stack state channel name and the corresponding stack state.
+  // Only filled when using the V2 API.
+  map<string, StackStateWrapper> last_stack_states = 30;
+
+  repeated simian_public.common.TimestampedDataPoint timestamped_data_points = 31;
+
+  // Encodes relative poses of objects.  See //simian/public/transforms/transform_forest.h .
+  spatial.TransformForest transform_forest = 33;
+
+  repeated simian_public.common.TimestampedStruct timestamped_structs = 39;
+
+  // Keyed by ego name instead of ID because of how Applied internally queries egos for stats.
+  map<string, ego.EgoOutput> egos_map = 36;
+
+  // Map between the channel name and the reference trajectory obtained via customer stack
+  // in order to update and compute stats.
+  map<string, simian_public.spatial.Trajectory> reference_trajectories = 37;
+
+  // Please find actor bounding boxes in the |actors| field of this proto.
+  // reserved "actor_outputs", "metadata_outputs", "struct_data", "egos";
+  // reserved 19, 27, 35, 26;
+}

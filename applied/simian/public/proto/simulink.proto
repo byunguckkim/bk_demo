@@ -1,0 +1,212 @@
+// Copyright (C) 2022 Applied Intuition, Inc. All rights reserved.
+// This source code file is distributed under and subject to the LICENSE in license.txt
+
+syntax = "proto3";
+
+package simian_public.simulink;
+
+import "google/protobuf/struct.proto";
+import "google/protobuf/timestamp.proto";
+import "applied/simian/public/proto/helix_common.proto";
+import "applied/simian/public/proto/motion_model.proto";
+import "applied/simian/public/proto/perception.proto";
+import "applied/simian/public/proto/scenario/vehiclesim_config.proto";
+import "applied/simian/public/proto/spatial.proto";
+import "applied/simian/public/proto/v2/customer_service_v2.proto";
+import "applied/simian/public/proto/v2/io.proto";
+import "applied/simian/public/proto/vehiclesim.proto";
+
+message ADPInitRequest {
+  ToolboxVersion version = 1;
+}
+
+message ToolboxVersion {
+  uint32 major_version = 1;
+  uint32 minor_version = 2;
+  uint32 patch_version = 3;
+}
+
+// Describes pause data / metadata
+message ADPSimulinkSimCommand {
+  enum SimulinkADPCommand {
+    PAUSE = 0;
+    ERROR = 1;
+    STOP_SUCCESSFULLY = 2;
+  }
+  SimulinkADPCommand command = 1;
+  string error_msg = 2;
+}
+
+message HelixInterfaceData {
+  message BehaviorChange {
+    // Agent ID for which to trigger the new behavior. Set to -1 to select the ego.
+    int32 agent_id = 1;
+    // Behavior ID, as defined in the Helix configuration.
+    uint32 behavior_id = 2;
+    // Rising edge indicates when the change goes into effect.
+    uint32 behavior_changed = 3;
+  }
+
+  repeated BehaviorChange behavior_change = 1;
+
+  message CarSimData {
+    double distance_traveled = 1;
+  }
+
+  CarSimData carsim_data = 2;
+}
+
+// This message provides a unified API for sending out information
+// to Simulink, dSPACE HIL and NI HIL rigs.
+// The XIL bridge will send out data encoded in this message,
+// over UDP, TCP or ZMQ.
+// <!-- Next ID: 20. last modified by sumanthkandala99 -->
+message ADPOutput {
+  repeated TimeChannelData time_channels = 1;
+  repeated ActorSensorChannelData actor_sensor_channels = 2;
+  repeated LaneSensorChannelData lane_sensor_channels = 3;
+  repeated TriggerChannelData trigger_channels = 4;
+
+  // Ego pose data is sent through these channels.
+  repeated PoseChannelData pose_channels = 5;
+
+  // For HIL applications, a terrain sensor for the ego might be added
+  // directly on the bridge to reduce latency going to Simian so that
+  // higher update rates can be managed.
+  repeated TerrainSensorChannelData terrain_sensor_channels = 6;
+
+  // These channels are typically used for ego behaviors from Simian.
+  repeated ControlsChannelData predicted_controls_channels = 7;
+
+  // LocalizationSensor data is sent through these channels.
+  repeated LocalizationSensorChannelData localization_sensor_channels = 8;
+  ADPSimulinkSimCommand sim_command = 9;
+  repeated WheelSpeedChannelData wheel_speed_channels = 10;
+  repeated TrafficLightChannelData traffic_light_channels = 11;
+  repeated TrafficSignChannelData traffic_sign_channels = 12;
+  simulator.v2.InterfaceStartupOptions startup_options = 13;
+  repeated MotionFeedbackData feedback_channels = 14;
+  repeated MapSensorData map_sensor_channels = 15;
+  repeated AgentTrajectoryChannelData agent_trajectory_channels = 17;
+
+  // VehiclesimConfig after scenario compilation.
+  simian_public.proto.scenario.vehiclesim_config.CompiledVehiclesimConfig vehiclesim_config = 16;
+
+  // Runtime configuration for VehicleSim
+  simian_public.helix_common.CarSimRuntimeControl carsim_runtime_control = 18;
+
+  // Additional data sent from the interface to Simulink.
+  SimulinkInterfaceData simulink_interface_data = 19;
+}
+
+// This message provides a unified API for receiving information
+// from Simulink, dSPACE HIL and NI HIL rigs.
+message ADPInput {
+  repeated ControlsChannelData controls_channels = 1;
+  ADPSimulinkSimCommand sim_command = 2;
+  simulator.v2.Extras extras = 3;
+  // Specifies certain signals from the model to the Helix Bridge
+  HelixInterfaceData helix_interface_data = 4;
+  SimulinkInterfaceData simulink_interface_data = 5;
+}
+
+// This message allows to you share additional data between
+// your Hybrid Simulink Interface and Simulink, and can be
+// accessed in Simulink using the Read/Write ADP Field blocks.
+message SimulinkInterfaceData {
+  // The google.protobuf.Value can be used to send or receive
+  // any generic data (bool, string, numeric, struct, list)
+  // to or from Simulink.
+  google.protobuf.Value interface_data = 1;
+}
+
+message MotionFeedbackData {
+  simulator.v2.Channel channel_metadata = 1;
+  motion_model.Feedback channel_data = 2;
+}
+
+message MapSensorData {
+  simulator.v2.Channel channel_metadata = 1;
+  perception.PerceptionChannel.MapSensor channel_data = 2;
+}
+
+message WheelSpeedChannelData {
+  simulator.v2.Channel channel_metadata = 1;
+  perception.PerceptionChannel.WheelSpeedSensor channel_data = 2;
+}
+
+message TrafficLightChannelData {
+  simulator.v2.Channel channel_metadata = 1;
+  perception.PerceptionChannel.TrafficLightSensor channel_data = 2;
+}
+
+message TrafficSignChannelData {
+  simulator.v2.Channel channel_metadata = 1;
+  perception.PerceptionChannel.TrafficSignSensor channel_data = 2;
+}
+
+message ActorSensorChannelData {
+  simulator.v2.Channel channel_metadata = 1;
+  perception.PerceptionChannel.ActorSensor channel_data = 2;
+}
+
+message LaneSensorChannelData {
+  simulator.v2.Channel channel_metadata = 1;
+  perception.PerceptionChannel.LaneSensor channel_data = 2;
+}
+
+message TriggerChannelData {
+  simulator.v2.Channel channel_metadata = 1;
+  simulator.v2.Trigger channel_data = 2;
+}
+
+message TerrainSensorChannelData {
+  simulator.v2.Channel channel_metadata = 1;
+  perception.PerceptionChannel.TerrainSensor channel_data = 2;
+}
+
+message LocalizationSensorChannelData {
+  simulator.v2.Channel channel_metadata = 1;
+  perception.PerceptionChannel.LocalizationSensor channel_data = 2;
+}
+
+message PoseChannelData {
+  simulator.v2.Channel channel_metadata = 1;
+  simulator.v2.Pose channel_data = 2;
+}
+
+message TimeChannelData {
+  simulator.v2.Channel channel_metadata = 1;
+  google.protobuf.Timestamp time = 2;
+}
+
+message AgentTrajectoryChannelData {
+  simulator.v2.Channel channel_metadata = 1;
+  simian_public.perception.PerceptionChannel.AgentTrajectorySensor channel_data = 2;
+}
+
+message VehiclesimModel {
+  // Initial ego state.
+  spatial.State initial_ego_state = 1;
+  // List of vehiclesim import variables.
+  map<string, vehiclesim.ImportSettings> vehiclesim_variables = 2;
+  // List of VS variables to override: the values of these variables will not be defined in the
+  // Simfile but in the scenario YAML file instead.
+  map<string, double> variable_overrides = 3;
+  // List of arbitrary VS Commands. These may be executed at any time during the simulation.
+  // VS Commands are a scripting language provided by VehicleSim to extend the vehicle model. In
+  // most cases, they have the following syntax: (command) keyword (=) expression (; (( UNITS ) (=)
+  // units) (; (description))) where command is an instruction (e.g. DEFINE_PARAMETER), keyword is
+  // the name of a parameter, expression is either a number or an algebraic expression, units is an
+  // optional keyword used to  specify the units associated with the parameter or variable specified
+  // by keyword, and description is a new text description of the parameter or variable. Optional
+  // fields are shown between parentheses. For more information, please refer to the VS Commands
+  // Reference Manual.
+  repeated string vs_commands = 4;
+}
+
+message ControlsChannelData {
+  simulator.v2.Channel channel_metadata = 1;
+  motion_model.Input channel_data = 2;
+  VehiclesimModel vehiclesim_channel_data = 3;
+}

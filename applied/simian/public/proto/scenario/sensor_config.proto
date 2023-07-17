@@ -1,0 +1,1725 @@
+// Copyright (C) 2020 Applied Intuition, Inc. All rights reserved.
+// This source code file is distributed under and subject to the LICENSE in license.txt
+
+syntax = "proto3";
+
+package simian_public.scenario;
+
+import "google/protobuf/duration.proto";
+import "applied/simian/public/proto/common.proto";
+import "applied/simian/public/proto/field_options.proto";
+import "applied/simian/public/proto/map/map_enums.proto";
+import "applied/simian/public/proto/planar.proto";
+import "applied/simian/public/proto/scenario/common.proto";
+import "applied/simian/public/proto/sensor_model.proto";
+import "applied/simian/public/proto/spatial.proto";
+
+// Specify all sensor definitions of the vehicle.
+// Ego-mounted sensors are underneath the top-level `vehicle` field.
+// For more details, see the Simian manual section "Ego > Ego-mounted
+// Sensors".
+message SensorConfig {
+  // [DEPRECATED] Please use actor occlusion sensor filters instead.
+  repeated LidarSpec lidars = 1 [(field_options.ignore_in_autocomplete) = true, deprecated = true];
+  // List of lane sensors. Use to detect lanes and lane boundaries within a field of view.
+  repeated LaneSensorSpec lane_sensors = 2 [
+    (field_options.manual_link) =
+        'https://home.applied.co/manual/simian/latest/#/object-level_sensors/sensing_lanes/sensing_lanes?id=lane-sensor'
+  ];
+  // List of traffic light sensors.
+  // Use to report traffic light bulb states within the field of view.
+  repeated TrafficLightSensorSpec traffic_light_sensors = 3 [
+    (field_options.manual_link) =
+        'https://home.applied.co/manual/simian/latest/#/object-level_sensors/environmental_sensors/environmental_sensors?id=traffic-light-sensor'
+  ];
+  // List of actor sensors.
+  // Use to model post-perception perceived actors within the field of view.
+  repeated ActorSensorSpec actor_sensors = 4 [
+    (field_options.manual_link) =
+        'https://home.applied.co/manual/simian/latest/#/object-level_sensors/sensing_agents/sensing_agents?id=actor-sensor'
+  ];
+  // List of lane keep sensors. Use to report the agent's current lane and lane boundaries
+  // along with all successor lane elements within a field of view.
+  repeated LaneSensorSpec lane_keep_sensors = 5 [
+    (field_options.manual_link) =
+        'https://home.applied.co/manual/simian/latest/#/object-level_sensors/sensing_lanes/sensing_lanes?id=lane-keep-sensor'
+  ];
+  // [SPECTRAL ONLY] List of Spectral sensors.
+  repeated simian_public.sensor_model.Description sensor_models = 6;
+  // List of planar lidar sensors.
+  // This sensor will report 2d distances of actors to the ego with equally spaced rays within the
+  // defined sector field of view.
+  repeated PlanarLidarSensorSpec planar_lidar_sensors = 7 [
+    (field_options.manual_link) =
+        'https://home.applied.co/manual/simian/latest/#/object-level_sensors/sensing_agents/sensing_agents?id=planar-lidar-sensor'
+  ];
+  // List of occupancy grid sensors.
+  // The sensor creates an evenly spaced grid with cells that describe the presence of an obstacle.
+  // Each cell is associated with a float of value [0, 1] representing probability of existence.
+  repeated PlanarOccupancyGridSensorSpec planar_occupancy_grid_sensors = 8 [
+    (field_options.manual_link) =
+        'https://home.applied.co/manual/simian/latest/#/object-level_sensors/sensing_agents/sensing_agents?id=occupancy-grid-sensor'
+  ];
+  // List of localization sensors.
+  // This reports a pose, velocity, and acceleration at a sensor mount affixed to the ego, including
+  // on its trailers.
+  repeated LocalizationSensorSpec localization_sensors = 9 [
+    (field_options.manual_link) =
+        'https://home.applied.co/manual/simian/latest/#/object-level_sensors/sensing_ego_state/sensing_ego_state?id=localization-sensor'
+  ];
+  // List of lane marker sensors. Use to report visible lane boundaries (but not lanes) within a
+  // given field of view
+  repeated LaneMarkerSensorSpec lane_marker_sensors = 10 [
+    (field_options.manual_link) =
+        'https://home.applied.co/manual/simian/latest/#/object-level_sensors/sensing_lanes/sensing_lanes?id=lane-marker-sensor'
+  ];
+  // List of free space sensors.
+  // This reports a list of exterior/interior boundaries that represent a 2d collision-free world
+  // space.
+  repeated FreeSpaceSensorSpec free_space_sensors = 11 [
+    (field_options.manual_link) =
+        'https://home.applied.co/manual/simian/latest/#/object-level_sensors/environmental_sensors/environmental_sensors?id=free-space-sensor'
+  ];
+  // List of traffic light block sensors.
+  // Use to report traffic light block states within the field of view.
+  repeated TrafficLightSensorSpec traffic_light_block_sensors = 12 [
+    (field_options.manual_link) =
+        'https://home.applied.co/manual/simian/latest/#/object-level_sensors/environmental_sensors/environmental_sensors?id=traffic-light-block-sensor'
+  ];
+  // [DEPRECATED] Please use Logstream instead.
+  repeated ImportedSensorSpec imported_sensors = 13
+      [deprecated = true, (field_options.ignore_in_autocomplete) = true];
+  // List of traffic sign sensors.
+  // Use to report traffic signs within the field of view.
+  repeated TrafficSignSensorSpec traffic_sign_sensors = 15 [
+    (field_options.manual_link) =
+        'https://home.applied.co/manual/simian/latest/#/object-level_sensors/environmental_sensors/environmental_sensors?id=traffic-sign-sensor'
+  ];
+  // List of Inertial Measurement Unit (IMU) sensors.
+  // Use to report a 6 DOF IMU with translational acceleration and angular velocities in the sensor
+  // frame.
+  repeated IMUSensorSpec imu_sensors = 16 [
+    (field_options.manual_link) =
+        'https://home.applied.co/manual/simian/latest/#/object-level_sensors/sensing_ego_state/sensing_ego_state?id=inertial-measurement-unit-sensor'
+  ];
+  // List of wheel speed sensors.
+  // Use to report the wheel states of the agent.
+  // This sensor uses the longitudinal velocity of the agent and the wheel configuration to report
+  // wheel states.
+  repeated WheelSpeedSensorSpec wheel_speed_sensors = 17 [
+    (field_options.manual_link) =
+        'https://home.applied.co/manual/simian/latest/#/object-level_sensors/sensing_ego_state/sensing_ego_state?id=wheel-speed-sensor'
+  ];
+  // List of occlusion grid sensors.
+  // Use to output the maximum height of occlusion for each cell within a defined grid.
+  repeated OcclusionGridSensorSpec occlusion_grid_sensors = 18 [
+    (field_options.manual_link) =
+        'https://home.applied.co/manual/simian/latest/#/object-level_sensors/environmental_sensors/environmental_sensors?id=occlusion-grid-sensor'
+  ];
+  // List of map sensors.
+  // Use to report map elements within the field of view.
+  // Currently supported for `CROSSWALK`, `STOP_REGION`, `REGION` and `ROAD_MARKING` map features.
+  repeated MapSensorSpec map_sensors = 19 [
+    (field_options.manual_link) =
+        'https://home.applied.co/manual/simian/latest/#/object-level_sensors/environmental_sensors/environmental_sensors?id=map-sensor'
+  ];
+  // List of terrain sensors.
+  // Use to report information about the terrain underneath and around the ego.
+  repeated TerrainSensorSpec terrain_sensors = 20 [
+    (field_options.manual_link) =
+        'https://home.applied.co/manual/simian/latest/#/object-level_sensors/sensing_ego_state/sensing_ego_state?id=terrain-sensor'
+  ];
+  // List of wind sensors.
+  // Use to output wind velocity (observed in the world frame) at the sensor's location.
+  repeated WindSensorSpec wind_sensors = 21 [
+    (field_options.manual_link) =
+        'https://home.applied.co/manual/simian/latest/#/object-level_sensors/environmental_sensors/environmental_sensors?id=wind-sensor'
+  ];
+  // List of polar obstacle sensors.
+  // Use this to detect actors and road edges at greater detail than just distances (provided by the
+  // planar lidar sensor).
+  repeated PolarObstacleSensorSpec polar_obstacle_sensors = 22 [
+    (field_options.manual_link) =
+        'https://home.applied.co/manual/simian/latest/#/object-level_sensors/sensing_agents/sensing_agents?id=polar-obstacle-sensor'
+  ];
+  // List of agent trajectory sensors.
+  // Use to detect the planned trajectories of agents in the simulation.
+  repeated AgentTrajectorySensorSpec agent_trajectory_sensors = 23 [
+    (field_options.manual_link) =
+        'https://home.applied.co/manual/simian/latest/#/object-level_sensors/sensing_agents/sensing_agents?id=agent-trajectory-sensor'
+  ];
+}
+
+// ======== Section for DEPRECATED protos. ===========
+// <!-- [DEPRECATED] Only used for LidarSpec, should not be re-used.
+// Sensor coordinate frame relative to vehicle coordinate frame. For
+// purely planar configs, only x, y, and yaw are used. -->
+// [DEPRECATED] Part of a deprecated feature, please do not use the higher-level feature.
+message SensorMount {
+  double x = 1;
+  double y = 2;
+  double z = 3;
+  double yaw = 4;
+  double pitch = 5;
+  double roll = 6;
+}
+
+// [DEPRECATED] Please use actor sensor filters for occlusion instead.
+message LidarSpec {
+  enum Mode {
+    // Pure 2D: Sensor mounts and vehicle poses are interpreted as
+    // purely planar, their z, pitch, and roll are ignored. The z
+    // coordinates of object points are also ignored.
+    //
+    // <!-- Only fill in mount, distance_near, distance_far, yaw_start, and
+    // yaw_length. In the mount, only fill in x, y, and
+    // angle. Everything else is ignored. -->
+    PLANAR = 0;
+
+    // 2.5D: Vehicle poses are still interpreted as purely
+    // planar. Sensor mounts and object points are fully 3D. This
+    // results in more realistic perception simulations, as objects
+    // may become invisible if they are too low, and tall objects may
+    // still be detected even if they are behind other objects.
+    //
+    // <!-- Note that due to the projection of the vehicle pose, the
+    // vehicle origin ends up in the XY plane. Also, objects are moved
+    // along Z such that their lowest point ends up lying in the XY
+    // plane. -->
+    PLANAR_WITH_HEIGHT = 1;
+
+    // Full 3D.
+    SPATIAL = 2;
+  }
+  Mode mode = 1;
+
+  SensorMount mount = 2;
+  double distance_near = 3 [(field_options.units) = M];
+  double distance_far = 4 [(field_options.units) = M];
+  double yaw_start = 5 [(field_options.units) = RAD];
+  double yaw_length = 6 [(field_options.units) = RAD];
+  double pitch_start = 7 [(field_options.units) = RAD];
+  double pitch_length = 8 [(field_options.units) = RAD];
+}
+
+// <!-- Do not use in new code. Required for a legacy method of drive
+// conversion. Use Logstream instead. -->
+message ImportedSensorSpec {
+  string name = 1 [(field_options.is_required) = true];
+
+  // <!-- Users should not specify this field; it's set internally based on imported_ego_states. -->
+  BagUrl bag_filepath = 2;
+  message BagUrl {
+    string source = 1;
+    string key = 2;
+  }
+}
+
+// ===================================================
+
+// Defines the field of view of a Simian (object-level) sensors, and post-perception output.
+message SensorView {
+  // The 3D pose from which a sensor makes its observations, relative to the agent's reference
+  // frame.
+  simian_public.spatial.PoseSpec mount = 1;
+  // Choose the shape of the field of view.
+  oneof field_of_view_mode {
+    SectorFieldOfView sector_fov = 2;
+    PolygonFieldOfView polygon_fov = 4;
+    RectangleFieldOfView rectangle_fov = 6;
+    RectangleAndRouteFieldOfView rectangle_and_route_fov = 7;
+  }
+
+  message SectorFieldOfView {
+    // Specify the nearest distance from the sensor mount at which the sensor should sense objects.
+    double distance_near = 1 [(field_options.units) = M, (field_options.greater_than_or_equal) = 0];
+    // Specify the farthest distance from the sensor mount at which the sensor should sense objects.
+    double distance_far = 2 [(field_options.units) = M, (field_options.greater_than_or_equal) = 0];
+    // Specify the start of the yaw range of the sensor's field of view (counterclockwise about the
+    // sensor frame's +x axis).
+    double yaw_start = 3 [(field_options.units) = RAD];
+    // Specify the angular distance that the field of view extends counterclockwise from
+    // `yaw_start`.
+    double yaw_length = 4 [(field_options.units) = RAD, (field_options.greater_than_or_equal) = 0];
+    // Specify the start of the pitch range of the sensor's field of view (downward pitch is
+    // positive).
+    double pitch_start = 5 [(field_options.units) = RAD];
+    // Specify the angular distance that the field of view extends upwards
+    // (clockwise about the sensor frame's +y axis) from `pitch_start`.
+    double pitch_length = 6
+        [(field_options.units) = RAD, (field_options.greater_than_or_equal) = 0];
+  }
+
+  // This field of view requires that mode is PLANAR.
+  message PolygonFieldOfView {
+    // Vertices of the polygon expressed in the sensor frame.
+    // Order matters: the polygon's edges are defined by
+    // adjacent vertices.
+    // The polygon is closed by an edge between the first and last vertices.
+    // Providing vertices that cause edges to intersect will
+    // cause an error.
+    repeated planar.Point2d vertices = 1 [(field_options.units) = M];
+  }
+
+  // An axis-aligned rectangle in the sensor frame.
+  // This field of view requires that mode is PLANAR.
+  message RectangleFieldOfView {
+    // Minimum value of the x coordinate in the sensor frame ("back").
+    double x_min = 1 [(field_options.units) = M];
+    // Maximum value of the x coordinate in the sensor frame ("front").
+    double x_max = 2 [(field_options.units) = M];
+    // Minimum value of the y coordinate in the sensor frame ("right").
+    double y_min = 3 [(field_options.units) = M];
+    // Maximum value of the y coordinate in the sensor frame ("left").
+    double y_max = 4 [(field_options.units) = M];
+  }
+
+  message RectangleAndRouteFieldOfView {
+    // The shape of this field of view is dynamic, depending on the ego's position. It has two
+    // parts:
+    // 1. A rectangle placed at the geometry center of the ego.
+    // 2. A configurable pipe geometry around the ego's route (from the trip agent), defined by
+    // width, min, and max distance.
+    RectangleFieldOfView rectangle = 1;
+    // Route is a curved geometry generated based on the RoutePoints from TripAgent.
+    // It can be visualized as a pipe whose lateral distance is width, and longitudinal distance is
+    // min_distance.
+    Route route = 2;
+    // Options the determine how this field of view is visualized in the GUI.
+    simian_public.scenario.VisualizationOptions visualization_options = 3;
+
+    // Route is a curved geometry generated based on the RoutePoints from TripAgent.
+    // It can be visualized as a pipe whose lateral distance is width, and longitudinal distance is
+    // min_distance.
+    message Route {
+      // How far this `pipe` is stretched along the route's lateral direction.
+      double width = 1 [(field_options.units) = M, (field_options.greater_than) = 0];
+      // How long this `pipe` extends along the route's longitudinal direction.
+      double min_distance = 2 [(field_options.units) = M, (field_options.greater_than) = 0];
+      double max_distance = 3 [(field_options.units) = M, (field_options.greater_than) = 0];
+      // We sample points along the ego's route using interpolation_distance to generate the pipe
+      // geometry.
+      double interpolation_distance = 4
+          [(field_options.units) = M, (field_options.greater_than) = 0];
+    }
+  }
+
+  enum Mode {
+    // Pure 2D: Sensor mounts and vehicle poses are interpreted as
+    // purely planar, their z, pitch, and roll are ignored. The z
+    // coordinates of object points are also ignored.
+    //
+    // Only fill in mount, distance_near, distance_far, yaw_start, and
+    // yaw_length. In the mount, only fill in x, y, and
+    // angle. Everything else is ignored.
+    PLANAR = 0;
+    // Full 3D.
+    SPATIAL = 2;
+  }
+
+  // Specify if the field of view is planar (2D) or spatial (3D).
+  Mode mode = 5;
+
+  // Specify if mount is relative to the map frame, not the agent frame. Defaults to agent frame
+  // (`fix_to_global_frame = false`).
+  bool fix_to_global_frame = 3;
+}
+
+// Defines the conventions to be used when Simian creates the output
+// of a given "sensor".
+message SensorOutputConfig {
+  // The reference frame in which the sensor output is expressed.
+  ReportingFrame reporting_frame = 1 [(field_options.is_required) = true];
+
+  enum ReportingFrame {
+    // sentinel
+    __INVALID__ = 0;
+    // Frame of the sensor.
+    SENSOR = 1;
+    // Frame of the agent the sensor is mounted on.
+    // <!-- x forward -->
+    VEHICLE = 2;
+    // Map frame.
+    MAP = 3;
+  }
+}
+
+message ActorSensorSpec {
+  // The name of the channel to which the sensor will publish in the customer interface.
+  // Use this to distinguish between different actor sensors in the interface.
+  string name = 1 [(field_options.is_required) = true];
+  // Specify the mount and field of view of the sensor.
+  SensorView sensor_view = 2 [(field_options.is_required) = true];
+  // Specify output format options (e.g., the reporting reference frame).
+  SensorOutputConfig sensor_output = 3 [(field_options.is_required) = true];
+  // Optional list of sensor filters to modify the sensor output with noise, occlusion modeling,
+  // etc.
+  repeated SensorFilter sensor_filters = 4;
+  // If true, will visualize the field of view (only visualized in PLANAR mode).
+  bool visualize = 5;
+  // If true, will populate lane IDs in the actor proto sent to the customer interface.
+  // This may incur a performance cost.
+  bool populate_closest_lane_id = 6;
+  // Version 0.1 (default):
+  //   - Actor velocity and acceleration are not affected by the sensor_output reporting_frame.
+  // Version 0.2:
+  //   - Actor velocity and acceleration are expressed in the sensor_output reporting_frame.
+  simian_public.common.VersionMajorMinor version = 8;
+}
+
+message WindSensorSpec {
+  // The name of the channel to which the sensor will publish in the customer interface.
+  // Use this to distinguish between different wind sensors in the interface.
+  string name = 1 [(field_options.is_required) = true];
+  // Specify output format options (e.g., the reporting reference frame).
+  SensorOutputConfig sensor_output = 2;
+  // The 3D pose from which the sensor observes wind, expressed in the agent's reference frame.
+  simian_public.spatial.PoseSpec mount = 3 [(field_options.is_required) = true];
+}
+
+// The localization sensor provides various configurations to trade-off
+// accuracy and reporting delay. See section "Ego > Ego-mounted
+// Sensors > Sensing Ego State > Localization Sensor" in the Simian
+// manual.
+// <!-- Next ID: 10 -->
+message LocalizationSensorSpec {
+  // The name of the channel to which the sensor will publish in the customer interface.
+  // Use this to distinguish between different localization sensors in the interface.
+  string name = 1 [(field_options.is_required) = true];
+  // Specify the pose of the sensor relative to the agent's reference frame.
+  oneof relative_pose {
+    option (field_options.oneof_is_required) = true;
+    // Specify the 3D pose of the sensor relative to the agent's reference frame.
+    simian_public.spatial.PoseSpec mount = 2;
+    // Specify the sensor relative to a frame in the `TransformForest`.
+    simian_public.spatial.TransformNode mount_in_frame = 8;
+  }
+  // Modify the sensor output with noise, etc.
+  repeated SensorFilter sensor_filters = 3;
+
+  // <!-- The localization sensor involves a trade-off between reporting
+  // delay and realism. The customer use case influences the choice
+  // here. -->
+  // Choose a method for estimating pose, velocity, and acceleration from the
+  // trajectory of poses.
+  // Defaults to `differentiation: FIRST_ORDER_BACKWARD_DIFFERENCE`.
+  oneof implementation_spec {
+    // Estimation based on numerical differentiation methods, specify the method in the spec.
+    // Defaults to `FIRST_ORDER_BACKWARD_DIFFERENCE`.
+    DifferentiationMethod differentiation = 4;
+    // Estimated based on smoothing the "ground-truth" pose history.
+    // Use for applications where the internal consistency between reported accelerations,
+    // velocities, and poses is more important than tracking the "ground-truth" simulated pose.
+    LeastSquaresFit least_squares_fit = 5;
+    // No estimation.
+    // Directly uses the pose, velocity, and acceleration computed from the vehicle's motion model
+    // and from placing the vehicle on terrain.
+    Raw raw = 7;
+  }
+
+  // The frame in which the sensor output is expressed.
+  // If the sensor_output.reporting_frame is VEHICLE or SENSOR, the output is
+  // reported using the delayed VEHICLE or SENSOR frame.
+  SensorOutputConfig sensor_output = 6;
+
+  // Adds bias to the localization sensor's linear acceleration.
+  SensorBias sensor_bias = 9;
+
+  message SensorBias {
+    // The bias vector is expressed in the MAP frame, regardless of the reporting
+    // frame of the sensor.
+    simian_public.common.Vector3 world_linear_acceleration_bias = 1 [(field_options.units) = MPS2];
+  }
+
+  enum DifferentiationMethod {
+    // Use a https://en.wikipedia.org/wiki/Five-point_stencil when
+    // computing numerical derivatives.
+    //
+    // Advantage: better accuracy than FIRST_ORDER_BACKWARD_DIFFERENCE
+    //
+    // Disadvantage: introduces a delay of 2 simulation steps between
+    // the current ground truth sim state and the quantities reported
+    // by the localization sensor.
+    FIVE_POINT_STENCIL = 0;
+
+    // Use a first-order backward difference
+    // https://en.wikipedia.org/wiki/Finite_difference when computing
+    // numerical derivatives.
+    //
+    // Advantage: all quantities reported by the localization sensor
+    // pertain to the latest simulation step.
+    //
+    // Disadvantage: the reported quantities are less realistic that
+    // FIVE_POINT_STENCIL.
+    FIRST_ORDER_BACKWARD_DIFFERENCE = 1;
+  }
+
+  // The least-squares fit estimates an acceleration signal that
+  // trades off three things:
+  // - tracking simulated ground truth
+  // - smooth velocities and accelerations
+  // - reporting delay
+  //
+  // The fit happens over a sliding window of size N that lives N
+  // ticks in the past. The least-squares fit thus introduces a
+  // reporting delay of N-1 ticks.
+  message LeastSquaresFit {
+    // Number of sim ticks in the sliding window.
+    int32 window_size = 1;
+    // Relative weight of velocity deviations.
+    double velocity_weight = 2 [(field_options.units) = NO_UNITS];
+    // Relative weight of acceleration deviations.
+    double acceleration_weight = 3 [(field_options.units) = NO_UNITS];
+    // Version 0.1 (default):
+    //   - Original python LSQ position tracker implementation
+    // Version 0.2 (introduced in Simian v1.26):
+    //   - Improved runtime performance of least_squares_fit by 5x with C++ implementation
+    simian_public.common.VersionMajorMinor version = 4;
+  }
+
+  // Use the raw pose, velocity, and acceleration from the motion model and from placing
+  // the vehicle on terrain (no finite differencing or smoothing).
+  message Raw {}
+}
+
+message TrafficLightSensorSpec {
+  // The name of the channel to which the sensor will publish in the customer interface.
+  // Use this to distinguish between different traffic light sensors in the interface.
+  string name = 1 [(field_options.is_required) = true];
+  // Specify the mount and field of view of the sensor.
+  SensorView sensor_view = 2 [(field_options.is_required) = true];
+  // Specify output format options (e.g., the reporting reference frame).
+  SensorOutputConfig sensor_output = 3 [(field_options.is_required) = true];
+  // Optional list of sensor filters to modify the sensor output with noise, occlusion modeling,
+  // etc.
+  repeated SensorFilter sensor_filters = 4;
+  // Version 0.1 (default):
+  //   - Setting sensor_output.reporting_frame to VEHICLE or SENSOR is not handled correctly
+  //     (traffic light pose and polygon points are incorrect).
+  // Version 0.2 (introduced in Simian v1.26):
+  //   - Setting sensor_output.reporting_frame to VEHICLE or SENSOR is handled correctly
+  //     (traffic light pose and polygon points are correctly expressed in the
+  //     VEHICLE or SENSOR frame).
+  //   - Bug fix: The Traffic Light Block Sensor can now report blocks with only 1 bulb.
+  simian_public.common.VersionMajorMinor version = 5;
+  // Options to visualize the output of the sensor.
+  // Defaults to no visualizations for the sensor.
+  simian_public.scenario.VisualizationOptions visualization_options = 6;
+}
+
+message TrafficSignSensorSpec {
+  // The name of the channel to which the sensor will publish in the customer interface.
+  // Use this to distinguish between different traffic sign sensors in the interface.
+  string name = 1 [(field_options.is_required) = true];
+  // Specify the mount and field of view of the sensor.
+  SensorView sensor_view = 2 [(field_options.is_required) = true];
+  // Specify output format options (e.g., the reporting reference frame).
+  SensorOutputConfig sensor_output = 3 [(field_options.is_required) = true];
+  // Optional list of sensor filters to modify the sensor output with noise, occlusion modeling,
+  // etc.
+  repeated SensorFilter sensor_filters = 4;
+}
+
+message IMUSensorSpec {
+  // The name of the channel to which the sensor will publish.
+  string name = 1 [(field_options.is_required) = true];
+  // Specify the mount of the sensor, relative to the agent's frame.
+  simian_public.spatial.PoseSpec mount = 2;
+  // Optional list of sensor filters to modify the sensor output with noise, occlusion modeling,
+  // etc.
+  repeated SensorFilter sensor_filters = 3;
+}
+
+message WheelSpeedSensorSpec {
+  // The name of the channel to which the sensor will publish in the customer interface.
+  // Use this to distinguish between different wheel speed sensors in the interface.
+  string name = 1 [(field_options.is_required) = true];
+  // Optional list of sensor filters to modify the sensor output.
+  // The only filter supported by the wheel speed sensor is the `noise_filter`.
+  repeated SensorFilter sensor_filters = 2;
+  // <!-- Wheel configurations are copied from the VehicleConfig message;
+  // users should not specify wheels in the sensor spec. -->
+  // [DEPRECATED] Unused, please specify in `vehicle.wheels` instead.
+  repeated simian_public.scenario.WheelConfig wheels = 3
+      [(field_options.ignore_in_autocomplete) = true];
+  // Account for the vehicle's yawrate, causing wheels on the outside
+  // of a turn to have a higher speed.
+  bool differential_wheel_speed = 4;
+}
+
+message AgentPeriodicDistance {
+  // Distance interval at which the sensor should send info.
+  double distance = 1 [
+    (field_options.units) = M,
+    (field_options.greater_than) = 0,
+    (field_options.is_required) = true
+  ];
+  // Reference agent to which distance should be tracked.
+  // Only supported for ego.
+  simian_public.scenario.NewObstacleIdent reference_agent = 2 [(field_options.is_required) = true];
+}
+
+// Conditional filters for when sensor info should be sent.
+// If set, populates lane sensor info sent from Simian -> stack at ticks when the specified
+// condition evaluates to true. In all other ticks only the name and timestamp fields will be
+// populated. If not specified, Simian as usual, will populate lane sensor data for all ticks at
+// the sensor's channel rate.
+message PopulateOutputWhenTrue {
+  oneof condition {
+    // Send sensor info every time agent travels the specified distance.
+    // For example, if distance is set to 100, this will return true at 100m, 200m, 300m... and so
+    // on. Any agent motion, including reversing, adds to the distance travelled.
+    // Useful for simulating large amounts of sensor data sent only when there is new data at some
+    // distance interval.
+    AgentPeriodicDistance agent_periodic_distance = 1;
+  }
+}
+
+// <!-- Next ID: 30 [last edited by Koh] -->
+message LaneSensorSpec {
+  // Name of the lane sensor channel. If you are using the multi-rate interface, make sure this name
+  // matches the channel name listed in the `v2_api_basic` section.
+  string name = 1 [(field_options.is_required) = true];
+  // Field of view of the lane sensor.
+  SensorView sensor_view = 2;
+  // Defines the conventions to be used when Simian creates the output for the lane sensor,
+  // e.g. sensor reporting frame.
+  SensorOutputConfig sensor_output = 3 [(field_options.is_required) = true];
+  // List of filters to apply to the Lane Sensor.
+  repeated SensorFilter sensor_filters = 4;
+  // Determines if Simian mandates length(lane_boundary_points) == length(lane_boundary_metadata).
+  MetadataSizeChecking metadata_size_checking = 25;
+  // If set, populates lane sensor info sent from Simian to the stack at ticks when the specified
+  // condition evaluates to true. In all other ticks, only the name and timestamp fields will be
+  // populated. If not specified, Simian as usual, will populate lane sensor data for all ticks at
+  // the sensor's channel rate.
+  PopulateOutputWhenTrue populate_output_when_true = 26;
+  enum MetadataSizeChecking {
+    // (Default) Simian errors out if length(lane_boundary_points) !=
+    // length(lane_boundary_metadata). Note that the recommended output is
+    // length(lane_boundary_points) == length(lane_boundary_metadata).
+    STRICT_METADATA_CHECKING = 0;
+    // Simian will not mandate length(lane_boundary_points) == length(lane_boundary_metadata). Note
+    // that this setting may result in strange output.
+    LENIENT = 1;
+  }
+
+  // Specify which lane lines (e.g. centerlines, boundary lines) Simian should report.
+  ReportedLines reported_lines = 5;
+  enum ReportedLines {
+    // (Default) Report only lane boundaries.
+    BOUNDARIES = 0;
+    // Report lane centerlines and lane boundaries.
+    BOUNDARIES_AND_CENTER = 1;
+    // Report only lane centerlines.
+    CENTER = 2;
+  }
+  // Use this setting to determine if the lane sensor should report lane pairing info for terminal
+  // lanes. Terminal lanes are lanes that do not have any successor and/or predecessor lanes.
+  ReportingLanePairing report_lane_pairing = 23;
+  enum ReportingLanePairing {
+    // (Default) Terminal lanes, i.e. lines that do not have predecessors and/or succesors will not
+    // report lane pairing information. All other lanes will report lane pairing.
+    TERMINAL_LANES_DO_NOT_REPORT_LANE_PAIRING = 0;
+    // All lanes report lane pairing info.
+    ALL_LANES_REPORT_LANE_PAIRING = 1;
+  }
+
+  // This field allows you to configure the order in which lane boundary points are reported by the
+  // lane sensor. Ignored by lane keep sensors.
+  ReportedPointOrdering lane_boundary_point_ordering = 22;
+  enum ReportedPointOrdering {
+    // (Default) Lane boundary points maintain ordering defined in the source map (see
+    // map_lane.proto for exact schema). The points are reported in OSI format (see osi_lane.proto)
+    // and may not have a 1:1 correspondence with the points defined in map_lane.proto.
+    SOURCE_ORDER = 0;
+    // In this mode, the ordering of points in a boundary is reversed from their order in the source
+    // map if the endpoint nearest to the sensor mount is at the end of the point list. The points
+    // are reported in OSI format (see osi_lane.proto) and may not have a 1:1 correspondence with
+    // the points defined in map_lane.proto.
+    ASCENDING_DISTANCE_FROM_MOUNT_ORDER = 1;
+    // In this mode, the ordering of points in a boundary is reversed from their order in the source
+    // map if the vector from the boundary's original starting point to its original end point is in
+    // the opposite direction (negative dot product) as the agent's longitudinal axis. The points
+    // are reported in OSI format (see osi_lane.proto) and may not have a 1:1 correspondence with
+    // the points defined in map_lane.proto.
+    AGENT_HEADING_ORDER = 2;
+  }
+
+  // Report empty lines with no points in field of view.
+  ReportEmpty report_empty = 24;
+  enum ReportEmpty {
+    // (Default) Note that empty lane boundaries may or may not be reported based on the field
+    // subsegment_handling_version. If subsegment_handling_version is set to
+    // SUBSEGMENT_HANDLING_SNAP_WITH_GAP, empty lane boundaries will NOT be reported even if
+    // report_empty is set to CENTER_AND_MAYBE_BOUNDARIES.
+    CENTER_AND_MAYBE_BOUNDARIES = 0;
+    // Empty lane center lines are not reported in this configuration.
+    // Note that empty lane boundaries may or may not be reported based on the field
+    // subsegment_handling_version. If subsegment_handling_version is set to
+    // SUBSEGMENT_HANDLING_SNAP_WITH_GAP, empty lane boundaries will NOT be reported even if
+    // report_empty is set to CENTER_AND_MAYBE_BOUNDARIES.
+    //
+    // If you want the lane sensor to NOT report empty lane center lines and lane boundaries, set
+    // report_empty to MAYBE_BOUNDARIES and make sure subsegment_handling_version is NOT
+    // SUBSEGMENT_HANDLING_SNAP_WITH_GAP.
+    MAYBE_BOUNDARIES = 1;
+  }
+
+  // This field allows you to choose the formats in which lane data is reported.
+  // If `reported_formats` is not specified in scenario files,
+  // `reported_format` defaults to `polyline`.
+  ReportedFormats reported_formats = 21;
+  message ReportedFormats {
+    // (Default) Report the lane centerline/boundary line information as a list of points defining
+    // the line.
+    Polyline polyline = 1 [(field_options.is_required) = true];
+    // Report the lane centerline/boundary line information as a cubic polynomial, calculated by
+    // least square fitting. Output is specified in `osi3.Lane` and `osi3.LaneBoundary`
+    // `centerline_polynomial` and `boundary_polynomial` messages.
+    // Only specifying `cubic_polynomial`` is not allowed.
+    CubicPolynomial cubic_polynomial = 2;
+    message CubicPolynomial {}
+    message Polyline {}
+  }
+
+  // Resample the lanes using this distance (in meters).
+  // This removes points from the lane segments so that the distance between points is approximately
+  // equal to the `lane_sampling_distance`. You can use this field to downsample the reported lane
+  // points for better performance on large maps with very dense lane points. Default: zero (no
+  // resampling).
+  double lane_sampling_distance = 6
+      [(field_options.units) = M, (field_options.greater_than_or_equal) = 0];
+  // Lines may be stitched together if they terminate within lane_stitching_distance
+  // of each other. See the `stitching` field for more lane stitching configuration options.
+  // Default: 0.1 meters
+  double lane_stitching_distance = 7
+      [(field_options.units) = M, (field_options.greater_than_or_equal) = 0];
+
+  // When using the `lane_scan_filter`, the points in the reported lines
+  // are the intersections between the lane lines and lateral line segments (scan lines).
+  // Therefore, the reported points form rows in which each point has the same
+  // longitudinal distance from the sensor.
+  // The furthest reported points will have a longitudinal distance of
+  // (num_scan_lines * scan_line_distance) from the sensor.
+  // The main reason to use the `lane_scan_filter` is to upsample the lane points.
+  LaneScanFilter lane_scan_filter = 8;
+  message LaneScanFilter {
+    // Number of laterally-oriented line segments to intersect with the lane lines.
+    int32 num_scan_lines = 1 [
+      (field_options.units) = NO_UNITS,
+      (field_options.greater_than) = 0,
+      (field_options.is_required) = true
+    ];
+    // Distance between scan lines along the longitudinal axis of the sensor.
+    double scan_line_distance = 2 [
+      (field_options.units) = M,
+      (field_options.greater_than) = 0,
+      (field_options.is_required) = true
+    ];
+    // In general, the lane scan filter can cause gaps between lanes, especially
+    // when stitching is disabled. Use `include_endpoints` to close these gaps.
+    // Lane endpoints are included only if they are within the `scan_line_distance` of
+    // the first or last scan line intersection points.
+    // Applies only to lane boundaries, not to lane centerlines.
+    // Default: false
+    bool include_endpoints = 3;
+    // If the scan line intersects a lane boundary in multiple locations,
+    // use the intersection point located at the shortest distance along the
+    // lane boundary ahead of the sensor.
+    // Currently applies only to lane boundaries, not to lane centerlines.
+    // Default: false (use an arbitrary intersection)
+    bool nearest_intersection = 4;
+    // Length of each scan line (parallel to the longitudinal axis of the sensor).
+    // Default: the lateral range of the sensor's field of view.
+    double scan_line_length = 5 [(field_options.units) = M, (field_options.greater_than) = 0];
+  }
+
+  // If false, then the sensor does not report lane points behind the sensor.
+  // Only supported for the `lane_keep_sensor`.
+  bool use_predecessor = 9;
+
+  // If `sample_successors`` is provided, then the only lanes and lane boundaries reported
+  // are those that come from successor lanes (recursively) of the ego's initial lane
+  // (or the ego's initial lane itself).
+  // `sample_successors` requires `reported_lines` to be BOUNDARIES.
+  SampleSuccessors sample_successors = 10;
+  message SampleSuccessors {
+    // If the closest lane to the sensor is farther away than `lane_resampling_distance`,
+    // the lane sensor restarts its sensing from the lane that is currently closest.
+    // Currently only supported for `lane_keep_sensor` lane_boundaries.
+    double lane_resampling_distance = 1
+        [(field_options.units) = M, (field_options.greater_than_or_equal) = 0];
+    // If true, report left and right neighbor lanes and their successors in addition to the host
+    // lane. If false, report host lane only. Currently only supported for `lane_keep_sensor``
+    // lane_boundaries.
+    bool get_adjacent_lanes = 2;
+  }
+  // <!-- Easter egg: visualize road as a Mario Kart-esque rainbow road. -->
+  bool visualize_road = 11 [(field_options.ignore_in_autocomplete) = true];
+
+  // Combine lanes and lane boundaries with their successors or predecessors if the two are the same
+  // type. Stitching is affected by the `lane_stitching_distance``.
+  LaneStitching stitching = 12;
+  message LaneStitching {
+    // Enable lane stitching if true.
+    // Must be true when `boundary_type_groups` are listed.
+    bool enable = 1;
+
+    // By default, lane stitching is strict about the `is_host_vehicle_lane` flag and refuses to
+    // stitch two lanes if they have different values for that flag. But depending on the use case,
+    // it is more appropriate to ignore that runtime information and stitch solely based on constant
+    // lane information. Default: false
+    bool lenient_ego_lane = 2;
+
+    // If specified, boundaries are stitched with other boundaries whose type is in the same group.
+    // Color, custom type, and custom color are ignored.
+    repeated BoundaryTypeGroup boundary_type_groups = 3;
+    message BoundaryTypeGroup {
+      // List of Lane Boundary types. Lane Boundary types within the same group will be stitched
+      // together.
+      repeated simian_public.hdmap.LaneBoundaryTypeEnum.LaneBoundaryType types = 1;
+    }
+
+    // Version 0.1 (default):
+    //   - A lane or lane boundary that is shorter than the `lane_stitching_distance` may not be
+    //   stitched to other lanes or lane boundaries.
+    // Version 0.2 (introduced in Simian v1.39):
+    //   - The stitcher supports stitching lanes or lane boundaries that are shorter than the
+    //   `lane_stitching_distance`.
+    //   - The `constant_ids` setting now forces a constant ID when two boundaries with pre-existing
+    //   constant IDs are stitched together (the constant ID of the previously-sensed boundary is
+    //   used).
+    simian_public.common.VersionMajorMinor version = 4;
+
+    // With this option, stitching causes a line's ID to be inherited (copied) from the
+    // previously-sensed line to which a line is stitched, over the lifetime of the simulation (that
+    // is, even as the field of view no longer covers the previously-sensed line). The original IDs
+    // of lines that get stitched to previously-sensed lines are discarded in the sensor's output.
+    // Currently, this applies only to boundaries, not to centerlines.
+    bool constant_ids = 5;
+  }
+
+  // If the map contains a description of the road and this field is true,
+  // then the left and right edges of the road are reported as OSI lane boundaries.
+  // The field `reported_lines` must be either BOUNDARIES or BOUNDARIES_AND_CENTER.
+  // Only supported in LaneSensor, not in LaneKeepSensor.
+  bool include_road_edges_as_boundaries = 13;
+
+  // Compute the lane sensor in parallel with the rest of the simulation
+  // and the customer stack.
+  // This gives the sensor additional time to perform its calculations, but
+  // introduces a delay by one update. For example,
+  // if this sensor updates at a frequency of 10 Hz, then delaying
+  // the sensor gives the sensor 0.1 seconds to perform its calculations
+  // in parallel, but the data returned will be delayed by 0.1 seconds.
+  // This option is useful for real-time simulation.
+  // If the sensor_output.reporting_frame is VEHICLE or SENSOR, the lane data is
+  // reported using the ego pose from the previous tick at which the lane sensor
+  // was requested.
+  // Currently only supported for LaneSensor (not LaneKeepSensor).
+  bool deferred_parallel_processing = 14;
+  // Settings for the deferred_parallel_processing field (e.g. `report_first_tick`).
+  // Only used if `deferred_parallel_processing` is `True`.
+  DeferredParallelProcessingSettings deferred_parallel_processing_settings = 27;
+  message DeferredParallelProcessingSettings {
+    // Can only be true if `deferred_parallel_processing` is true.
+    // Computes the first tick of the simulation at the normal cadence, but then
+    // delays the rest of the computations so there will be a 1-update delay.
+    // This allows customers to not have to tweak their stacks to handle the
+    // absence of lane sensor output during the initial tick of the simulation.
+    bool report_first_tick = 1;
+  }
+
+  // Report only the lanes connected to the ego's current lane as
+  // predecessors, successors, left neighbors, and right neighbors (recursively).
+  // Only applies to the LaneSensor, not the LaneKeepSensor.
+  Connectivity connectivity = 15;
+  message Connectivity {}
+
+  // The lane sensor populates the OSI field `is_host_vehicle_lane` with the ID of the ego's current
+  // lane. The determination of the ego's current lane is influenced by the distance between the
+  // ego origin and lane centerlines. This distance must be less than the `ego_lane_search_radius`
+  // for a lane to be considered as the ego's current lane.
+  // If the ego may drive far from a lane's centerline, consider setting this field to 2 meters.
+  // This setting also influences the `connectivity` setting.
+  // Default: 1 meter.
+  double ego_lane_search_radius = 16
+      [(field_options.units) = M, (field_options.greater_than_or_equal) = 0];
+
+  // Report only one lane boundary with given endpoints.
+  // A lane boundary is considered similar to another if each of its endpoints are within
+  // endpoint_distance of the respective endpoints of the other lane boundary.
+  RemoveSimilarLaneBoundaries remove_similar_lane_boundaries = 17;
+  message RemoveSimilarLaneBoundaries {
+    // Default: true.
+    bool enable = 1;
+    // A lane boundary is considered similar to another if each of its endpoints are within
+    // endpoint_distance of the respective endpoints of the other lane boundary.
+    // We suggest choosing a value that is less than the width of a lane.
+    // Default: `lane_stitching_distance`.
+    double endpoint_distance = 2 [(field_options.units) = M, (field_options.greater_than) = 0];
+  }
+
+  // Choose the method by which the `lane_sampling_distance` is applied.
+  LaneSamplingMethod lane_sampling_method = 18;
+  enum LaneSamplingMethod {
+    // Remove points from lane lines so that no two points are within `lane_sampling_distance` of
+    // each other.
+    DROP = 0;
+    // Interpolate the lane lines at intervals of `lane_sampling_distance` along the original lane
+    // lines.
+    INTERPOLATE = 1;
+  }
+
+  // Version 0.1 (default):
+  //   - This version does not cull lane boundaries correctly when a lane boundary exits and enters
+  //   the lane sensor's
+  //     field of view. In this version, Simian incorrectly creates a polyline connecting the lane
+  //     boundary's exit and entry points; this incorrect polyline is reflected in the frontend
+  //     visualizer.
+  // Version 0.2 (introduced in Simian v1.31):
+  //   - In v1.31, Applied fixed a bug that surfaces when lane boundaries exit and and enter the
+  //   lane sensor's field of
+  //     view. In this version, Simian splits the lane boundary into multiple distinct OSI
+  //     boundaries when a lane boundary exits and enters the field of view.
+  // Version 0.3 (introduced in Simian v1.36):
+  //   - In v1.36, Applied fixed a bug to compute accurate cubic polynomial fit for lanes that have
+  //   large coordinate values.
+  // Version 0.4 (introduced in Simian v1.37):
+  //   - In v1.37, Applied uses a more reliable method to determine the ego's lane, and
+  //   ego_lane_search_radius is no longer used in 0.4 or later.
+  //     This applies to Lane Sensors only, not Lane Keep Sensors.
+  simian_public.common.VersionMajorMinor version = 20;
+
+  // Backward-compatibility mechanism for subsegment support.
+  SubsegmentHandlingVersion subsegment_handling_version = 19;
+  enum SubsegmentHandlingVersion {
+    // The default is to use the latest available version. This does not
+    // need to be explicitly set in a scenario.
+    SUBSEGMENT_HANDLING_DEFAULT = 0;
+
+    // Added in Simian release 1.29:
+    //
+    // Report lane boundary subsegments as individually converted OSI
+    // lane boundaries. Support the per-subsegment VIRTUAL boundary
+    // type enum value as well as the per-segment virtual flag. The
+    // VIRTUAL boundary type is the preferred method for specifying
+    // which (sub)segments should be reported as virtual, the
+    // segment-level `virtual` flag should not be used (but is still
+    // supported for backward compatibility).
+    //
+    // Each subsegment snaps to the first boundary point that is at or
+    // beyond the desired arc-length. Between consecutive subsegments,
+    // a gap is left open (i.e. the final point of the preceding
+    // subsegment is distinct from the first point of the following
+    // subsegment).
+    //
+    // In case of multiple boundary types in a subsegment, only the
+    // last type gets reported.
+    SUBSEGMENT_HANDLING_SNAP_WITH_GAP = 2;
+
+    // Up to (including) Simian release v1.28:
+    //
+    // This is essentially a legacy support version. It does not
+    // report sub-segments at all.
+    //
+    // Only honors the per-segment `virtual` flag, those segments get
+    // mapped to OSI TYPE_NO_LINE and COLOR_NONE. Any VIRTUAL boundary
+    // type values get remapped to OSI TYPE_UNKNOWN and COLOR_UNKNOWN.
+    //
+    // In case of multiple boundary types in a subsegment, only the
+    // last type gets reported.
+    SUBSEGMENT_HANDLING_DISABLED = 1;
+  }
+
+  // Specify the lane boundary types to report.
+  // This is effective only when `reported_lines` is `BOUNDARIES` or `BOUNDARIES_AND_CENTER`.
+  // If unspecified, the sensor will report all of the lane boundary types.
+  repeated simian_public.hdmap.LaneBoundaryTypeEnum.LaneBoundaryType boundary_types = 28;
+
+  // Specify multiple reported regions with different settings.
+  // This feature is helpful when users want to specify multiple lane sensor settings
+  // but want to avoid using multiple lane sensors, which would be less performant.
+  repeated ReportedRegion reported_regions = 29;
+  message ReportedRegion {
+    // Specify the mount and field of view of the sensor.
+    // Cannot specify both `sensor_view` under `reported_regions` and `sensor_view` under
+    // `lane_sensors`. If unspecified, use `sensor_view` under `lane_sensors`. Defaults to report
+    // all of the lane boundary types.
+    SensorView sensor_view = 1;
+
+    // Specify the lane boundary types to report.
+    // Cannot specify both `boundary_types` under `reported_regions` and `boundary_types` under
+    // `lane_sensors`. If unspecified, use `boundary_types` under `lane_sensors`. Defaults to report
+    // all of the lane boundary types.
+    repeated simian_public.hdmap.LaneBoundaryTypeEnum.LaneBoundaryType boundary_types = 2;
+  }
+}
+
+message LaneMarkerSensorSpec {
+  // The name of the channel to which the sensor will publish in the customer interface.
+  // Use this to distinguish between different lane marker sensors in the interface.
+  string name = 1 [(field_options.is_required) = true];
+  // Specify the mount and field of view of the sensor.
+  SensorView sensor_view = 2 [(field_options.is_required) = true];
+  // Specify output format options (e.g., the reporting reference frame).
+  SensorOutputConfig sensor_output = 3;
+  // Optional list of sensor filters to modify the sensor output with noise, occlusion modeling,
+  // etc.
+  repeated SensorFilter sensor_filters = 4;
+
+  // Combine lanes and lane boundaries when one line ends where another line begins
+  // and both are of the same type.
+  // Defaults to 0.1m.
+  double lane_stitching_distance = 5
+      [(field_options.units) = M, (field_options.recommended_greater_than) = 0.1];
+  // Set as true to visualize the field of view of the lane marker sensor.
+  bool render_fov = 6;
+  // <!-- Easter egg: visualize road as a Mario Kart-esque rainbow road. -->
+  bool visualize_road = 7 [(field_options.ignore_in_autocomplete) = true];
+}
+
+message FreeSpaceSensorSpec {
+  // The name of the channel to which the sensor will publish in the customer interface.
+  // Use this to distinguish between different free space sensors in the interface.
+  string name = 1 [(field_options.is_required) = true];
+  // Specify the mount and field of view of the sensor.
+  SensorView sensor_view = 2 [(field_options.is_required) = true];
+  // Specify output format options (e.g., the reporting reference frame).
+  SensorOutputConfig sensor_output = 3 [(field_options.is_required) = true];
+  // Optional list of sensor filters to modify the sensor output with noise, occlusion modeling,
+  // etc.
+  repeated SensorFilter sensor_filters = 4;
+  // Set as `true` to visualize the output of the free space sensor.
+  bool visualize = 5;
+}
+
+message PlanarLidarSensorSpec {
+  // The name of the channel to which the sensor will publish in the customer interface.
+  // Use this to distinguish between different planar lidar sensors in the interface.
+  string name = 1 [(field_options.is_required) = true];
+  // x value of the 2d mount of the sensor, relative to the agent's reference frame.
+  // Defaults to 0.
+  double mount_x = 2 [(field_options.units) = M];
+  // y value of the 2d mount of the sensor, relative to the agent's reference frame.
+  // Defaults to 0.
+  double mount_y = 3 [(field_options.units) = M];
+  // yaw value for mounting the sensor, relative to the agent's reference frame.
+  // Defaults to 0.
+  double mount_yaw = 4 [(field_options.units) = RAD];
+  // Specify the sector field of view of the sensor.
+  SectorFieldOfView sector_fov = 5 [(field_options.is_required) = true];
+
+  message SectorFieldOfView {
+    // Specify the nearest distance from the sensor mount at which the sensor should sense objects.
+    double distance_near = 1 [(field_options.units) = M, (field_options.greater_than_or_equal) = 0];
+    // Specify the farthest distance from the sensor mount at which the sensor should sense objects.
+    double distance_far = 2 [(field_options.units) = M, (field_options.greater_than_or_equal) = 0];
+    // Specify the start of the yaw range of the sensor's field of view (counterclockwise about the
+    // sensor frame's +x axis).
+    double yaw_start = 3 [(field_options.units) = RAD];
+    // Specify the angular distance that the field of view extends counterclockwise from
+    // `yaw_start`.
+    double yaw_length = 4 [(field_options.units) = RAD, (field_options.greater_than_or_equal) = 0];
+    // Specify the start of the pitch range of the sensor's field of view (downward pitch is
+    // positive).
+    double pitch_start = 5 [(field_options.units) = RAD];
+    // Specify the angular distance that the field of view extends upwards
+    // (clockwise about the sensor frame's +y axis) from `pitch_start`.
+    double pitch_length = 6
+        [(field_options.units) = RAD, (field_options.greater_than_or_equal) = 0];
+  }
+  // Number of rays to be used in the planar lidar sensor.
+  int32 num_rays = 6 [
+    (field_options.units) = NO_UNITS,
+    (field_options.greater_than) = 1,
+    (field_options.is_required) = true
+  ];
+  // [DEPRECATED] Please use `visualization_options` instead.
+  bool visualize = 7;
+
+  // Filter the detections to be restricted by the driveable surface.
+  // The driveable surface is all lanes connected to the ego's current lane.
+  // Currently the driveable surface does NOT account for Roads (see map_road.proto) in the Simian
+  // map. Default: false
+  bool filter_free_space = 8;
+
+  // Options to toggle runtime visualizations of the sensor.
+  simian_public.scenario.VisualizationOptions visualization_options = 9;
+}
+
+// <!-- `x` is aligned forward with the direction of sensor.
+// Grid center is located at the center of the sensor position. -->
+message PlanarOccupancyGridSensorSpec {
+  // The name of the channel to which the sensor will publish in the customer interface.
+  // Use this to distinguish between different planar occupancy grid sensors in the interface.
+  string name = 1 [(field_options.is_required) = true];
+  // Position of the sensor along the x axis of the vehicle frame.
+  // Defaults to 0.
+  double mount_x = 2 [(field_options.units) = M];
+  // Position of the sensor along the y axis of the vehicle frame.
+  // Defaults to 0.
+  double mount_y = 3 [(field_options.units) = M];
+  // Angle between the x axes of the sensor frame and vehicle frame.
+  // Defaults to 0.
+  double mount_yaw = 4 [(field_options.units) = RAD];
+  // Length of each square grid cell.
+  double cell_length = 5 [
+    (field_options.units) = M,
+    (field_options.greater_than) = 0,
+    (field_options.is_required) = true
+  ];
+  // Number of grid cells in the x-direction.
+  uint32 grid_dimension_x = 6 [
+    (field_options.units) = M,
+    (field_options.greater_than) = 0,
+    (field_options.is_required) = true
+  ];
+  // Number of grid cells in the y-direction.
+  uint32 grid_dimension_y = 7 [
+    (field_options.units) = M,
+    (field_options.greater_than) = 0,
+    (field_options.is_required) = true
+  ];
+  // When set to `true` Simian will draw a
+  // [billboarded](https://en.wiktionary.org/wiki/billboarding) tile for each cell in the grid of
+  // the sensor. Squares that are colored red are occupied by other actors in the scene, whereas
+  // squares that are colored green are unoccupied, as perceived by the occupancy grid sensor.
+  bool visualize = 8;
+  // Optional list of sensor filters to modify the sensor output with noise, occlusion modeling,
+  // etc.
+  repeated SensorFilter sensor_filters = 9;
+}
+
+// <!-- Grid center is located at the center of the agent. -->
+message OcclusionGridSensorSpec {
+  // The name of the channel to which the sensor will publish in the customer interface.
+  // Use this to distinguish between different occlusion grid sensors in the interface.
+  string name = 1 [(field_options.is_required) = true];
+  // Length of each square grid cell.
+  double cell_length = 2 [
+    (field_options.units) = M,
+    (field_options.greater_than) = 0,
+    (field_options.is_required) = true
+  ];
+  // Number of grid cells in the x-direction.
+  uint32 grid_dimension_x = 3 [
+    (field_options.units) = M,
+    (field_options.greater_than) = 0,
+    (field_options.is_required) = true
+  ];
+  // Number of grid cells in the y-direction.
+  uint32 grid_dimension_y = 4 [
+    (field_options.units) = M,
+    (field_options.greater_than) = 0,
+    (field_options.is_required) = true
+  ];
+  // Use in conjunction with the `clip_height_by_max_height` parameter - specify the `max_height`
+  // the sensor should clip to.
+  double max_height = 5 [(field_options.units) = M];
+  // When true, will visualize the output of the occlusion grid sensor.
+  bool visualize = 6;
+  // Optional list of sensor filters to modify the sensor output with noise, occlusion modeling,
+  // etc.
+  repeated SensorFilter sensor_filters = 7;
+  // Version of the occlusion grid sensor.
+  // v0.1 Base version
+  // [Default] v0.2 Performant version, 12x faster than v0.1. Introduced in 1.23
+  simian_public.common.VersionMajorMinor version = 8;
+  // Clip the outputs of the occlusion grid sensor by the max_height parameter.
+  bool clip_height_by_max_height = 9;
+}
+
+// <!-- Next id: 8 -->
+message MapSensorSpec {
+  // The name of the channel to which the sensor will publish in the customer interface.
+  // Use this to distinguish between different map sensors in the interface.
+  string name = 1 [(field_options.is_required) = true];
+  // Specify the mount and field of view of the sensor.
+  SensorView sensor_view = 2 [(field_options.is_required) = true];
+  // Specify output format options (e.g., the reporting reference frame).
+  SensorOutputConfig sensor_output = 3;
+  // If map_features is empty, all MapFeatures listed in the
+  // enum are reported.
+  repeated MapFeature map_features = 4;
+  // This enum lists the map features that this sensor can report.
+  enum MapFeature {
+    // Corresponds to the legacy simian_public.hdmap.Map.crosswalk list.
+    CROSSWALK = 0;
+    // Corresponds to the legacy simian_public.hdmap.Map.stop_line list.
+    STOP_LINE = 1;
+    // Corresponds to the simian_public.hdmap.Map.region list.
+    REGION = 2;
+    // Corresponds to the simian_public.hdmap.Map.road_marking list.
+    ROAD_MARKING = 3;
+  }
+  // Visualize the field of view of the sensor.
+  bool visualize = 5;
+
+  // Filter the output of the map sensor. The only sensor filter currently
+  // supported by this sensor is EgoLaneAssociationFilter.
+  repeated SensorFilter sensor_filters = 6;
+  // If set, populates map sensor info sent from Simian -> stack at only those ticks when the
+  // specified condition evaluates to true. In all other ticks only the name and timestamp fields
+  // will be populated. If not specified, Simian as usual, will populate map sensor data for all
+  // ticks at the sensor's channel rate.
+  PopulateOutputWhenTrue populate_output_when_true = 7;
+}
+
+message TerrainSensorSpec {
+  // The name of the channel to which the sensor will publish in the customer interface.
+  // Use this to distinguish between different terrain sensors in the interface.
+  string name = 1 [(field_options.is_required) = true];
+  // Specifies the points the terrain sensor queries to find terrain information about.
+  oneof terrain_sensor_type {
+    // Query points are the ego's wheel origins.
+    WheelOrigins wheel_origins = 2;
+    // Query points are the centers of cells in a grid that is centered at the sensor's mount point.
+    GridMap grid_map = 5;
+  }
+
+  // This terrain sensor type reports the elevation and surface normal found at each wheel origin.
+  // The sensor reads wheel origin locations from the vehicle:wheels: section of the scenario.
+  message WheelOrigins {}
+
+  /**
+     <!-- The grid is mounted in the sensor frame. Unlike with other Simian sensors, the sensor
+     frame does *not* rotate with the ego; the sensor frame orientation is fixed in the world frame
+     (the sensor frame's x axis is parallel to the world frame's x axis regardless of the ego's
+     orientation).
+
+                                      ^  y, sensor frame
+                                      |
+                              #---#---#---#---#
+                              # 2 | 5 | 8 |11 |
+        y                     #---#---#---#---#
+        ^                     # 1 | 4 | 7 |10 |  -->  x, sensor frame
+        | world frame         #---#---#---#---#
+        o--> x                # 0 | 3 | 6 | 9 |
+                              #---#---#---#---#
+       --> */
+  message GridMap {
+    // The position of the sensor in the vehicle frame.
+    simian_public.spatial.Point mount_point = 1;
+    // The side length of each square grid cell.
+    double cell_length = 5 [(field_options.units) = M];
+    // The number of grid cells in the x direction.
+    uint32 grid_dimension_x = 6 [(field_options.units) = NO_UNITS];
+    // The number of grid cells in the y direction.
+    uint32 grid_dimension_y = 7 [(field_options.units) = NO_UNITS];
+  }
+
+  // When using the WheelOrigins terrain_sensor_type, the terrain sensor uses step_size to look to
+  // the left, right, and front of the query point (based on the heading of the vehicle) to find
+  // three terrain points to fit a plane to. When using the GridMap terrain_sensor_type, the steps
+  // are in the world's +x, +y, and -y directions. The step_size does *not* need to be less than
+  // cell_length.
+  double step_size = 3 [(field_options.units) = M];
+  // Range of the area the terrain sensor will look above and below the query point's elevation
+  // at each of the three points around the query point to find terrain. This represents the
+  // total vertical search distance in both directions, meaning the sensor will look above and
+  // below by a distance of 0.5 * vertical_search_distance.
+  // When using the WheelOrigins terrain_sensor_type, the value should be close to the
+  // vehicle's tire diameter.
+  // When using the GridMap terrain_sensor_type, the value should be as large as you might expect
+  // the elevation to vary across the grid, but small enough so as to avoid overpasses or other
+  // terrain surfaces above or below the vehicle's driving surface (recommendation: 5 meters).
+  double vertical_search_distance = 4 [(field_options.units) = M];
+
+  // Set the terrain sensor version.
+  // Specify {major_version: 0, minor_version: 0} to use the default version.
+  // Available versions:
+  // - 0.1 (default): Initial implementation.
+  simian_public.common.VersionMajorMinor version = 6;
+}
+
+// <!-- Next ID: 12 -->
+message PolarObstacleSensorSpec {
+  // The name of the channel to which the sensor will publish in the customer interface.
+  // Use this to distinguish between different polar obstacle sensors in the interface.
+  string name = 1 [(field_options.is_required) = true];
+  // Specifies if rays can detect through certain obstacle types.
+  oneof detection_type {
+    // Each ray detects only the first obstacle it intersects with.
+    Empty single_detection_per_ray = 2;
+    // Rays can pass through (and detect) road edges but stop at the first actor detection.
+    Empty detect_through_road_edges = 8;
+  }
+
+  planar.Pose2d mount = 3;
+
+  SectorFieldOfView sector_fov = 4;
+
+  // Compute the polar obstacle sensor in parallel with the rest of the simulation
+  // and the customer stack when road_element_detection is set to lane_boundary.
+  // This gives the sensor additional time to perform its calculations, but
+  // introduces a delay by one update. For example,
+  // if this sensor updates at a frequency of 10 Hz, then delaying
+  // the sensor gives the sensor 0.1 seconds to perform its calculations
+  // in parallel, but the data returned will be delayed by 0.1 seconds.
+  // Currently only supported when road_element_detection is set to lane_boundary.
+  bool deferred_parallel_processing = 10;
+
+  // Determines the road elements detected by the polar obstacle sensor.
+  RoadElementDetection road_element_detection = 9;
+
+  // Resample lane boundaries using this distance (in meters) if road_element_detection is set to
+  // lane_boundary. Decreasing this value will make the polar obstacle more accurate. This extra
+  // accuracy comes at the cost of performance. In other words, the sensor's performance drops if
+  // you decrease this value. Inversely, the performance improves if you increase this value.
+  // Default: 2.0 meters.
+  // Accepted range: (0.0, infinity). Zero is not accepted.
+  double lane_sampling_distance = 11;
+
+  message RoadElementDetection {
+    oneof element_type {
+      // Detects road edges defined in map_road.proto.
+      Empty simian_map_road_edges = 1;
+      // Detects lane boundaries of type lane_boundary.type.
+      // Specifying multiple lane boundary types is not currently supported.
+      // You can only specify one lane boundary type.
+      LaneBoundaryTypes lane_boundary = 2;
+      // Rays do not see roads. This mode may be substantially more performant.
+      Empty no_road_element_detection = 3;
+    }
+  }
+
+  message LaneBoundaryTypes {
+    // Specifying multiple lane boundary types is not currently supported.
+    // You can only specify one lane boundary type.
+    repeated LaneBoundaryType types = 1;
+  }
+
+  enum LaneBoundaryType { ROAD_EDGE = 0; }
+
+  message SectorFieldOfView {
+    // <!-- TODO(Sam): This needs distance_near. Maybe just replace with the sensor_view field? -->
+    double distance_far = 1 [(field_options.units) = M];
+    double yaw_start = 2 [(field_options.units) = RAD];
+    double yaw_length = 3 [(field_options.units) = RAD];
+  }
+
+  int32 num_rays = 5 [(field_options.units) = NO_UNITS, (field_options.greater_than) = 1];
+  SensorOutputConfig sensor_output = 6;
+  simian_public.scenario.VisualizationOptions visualization_options = 7;
+}
+
+message AgentTrajectorySensorSpec {
+  // The name of the channel to which the sensor will publish in the customer interface.
+  // Use this to distinguish between different agent trajectory sensors in the interface.
+  string name = 1 [(field_options.is_required) = true];
+  // List of lookahead durations (spans of time) at which the trajectory will be sampled.
+  repeated google.protobuf.Duration lookahead_durations = 2
+      [(field_options.is_required) = true, (field_options.units) = S];
+  // Options to visualize the output of the sensor.
+  // Defaults to no visualizations for the sensor.
+  simian_public.scenario.VisualizationOptions visualization_options = 3;
+  // Sensor will also report perceived behaviors if they exist.
+  bool report_perceived_behavior_trajectories = 4;
+  // Controls the reporting frame for this sensor. Currently supports VEHICLE and MAP frame.
+  SensorOutputConfig sensor_output = 7;
+
+  // List of types of agents to report trajectories for. If unspecified, this defaults
+  // to ACTORS only. Note that in multiego scenarios, all other egos are seen as actors
+  // to the ego this sensor is attached to.
+  message AgentsToInclude {
+    enum AgentsToIncludeEnum {
+      // Invalid type.
+      UNSET = 0;
+      // Only output the trajectory of the primary ego.
+      EGO = 1;
+      // Output trajectory of all actors in scene.
+      // In multiego, this also includes other ego trajectories.
+      ACTORS = 2;
+    }
+  }
+  // List of types of agents to report trajectories for. If unspecified, this defaults
+  // to ACTORS only. Note that in multiego scenarios, all other egos are seen as actors
+  // to the ego this sensor is attached to.
+  repeated AgentsToInclude.AgentsToIncludeEnum agents_to_include = 6;
+
+  // Specifies how to calculate where the agent will be at the lookahead duration.
+  enum LookaheadVelocityProfileEnum {
+    UNSET = 0;
+
+    // Assumes a constant acceleration over the lookahead duration and calculates the trajectory
+    // based on the current agent state.
+    // - Lookahead velocity = current_velocity + current_acceleration * lookahead_duration
+    // - Lookahead distance = 1/2 * current_acceleration * lookahead_duration^2 + current_velocity *
+    // lookahead_duration.
+    //     - The pose is calculated using the agent's path at this distance.
+    // This enum is recommended in cases where the agent may not perfectly follow the planned
+    // behavior (e.g., ACC)
+    CONSTANT_ACCELERATION = 3;
+
+    // Calculates lookahead state by integrating the planned velocity profile over the lookahead
+    // duration. This does not account for deviations from the planned velocity profile due to
+    // dynamics or modules like ACC. When the agent is able to follow the planned behavior well,
+    // this mode is more accurate than CONSTANT_ACCELERATION because it predicts the agent's
+    // trajectory exactly as it was specified in the scenario (as opposed to assuming a constant
+    // acceleration))
+    PLANNED_VELOCITY_PROFILE = 2;
+
+    // (Default) Assumes a constant velocity over the lookahead duration and returns the lookahead
+    // state based on the distance calculated by current_velocity * time. This implementation
+    // reports the *planned* agent velocity at that distance, and thus does not account for modules
+    // like ACC. This mode is default for legacy reasons, but is not recommended for future
+    // implementations due to it's inability to account for agent starts and stops or modules like
+    // ACC.
+    CONSTANT_VELOCITY = 1;
+  }
+  // Specifies how to calculate where the agent will be at the lookahead duration for ground truth
+  // trajectories.
+  LookaheadVelocityProfileEnum lookahead_velocity_profile = 5;
+  // Specifies how to calculate where the agent will be at the lookahead duration for perceived
+  // trajectories.
+  LookaheadVelocityProfileEnum perceived_lookahead_velocity_profile = 8;
+
+  // Specifies whether the trajectory source comes from:
+  // 1. (default) The agent's behavior and any perceived behaviors if
+  // report_perceived_behavior_trajectories is true.
+  // 2. The trip agent. Reports poses or states specified in the trip agent.
+  message TrajectorySource {
+    enum TrajectorySourceEnum {
+      UNSET = 0;
+      // Uses the agent's behavior (and any perceived behaviors) as the source of the trajectory.
+      AGENT_BEHAVIOR = 1;
+      // Uses the trip agent states as the source of the trajectory. Only supported for egos.
+      TRIP_AGENT = 2;
+    }
+  }
+  // Specifies whether the trajectory source comes from:
+  // 1. (default) The agent's behavior and any perceived behaviors if
+  // report_perceived_behavior_trajectories is true.
+  // 2. The trip agent. Reports poses or states specified in the trip agent.
+  TrajectorySource.TrajectorySourceEnum trajectory_source = 9;
+
+  // When the trip agent is selected as the trajectory source, specifies the buffer distances around
+  // the agent along the trip agent path with which to filter the trip agent states. I.e., if the
+  // forward buffer distance is 1 m, all trip agent states 1 m in front of the agent along the path
+  // from the agent will be reported.
+  message TripAgentDistanceConfig {
+    // How far in front of the agent along the path to report trip agent states.
+    double forward_buffer_distance = 1 [(field_options.units) = M];
+    // How far behind the agent along the path to report trip agent states.
+    double backward_buffer_distance = 2 [(field_options.units) = M];
+    // The tangent distance for the path created through the trip agent states. This is set to a
+    // small default (0.1 m) but is exposed here to adjust how smooth the path will be around trip
+    // agent states.
+    double path_tangent_distance = 3 [(field_options.units) = M];
+  }
+  oneof trajectory_source_config {
+    // When the trip agent is selected as the trajectory source, specifies the buffer distances
+    // around the agent along the trip agent path with which to filter the trip agent states. I.e.,
+    // if the forward buffer distance is 1 m, all trip agent states 1 m in front of the agent along
+    // the path from the agent will be reported.
+    TripAgentDistanceConfig trip_agent_distance_config = 10;
+  }
+}
+
+message SensorFilter {
+  oneof sensor_filter_model {
+    // Approximates occlusion by using a model with a field of view to detect visibility in 3D
+    // space. Limitations: does not occlude based on ego's shape and trailer.
+    ActorOcclusion actor_occlusion = 2 [
+      (field_options.manual_link) =
+          'https://home.applied.co/manual/simian/latest/#/object-level_sensors/sensing_agents/sensing_agents?id=actor_occlusion'
+    ];
+    // Adds scalar noise to a set of object properties. This can be used to fuzz position, rotation,
+    // and polygonal regions of detected actors.
+    NoiseFilter noise_filter = 3 [
+      (field_options.manual_link) =
+          'https://home.applied.co/manual/simian/latest/#/object-level_sensors/sensing_agents/sensing_agents?id=noise_filter'
+    ];
+    // Applies dropout to a set of target obstacles.
+    DropoutFilter dropout_filter = 4 [
+      (field_options.manual_link) =
+          'https://home.applied.co/manual/simian/latest/#/object-level_sensors/sensing_agents/sensing_agents?id=dropout_filter'
+    ];
+    NearestNActorFilter nearest_n_actor_filter = 5;
+    // <!-- TODO(Cynthia): Document filter behavior. -->
+    CurvedLookaheadFovFilter curved_lookahead_fov_filter = 6;
+    // <!-- TODO(Cynthia): Document filter behavior. -->
+    FreeSpaceBufferFilter free_space_buffer_filter = 9;
+    // Adds a `data_point` `SIMIAN_PERCENT_OCCLUSION` to each actor for the calculated occlusion
+    // percentage where 0 indicates the actor is fully visible and 100 indicates the actor is fully
+    // occluded.
+    ActorPercentOcclusion actor_percent_occlusion = 10 [
+      (field_options.manual_link) =
+          'https://home.applied.co/manual/simian/latest/#/object-level_sensors/sensing_agents/sensing_agents?id=actor_percent_occlusion'
+    ];
+    // Culls lane sensor output based on the occluded space created by surrounding actors.
+    ActorOcclusionLaneFilter actor_occlusion_lane_filter = 11 [
+      (field_options.manual_link) =
+          'https://home.applied.co/manual/simian/latest/#/object-level_sensors/sensing_lanes/sensing_lanes?id=actor-occlusion-lane-filter'
+    ];
+    // Delays sending the actors to the stack.
+    LatencyFilter latency_filter = 12 [
+      (field_options.manual_link) =
+          'https://home.applied.co/manual/simian/latest/#/object-level_sensors/sensing_agents/sensing_agents?id=latency_filter'
+    ];
+    // Filters out virtual lane boundaries.
+    // In the map, users should mark any boundaries that won't be useful in ego navigation as
+    // virtual, and use this filter to remove them from lane sensor output.
+    VirtualLaneBoundaryFilter virtual_lane_boundary_filter = 13 [
+      (field_options.manual_link) =
+          'https://home.applied.co/manual/simian/latest/#/object-level_sensors/sensing_lanes/sensing_lanes?id=virtual-lane-boundary-filter'
+    ];
+    // Actors that are occluded by 3D terrain are not perceived by the sensor.
+    TerrainOcclusionFilter terrain_occlusion_filter = 14;
+    // Report only features associated with the ego's current lane, or optionally,
+    // successor lanes of the ego's current lane.
+    // Currently applicable to only the traffic light, traffic sign, and map sensors.
+    EgoLaneAssociationFilter ego_lane_association_filter = 15 [
+      (field_options.manual_link) =
+          'https://home.applied.co/manual/simian/latest/#/object-level_sensors/environmental_sensors/environmental_sensors?id=ego-lane-association-filter'
+    ];
+    // This filter combines these two overlapping lane boundaries into a single lane boundary by
+    // averaging the two lane boundaries.
+    AverageAdjacentLaneBoundaryFilter average_adjacent_lane_boundary_filter = 16 [
+      (field_options.manual_link) =
+          'https://home.applied.co/manual/simian/latest/#/object-level_sensors/sensing_lanes/sensing_lanes?id=average-adjacent-lane-boundary-filter'
+    ];
+    // Calculate map properties (e.g., closest lane ID) for each actor.
+    MapPropertyFilter map_property_filter = 17 [
+      (field_options.manual_link) =
+          'https://home.applied.co/manual/simian/latest/#/object-level_sensors/sensing_agents/sensing_agents?id=map_property_filter'
+    ];
+    // Calculate agents' polygon while considering sensor field of view and other agents' occlusion.
+    AgentPointsOcclusion agent_points_occlusion = 18 [
+      (field_options.manual_link) =
+          'https://home.applied.co/manual/simian/latest/#/object-level_sensors/sensing_agents/sensing_agents?id=agent_points_occlusion'
+    ];
+  }
+
+  message ActorOcclusion {
+    enum Mode {
+      // Pure 2D: Sensor mounts and vehicle poses are interpreted as
+      // purely planar, their z, pitch, and roll are ignored. The z
+      // coordinates of object points are also ignored.
+      //
+      // Only fill in mount, distance_near, distance_far, yaw_start, and
+      // yaw_length. In the mount, only fill in x, y, and
+      // angle. Everything else is ignored.
+      PLANAR = 0;
+
+      // 2.5D: Vehicle poses are still interpreted as purely
+      // planar. Sensor mounts and object points are fully 3D. This
+      // results in more realistic perception simulations, as objects
+      // may become invisible if they are too low, and tall objects may
+      // still be detected even if they are behind other objects.
+      //
+      // Note that due to the projection of the vehicle pose, the
+      // vehicle origin ends up in the XY plane. Also, objects are moved
+      // along Z such that their lowest point ends up lying in the XY
+      // plane.
+      PLANAR_WITH_HEIGHT = 1;
+
+      // Full 3D.
+      SPATIAL = 2;
+    }
+    // Specify the mode of actor occlusion.
+    Mode mode = 1;
+
+    // <!-- DEPRECATED
+    // Do not use mount, distance_*, yaw_*, or pitch_*. The equivalent
+    // fields in sensor_view are used instead. The fields here will be
+    // removed. -->
+    // [DEPRECATED] Please use the equivalent fields in the sensor's `sensor_view` instead.
+    simian_public.spatial.PoseSpec mount = 2
+        [deprecated = true, (field_options.ignore_in_autocomplete) = true];
+    // <!-- Starting in v1.24, omitting distance_*, yaw_*, pitch_* will cause this filter to use the
+    // same field of view as the sensor containing this filter. -->
+    double distance_near = 3 [deprecated = true, (field_options.ignore_in_autocomplete) = true];
+    double distance_far = 4 [deprecated = true, (field_options.ignore_in_autocomplete) = true];
+    double yaw_start = 5 [deprecated = true, (field_options.ignore_in_autocomplete) = true];
+    double yaw_length = 6 [deprecated = true, (field_options.ignore_in_autocomplete) = true];
+    double pitch_start = 7 [deprecated = true, (field_options.ignore_in_autocomplete) = true];
+    double pitch_length = 8 [deprecated = true, (field_options.ignore_in_autocomplete) = true];
+  }
+
+  // <!-- Next ID: 9 -->
+  message NoiseFilter {
+    // List of target obstacles that the filter will affect.
+    repeated simian_public.scenario.NewObstacleIdent target_obstacles = 1;
+    // List of string properties the noise filter can affect.
+    // See the manual for the full list of features.
+    repeated string property_specs = 2;
+    // Seed used for sampling Gaussian distributions.
+    // Defaults to 0.
+    int32 seed = 3;
+    // The regions_of_effect is an optional field that will currently only impact noise filters that
+    // are applied to localization sensors. The region_of_effect is a binary "yes" or "no" in terms
+    // of determining if noise is applied. I.e. if the sensor is in one of the regions_of_effect,
+    // then noise is applied according to the noise spec; if the sensor is not in one of the
+    // regions_of_effect, then noise is not applied at all.
+    //
+    // It is possible to define multiple regions of effect for this single noise filter. The noise
+    // is only applied once even if the sensor is within multiple overlapping regions. If you want
+    // additive noise from overlapping regions, then you should define another distinct noise filter
+    // for the sensor.
+    repeated Region regions_of_effect = 8;
+    // Type of noise to apply.
+    oneof noise_type {
+      // <!-- Units are determined by the field this is applied to. -->
+      // The constant value specified is added to the specified `property_specs`.
+      double constant = 4 [(field_options.units) = NO_UNITS];
+      // Using the distance from the sensor origin to the actor origin (m), offset = distance *
+      // distanced_constant is added to the specified actor's `property_specs`.
+      double distanced_constant = 5 [(field_options.units) = NO_UNITS];
+      // A sample of the following gaussian distribution is added to the specified actor's
+      // `property_specs`.
+      Gaussian gaussian = 6 [(field_options.units) = NO_UNITS];
+      // Using the distance from the sensor origin to the actor origin (m), offset = distance *
+      // sample (where sample is a value sampled from the provided gaussian distribution) is added
+      // to the specified actor's `property_specs`.
+      Gaussian distanced_gaussian = 7 [(field_options.units) = NO_UNITS];
+    }
+    // The NoiseFilter provides versions 0.1 (default) and 0.2. The two versions provide
+    // equivalent functionality but generate different random numbers. Version 0.2 is required
+    // by certain sensors.
+    simian_public.common.VersionMajorMinor version = 9;
+
+    message Gaussian {
+      // Mean (average) of the distribution.
+      double mean = 1 [(field_options.units) = NO_UNITS];
+      // Standard deviation of the distribution.
+      double std_dev = 2 [(field_options.units) = NO_UNITS];
+    }
+  }
+
+  message DropoutFilter {
+    // List of target obstacles that the filter will affect.
+    repeated simian_public.scenario.NewObstacleIdent target_obstacles = 1;
+    // Seed used for sampling Gaussian distributions.
+    // Defaults to 0.
+    int32 seed = 2;
+    oneof dropout_type {
+      // An actor will dropout with this uniform probability.
+      // Value must be [0, 1].
+      double constant_probability = 3
+          [(field_options.greater_than_or_equal) = 0, (field_options.less_than_or_equal) = 1];
+      // Using the distance from the ego to the actor (m), an actor will dropout with probability =
+      // max(0, min(1, distanced_probability * distance)). This is useful to increase dropouts for
+      // actors that are further away.
+      double distanced_probability = 4 [(field_options.units) = NO_UNITS];
+    }
+    // The DropoutFilter provides versions 0.1 (default) and 0.2. The two versions provide
+    // equivalent functionality but use different random numbers. Version 0.2 is required
+    // by certain sensors.
+    simian_public.common.VersionMajorMinor version = 5;
+  }
+
+  message NearestNActorFilter {
+    uint32 num_actors = 1;
+  }
+
+  message CurvedLookaheadFovFilter {
+    double minimum_length = 1;
+    double time_buffer = 2;
+    double width = 3;
+    bool render_fov = 4;
+  }
+
+  message FreeSpaceBufferFilter {
+    double buffer_distance = 1;
+  }
+
+  message ActorPercentOcclusion {
+    // Set `true` to visualize the sensor filter output.
+    bool visualize = 1;
+    // Select the mode for occlusion to be calculated.
+    OcclusionMode mode = 2;
+    enum OcclusionMode {
+      // Invalid option, do not select.
+      UNKNOWN = 0;
+      // [Default] Reports the percentage of an actor's top-down area that is occluded by other
+      // actors.
+      TOP_DOWN = 1;
+      //  Reports occlusion based on how much of the actor face is occluded, using the line between
+      //  the actor's leftmost and rightmost angular extents as the basis for occlusion.
+      LINE = 2;
+    }
+  }
+
+  message ActorOcclusionLaneFilter {
+    // Option to visualize the output of the sensor filter.
+    bool visualize = 1;
+  }
+
+  message VirtualLaneBoundaryFilter {}
+
+  message LatencyFilter {
+    oneof latency_type {
+      // Delays actor detections by `n_frames` of the simulation.
+      uint32 n_frames = 1 [(field_options.units) = NO_UNITS];
+    }
+  }
+
+  message TerrainOcclusionFilter {}
+
+  // Report only features associated with the ego's current lane, or optionally,
+  // successor lanes of the ego's current lane.
+  // Currently applicable to only the traffic light, traffic sign, and map sensors.
+  message EgoLaneAssociationFilter {
+    // Specify the option include_successors as true to additionally report traffic lights whose
+    // associated lanes include any successor lanes of the ego's current lanes within the field of
+    // view.
+    bool include_successors = 1;
+  }
+
+  message MapPropertyFilter {
+    // Calculate if each actor is on any lane.
+    // This is a 2D calculation; the elevation of the actors or lanes are not considered.
+    OnLane on_lane = 1;
+
+    // Calculate closest_lane_id for points
+    // Calculate the ID of the lane closest to each actor (even if the actor is not on a lane).
+    ClosestLaneId closest_lane_id = 2;
+
+    // Calculate lane occupancy ratio for each actor.
+    LaneOccupancyRatio lane_occupancy_ratio = 3;
+
+    message OnLane {
+      // Choose which points of the agent to use determine if the agent is on a lane.
+      // By default, the filter queries `on_lane` for only the origin of the agent.
+      QueryOption query_option = 1;
+    }
+
+    message ClosestLaneId {
+      // Choose which points of the agent to use determine if the agent is on a lane.
+      // By default, the filter queries `on_lane` for only the origin of the agent.
+      QueryOption query_option = 1;
+    }
+
+    // Params for specifying the lane occupancy ratio for each actor.
+    message LaneOccupancyRatio {}
+
+    // Choose which points of the agent to use determine if the agent is on a lane.
+    // By default, the filter queries `on_lane` for only the origin of the agent.
+    message QueryOption {
+      // Origin of the concerned agent. For an actor, this is the center of its polygon.
+      QueryOrigin origin = 1;
+      // Polygon points of the concerned agent. For an actor those are polygon_points and
+      // world_polygon_points.
+      QueryPoints all_polygon_points = 2;
+      message QueryOrigin {}
+      message QueryPoints {}
+    }
+  }
+
+  message AgentPointsOcclusion {
+    // Visualization options for the output of this sensor filter.
+    // Defaults to `DISABLED`.
+    simian_public.scenario.VisualizationOptions visualization_options = 1;
+  }
+
+  // The Simian lane sensor may report two overlapping lane boundaries between adjacent lanes
+  // (the leftward lane's right boundary and the rightward lane's left boundary generally overlap).
+  // This filter combines these two lane boundaries into a single lane boundary (by averaging).
+  // The filter updates the boundary IDs stored in the OSI Lane message to be the ID of the
+  // single combined lane boundary.
+  // This filter requires the reported_lines enum to be BOUNDARIES_AND_CENTER.
+  message AverageAdjacentLaneBoundaryFilter {}
+}

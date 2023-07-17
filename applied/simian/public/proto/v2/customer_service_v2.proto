@@ -1,0 +1,132 @@
+// Copyright (C) 2019 Applied Intuition, Inc. All rights reserved.
+// This source code file is distributed under and subject to the LICENSE in license.txt
+
+syntax = "proto3";
+
+package simian_public.simulator.v2;
+
+import "applied/simian/public/proto/common.proto";
+import "applied/simian/public/proto/drawing.proto";
+import "applied/simian/public/proto/sim_command.proto";
+import "applied/simian/public/proto/stack_logs.proto";
+import "applied/simian/public/proto/triage.proto";
+import "applied/simian/public/proto/v2/io.proto";
+
+service CustomerServiceV2 {
+  rpc Commands(CommandsRequest) returns (CommandsResponse);
+  // DEPRECATED: Only for backwards compatibility with v1.11 and below. Will
+  // remove in v1.13 or later.
+  rpc StoreFinalizeCommands(StoreFinalizeCommandsRequest) returns (StoreFinalizeCommandsResponse);
+  rpc Finalize(FinalizeRequest) returns (FinalizeResponse);
+  rpc GetStackServerInfo(GetStackServerInfoRequest) returns (GetStackServerInfoResponse);
+}
+
+message CommandRequest {
+  enum CommandType {
+    // <!-- Next ID: 36 -->
+    __UNDEFINED__ = 0;
+    CREATE = 1;
+    DESTROY = 2;
+    INITIALIZE = 3;
+    FINALIZE = 4;
+    SET_STARTUP_OPTIONS = 5;
+    SET_STARTUP_OPTIONS_V2_1 = 29;  // V2.1+
+    GET_SERVER_VERSION = 6;
+    GET_STACK_VERSION = 7;
+    GET_INTERFACE_VERSION = 28;  // 1.12+
+    GET_DEFAULT_RATE = 8;
+    GET_DEFAULT_PERIOD_NS = 31;  // 1.13+
+    MIDDLEWARE_SETUP = 9;
+    MIDDLEWARE_TEARDOWN = 10;
+    RECORDING_SETUP = 11;
+    RECORDING_TEARDOWN = 12;
+    VISUALIZATION_SETUP = 13;
+    VISUALIZATION_TEARDOWN = 14;
+    STACK_SETUP = 15;
+    STACK_TEARDOWN = 16;
+    LISTEN_SETUP = 17;
+    LISTEN_TEARDOWN = 18;
+    PUBLISH_SETUP = 19;
+    PUBLISH_TEARDOWN = 20;
+    PUBLISH_SEND = 21;
+    CONVERT_FROM_SIMIAN = 22;
+    CONVERT_TO_SIMIAN = 23;
+    LOG_FETCH = 34;  // V2.1+
+    LOG_OPEN = 24;
+    LOG_OPEN_V2_2 = 33;  // V2.2+
+    LOG_CLOSE = 25;
+    LOG_READ_V2_1 = 27;  // V2.1+
+    LOG_REWIND = 35;     // V2.4+
+    PATCH = 30;          // V2.1+
+    SIMULATION_SUMMARY = 32;
+
+    // reserved "LOG_READ";  // Removed in favor of the V2.1+ API and LOG_READ_V2_1.
+    // reserved 26;
+  }
+  Channel channel = 1;
+  string target = 2;
+  CommandType command_type = 3;
+  bytes data = 4;
+  CommandRequest finalize_command = 5;
+}
+
+message CommandsRequest {
+  repeated CommandRequest command = 1;
+}
+
+message CommandResponse {
+  common.CommonResponse common = 1;
+  string channel_name = 2;
+  CommandRequest.CommandType command_type = 3;
+  string target = 4;
+  bytes data = 5;
+  double interface_execution_time_ms = 6;
+}
+
+message CommandsResponse {
+  common.CommonResponse common = 1;
+  repeated CommandResponse response = 2;
+  map<string, Extras> extras = 3;
+}
+
+message Extras {
+  repeated stack_logs.StackLogLine stack_logs = 1;
+  repeated drawing.Drawing drawings = 2;
+  repeated common.DataPoint data_points = 3;
+  repeated sim_command.SimCommand sim_commands = 4;
+  repeated common.ObserverEvent custom_observer_events = 5;
+  repeated common.Message messages = 6;
+  repeated simian_public.common.CustomDataPointMetadata custom_data_point_metadatas = 7;
+
+  repeated simian_public.common.TimestampedStruct timestamped_structs = 13;
+
+  repeated public_triage.TriageEvent triage_events = 9;
+  repeated simian_public.common.TimestampedDataPoint timestamped_data_points = 10;
+  repeated simian_public.common.CustomField custom_fields = 11;
+
+  // reserved 8, 12;
+  // reserved "struct_data";
+}
+
+message FinalizeRequest {}
+message FinalizeResponse {
+  // Same as CommandsResponse
+  common.CommonResponse common = 1;
+  repeated CommandResponse response = 2;
+  map<string, Extras> extras = 3;
+}
+
+message StoreFinalizeCommandsRequest {
+  repeated CommandRequest command = 1;
+}
+
+message StoreFinalizeCommandsResponse {
+  common.CommonResponse common = 1;
+}
+
+message GetStackServerInfoRequest {}
+
+message GetStackServerInfoResponse {
+  common.CommonResponse common = 2;
+  repeated string argv = 1;
+}

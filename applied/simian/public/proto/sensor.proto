@@ -1,0 +1,74 @@
+// Copyright (C) 2018 Applied Intuition, Inc. All rights reserved.
+// This source code file is distributed under and subject to the LICENSE in license.txt
+
+syntax = "proto3";
+
+package simian_public.sensor;
+
+import "applied/simian/public/osi3/osi_lane.proto";
+import "applied/simian/public/osi3/osi_trafficlight.proto";
+import "applied/simian/public/proto/actor.proto";
+import "applied/simian/public/proto/spatial.proto";
+
+// A sensor channel represents a specific stack input. These are data inputs
+// rather than actual sensor models. Sensor channels are further downstream than
+// raw sensor outputs and provide the necessary data to different AV modules.
+
+message SensorChannel {
+  // This is a oneof because it will grow over time.
+  string name = 1;
+  oneof sensor_data {
+    LaneSensor lane_sensor = 2;
+    TrafficLightSensor traffic_light_sensor = 3;
+    ActorSensor actor_sensor = 4;
+    LocalizationSensor localization_sensor = 5;
+  }
+
+  message LaneSensor {
+    repeated osi3.Lane lanes = 1;
+    repeated osi3.LaneBoundary lane_boundaries = 2;
+
+    // SensorView and SensorOutput are used to draw 2D fov
+    SensorView sensor_view = 3;
+    SensorOutput sensor_output = 4;
+  }
+
+  message TrafficLightSensor {
+    repeated osi3.TrafficLight traffic_lights = 1;
+  }
+
+  message ActorSensor {
+    repeated actor.Actor actors = 1;
+  }
+
+  message LocalizationSensor {
+    spatial.Pose pose = 1;
+  }
+}
+
+message SensorView {
+  simian_public.spatial.PoseSpec mount = 1;  // Always local to vehicle
+  oneof field_of_view_mode {
+    SectorFieldOfView sector_fov = 2;
+  }
+
+  message SectorFieldOfView {
+    double distance_near = 1;
+    double distance_far = 2;
+    double yaw_start = 3;
+    double yaw_length = 4;
+    double pitch_start = 5;
+    double pitch_length = 6;
+  }
+}
+
+message SensorOutput {
+  ReportingFrame reporting_frame = 1;
+
+  enum ReportingFrame {
+    __INVALID__ = 0;  // sentinel
+    SENSOR = 1;
+    VEHICLE = 2;  // rear axle midpoint, X forward
+    MAP = 3;      // unrealistic but convenient
+  }
+}

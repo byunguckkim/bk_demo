@@ -1,0 +1,143 @@
+// Copyright (C) 2018 Applied Intuition, Inc. All rights reserved.
+// This source code file is distributed under and subject to the LICENSE in license.txt
+
+syntax = "proto3";
+
+package simian_public.map_config;
+
+import "applied/simian/public/proto/common.proto";
+import "applied/simian/public/proto/geometry.proto";
+import "applied/simian/public/proto/map/map_common.proto";
+import "applied/simian/public/proto/map/map_enums.proto";
+import "applied/simian/public/proto/sensor_sim/spectral_map_config.proto";
+import "applied/simian/public/proto/spatial.proto";
+import "applied/simian/public/proto/terrain_config.proto";
+
+// Main map config
+// <!-- Next Id: 11 -->
+message MapConfig {
+  // Names of files in map directory. This is optional.
+  MapFilenames filenames = 1;
+  // Any default values associated with the map, including the start location of ego when this map
+  // is used in scenario.
+  MapDefaults defaults = 2;
+  // Information on coordinate systems and projections in the map.
+  MapTransforms transforms = 3;
+  // A configuration specification to denote how the terrain file should be processed.
+  simian_public.common.TerrainConfig terrain_config = 5;
+  // A configuration specification to denote how the point cloud files should be processed.
+  PointCloudConfig point_cloud_config = 6;
+  // Configuration used to enable map tiling. Contact Applied to enable this feature.
+  TilingConfig tiling_config = 7;
+  // The |spectral_config| field specifies how this
+  // particular map should be run with Spectral.
+  simian_public.sensor_sim.map_config.SpectralMapConfig spectral_config = 8;
+  // Custom tags to associate with the map that can be visualized on the ADP frontend.
+  repeated simian_public.hdmap.CustomTag custom_tags = 9;
+  // Information about the source of the map.
+  MapSourceInfo map_source_info = 10;
+}
+
+// Names of files in map directory. This is optional
+// <!-- Next ID: 12 -->
+message MapFilenames {
+  oneof base_map_files {  // Default is a single `base_map`: `base_map.bin`.
+    // The serialized base map is contained in a single file.
+    string base_map = 1;
+    // The base map is split up into separately serialized chunks. Note that this option
+    // is currently in beta, contact Applied before using it to make sure that you have
+    // the appropriate configurations set.
+    ChunkedBaseMap chunked_base_map = 11;
+  }
+  string viz_map = 2;     // Default is `viz_map.bin`.
+  string topo_graph = 3;  // Default is `topo_graph.bin`.
+  // Deprecated. Use terrain_config in MapConfig instead.
+  // Setting this to "no_terrain" is the same as using the lane_height terrain_config.
+  string terrain = 4;
+  string semantic_map = 5;      // Default is `semantic_map.bin`.
+  string procedural_map = 6;    // Default is `procedural_map.bin`.
+  string map_edits = 7;         // Default is `map_edits.yaml`.
+  string lane_markings_2d = 8;  // No default -- empty string means file not available.
+  string region_meshes = 9;     // No default -- empty string means file not available.
+  string ld_map = 10;           // Default is `ld_map.bin`.
+}
+
+// Describes the "chunk" files of a base map.
+// <!-- Next ID: 2 -->
+message ChunkedBaseMap {
+  // Chunks can be split in whatever method is most convenient. Elements can refer to
+  // elements in other chunks as e.g. predecessors or successors. Splitting a map into
+  // multiple chunks allows serializing a Map protobuf larger than the 2GB limit imposed
+  // by the protobuf library.
+  repeated string serialized_base_map_chunks = 1;
+}
+
+// Any default values associated with the map
+message MapDefaults {
+  oneof start_location_type {
+    // Start location of the ego when this map is used to create a new scenario through the GUI. The
+    // point must be expressed in the map coordinate system.
+    simian_public.common.PointENU generic_start_location = 2;
+    // [DEPRECATED] Use `generic_start_location` instead. Maps are now supported in coordinate
+    // systems other than UTM, so the `generic_start_location` allows for this to be generalized.
+    simian_public.common.UTM start_location = 1 [deprecated = true];
+  }
+}
+
+// Maps are stored in UTM format in Simian. This message provides
+// information for doing coordinate transformations to other reference frames.
+message MapTransforms {
+  // The projection specification of this map data. All maps are assumed
+  // to use exactly one coordinate reference system.
+  simian_public.common.CoordinateSystemDescription coordinate_system = 5;
+
+  // Reference lat/lng at center of map.
+  // Used for transforming to local cartesian
+  simian_public.common.LatLngAlt latlng_center = 2;
+
+  // DEPRECATED: Use coordinate_system instead.
+  simian_public.common.UTMProjection utm = 1;
+
+  // reserved 3, 4;
+  // reserved "wkt_file", "proj4_string";
+}
+
+// Each map can have one (optional) point cloud map associated with it for visualization.
+message PointCloudConfig {
+  string filename = 1;
+  simian_public.spatial.PoseSpec pose = 2;
+}
+
+// Config used for map tiling.
+message TilingConfig {
+  oneof group {
+    // Multiple maps can be part of the same map group.
+    // For example, sunnyvale_east and sunnyvale_west make up the greater_sunnyvale map group,
+    // which consists of map elements from both maps.
+    string map_group = 1;
+  }
+}
+
+// Information about the source of the map.
+// <!-- Next Id: 3 -->
+message MapSourceInfo {
+  // Metadata to track the source of the map.
+  simian_public.hdmap.MapSourceEnum.MapSource source = 1;
+  // Metadata to track if the map was edited in Meridian.
+  bool edited_in_meridian = 2;
+}
+
+message MapFormat {
+  enum Format {
+    UKNOWN = 0;
+    CUSTOM = 1;
+    APPLIED = 2;
+    APOLLO = 3;
+    OPENDRIVE = 4;
+    OPENSTREETMAP = 5;
+    GEOJSON = 6;
+    DEEPMAP = 7;
+  }
+  Format format = 1;
+  string custom_format = 2;
+}

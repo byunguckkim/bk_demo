@@ -1,0 +1,20 @@
+syntax = "proto3";
+
+package simian_public.sensor_sim.mesh_description;
+
+import "applied/simian/public/proto/geometry.proto";
+
+message MeshDescription {
+  // File information about how the mesh is stored.
+  MeshFile mesh = 1;
+  // Configurable properties to adjust the mesh. Currently just scaling.
+  MeshProperties properties = 2;
+}
+
+message MeshFile {
+  string file_uri = 1;
+}
+
+message MeshProperties {
+  simian_public.common.ScaleFactor scale_factor = 1;
+}

@@ -1,0 +1,213 @@
+// Copyright (C) 2018 Applied Intuition, Inc. All rights reserved.
+// This source code file is distributed under and subject to the LICENSE in license.txt
+
+syntax = "proto3";
+
+package simian_public.ego;
+
+import "applied/simian/public/proto/actor.proto";
+import "applied/simian/public/proto/common.proto";
+import "applied/simian/public/proto/motion_model.proto";
+import "applied/simian/public/proto/perception.proto";
+import "applied/simian/public/proto/scenario/common.proto";
+import "applied/simian/public/proto/sensor.proto";
+import "applied/simian/public/proto/sensor_sim/model_output.proto";
+import "applied/simian/public/proto/spatial.proto";
+
+// <!-- Next ID: 24 -->
+message EgoOutput {
+  //////////////////////////////////////////////////
+  // "True" sim data
+
+  bool engaged = 4;  // False can mean e.g. playback or previous run during preview.
+
+  // Neither closest_lane_id nor on_lane are currently populated. Similar information
+  // can be requested through triggered messages in the scenario description.
+  string closest_lane_id = 7;  // Lane id on ego on map
+  bool on_lane = 8;            // Are we on lane
+
+  // The perceived actors are filtered by occlusion from the current
+  // ego pose, but otherwise identical to the ground-truth actors in
+  // SimulatorOutput.actors
+  //
+  // Note that this field is mainly preserved for legacy reasons, it is
+  // better to explicitly model an "Actor Sensor" which (optionally)
+  // supports filters for e.g. noise, occlusion, latency, etc. See the
+  // manual for details.
+  repeated actor.Actor perceived_actors = 6;
+
+  // COMPATIBILITY NOTES for sections[i].state:
+  //
+  // Up to (and including) Simian v1.17, the reported lateral
+  // acceleration follows an uncommon sign convention, with v1.17
+  // introducing a versioning mechanism to explicitly control this
+  // from the scenario: the actor_reporting_version setting of the
+  // (top-level) integration_options field.
+  //
+  // To explicitly request the baseline version, which has the
+  // uncommon sign convention, place the following specification in
+  // the scenario or an include file. Under this convention, if the
+  // ego is moving forward along a left curve, the Y component of the
+  // acceleration is NEGATIVE (i.e. the opposite of what is commonly
+  // used).
+  //
+  // integration_options:
+  //   actor_reporting_version: { major: 0, minor: 0 }
+  //
+  // To get the common convention, pick any other valid version, such
+  // as version 0.1:
+  //
+  // integration_options:
+  //   actor_reporting_version: { major: 0, minor: 1 }
+  //
+  repeated Section sections = 10;
+
+  // <!-- TODO(rolo) Refactor to cleaner RigidBodySection: use shape.proto -->
+  // <!-- instead of height+polygon_points, remove mesh_name. -->
+
+  // A Section refers to a piece of body at a macroscopic level. For example, if the ego vehicle is
+  // a tractor with multiple trailers attached, sections[0] refers to the tractor, sections[1]
+  // refers to the trailer directly attached to the tractor, sections[2] refers to the trailer
+  // attached to the sections[1] trailer and so on.
+  message Section {
+    // Velocity and acceleration are observed in the world frame,
+    // and expressed in the frame of the section.
+
+    // State refers to the state of the center of the rear axle of this section.
+    // If this section has multiple rear axles, state refers to the state of the centroid of the
+    // centers of the rear axles of this section.
+
+    // For example, consider a section with "n" rear axles.
+    // Let (x1, y1, z1), (x2, y2, z2) .... (xn, yn, zn) be the coordinates of the centers of all its
+    // n rear axles. "State" refers to the state of the point whose coordinate is
+    //  ((x1 + x2 + ... + xn)/n, (y1 + y2 + ... + yn)/n, (z1 + z2 + ... + zn)/n)
+
+    // The center of the rear axle is a point
+    // on the chassis and knowledge of its state gives complete information about the sections's
+    // unsprung body, i.e. the part of the section NOT supported by suspension.
+
+    // For legacy reasons, Simian does not accurately report ego lateral velocity and ego lateral
+    // acceleration in state. Lateral velocity will always report 0.0 and lateral acceleration only
+    // accounts for the centripetal component. To get accurate lateral velocity, acceleration, and
+    // other state info you can add a localization sensor. See the localization sensor section of
+    // the manual for details on adding a localization sensor.
+    spatial.State state = 1;
+    // The height of the ego bounding volume.
+    double height = 2;
+    // Coordinates of the vertices of the ego bounding box footprint, defined in global frame.
+    repeated spatial.Point polygon_points = 3;
+    // The name of the vehicle mesh used for the ego.
+    string mesh_name = 4;
+    // Currently only populated for sections[0].
+    repeated Wheel wheel = 5;
+    // Sprung state refers to the state of suspended body i.e. the part of the section held up by
+    // suspension.
+    spatial.State sprung_state = 6;
+    // Each section has its own feedback from the motion model. For the first section, this field
+    // identically matches the ego.motion_model_feedback output.
+    motion_model.Feedback motion_model_feedback = 7;
+
+    // As of 1.27, using spectral_model_output is the preferred method of resolving
+    // properties and types for egos when running Spectral.
+
+    // When running with Spectral, each ego section can have its own model. The first ego section
+    // will always be SPECIFIC_SPECTRAL_MODEL which will determine the model based off of the
+    // mesh_name defined above.
+    actor.Actor.SpectralModel spectral_model = 8 [deprecated = true];
+    simian_public.sensor_sim.models.SpectralModelOutput spectral_model_output = 20;
+
+    // The length of this field is 0 if there is no kinematic articulation mounted to the ego, and 1
+    // if there is a kinematic articulation mounted on the ego.
+    repeated Articulation articulations = 9;
+  }
+
+  message Wheel {
+    // Wheel stores the full 3D state of a wheel along with its configuration and mesh name.
+    // WARNING: Field mesh name will (field id: 2) will be deprecated in the future as config
+    // already contains this info. state.Pose here is expressed in the world frame (x: easting, y:
+    // northing, z: altitude).
+    spatial.State state = 1;
+    string mesh_name = 2;
+    simian_public.scenario.WheelConfig config = 3;
+  }
+
+  message Articulation {
+    // The length of this field is the number of joints in the articulation.
+    repeated JointState joint_states = 1;
+    message JointState {
+      string name = 1;
+      // Units: radians or meters, depending on the type of joint.
+      double position = 2;
+    }
+    // The length of this field is the number of links in the articulation.
+    repeated Link links = 2;
+    message Link {
+      // Name of the link.
+      string name = 1;
+      // Currently, only the pose of the link (relative to the section frame) is populated;
+      // velocity and acceleration are not populated.
+      spatial.State section_state = 2;
+    }
+  }
+
+  //////////////////////////////////////////////////
+  // Simulated autonomy modules
+  //
+  // <!-- TODO(rolo) Currently only perception, adding localization and
+  // others is part of a bigger refactor. -->
+
+  repeated perception.PerceptionChannel perception_channels = 9;
+  // (chris) Moving towards sensor models and data models.
+  repeated sensor.SensorChannel sensor_channels = 11;
+  string rendered_model_name = 16;
+
+  motion_model.Input behavior_predicted_control = 12;
+  // This field will hold identical information to the feedback in the first Section,
+  // i.e. sections[0].motion_model_feedback. You should prefer to use the feedback field
+  // in the Section proto, as this field will eventually be deprecated and removed.
+  motion_model.Feedback motion_model_feedback = 13;
+
+  // Data points and messages
+  repeated simian_public.common.Message messages = 14;
+  repeated simian_public.common.DataPoint data_points = 15;
+
+  // <!-- TODO(rolo,fahhem) stop using SimulatorOutput in bags, which adds
+  // backward compatibility constraints that make it hard to cleanly
+  // evolve the runtime API.
+  // * Preview/Extraction both use SimulatorOutput, which isn't meant to be
+  // used long-term. Preview is fine because it only runs on recent bags, but
+  // Extraction is meant to be able to run on older bags (converted and
+  // simulated).
+  // * Need to design/write a SimFrame top-level proto that gets converted to
+  // from SimulatorOutput to avoid this. -->
+
+  repeated string nearby_lane_ids = 17;  // Returns overlapping lane ids in the area
+
+  motion_model.Input prev_motion_model_input = 18;
+
+  map<string, double> simian_data_points = 20;
+
+  // Egos will have ids so they can be reported as actors for multi-ego
+  int64 id = 21;
+  string ego_name = 22;
+
+  // As of 1.27, using spectral_model_output is the preferred method of resolving
+  // properties and types for egos when running Spectral.
+  // Use of spectral_asset here is deprecated and will be removed in v1.30
+  actor.AssetConfig spectral_asset = 23 [deprecated = true];
+
+  // reserved 1, 2, 3, 5;
+  // reserved "pose", "velocity", "acceleration", "polygon_points";
+}
+
+// See #32399 for a description of how to extend override to more than just ego pose and controls
+message OperatorOverrideState {
+  enum OverrideState {
+    INVALID = 0;                       // Sentinel
+    OPERATOR_OVERRIDE_DISENGAGED = 1;  // Override is not engaged (ego is in control)
+    OPERATOR_OVERRIDE_ENGAGED = 2;     // Override is engaged (ego is not in control)
+    OPERATOR_OVERRIDE_WAITING_FOR_ENGAGED =
+        3;  // Override is engaged, but will disengage once the ego reports that it's engaged
+  }
+  OverrideState override_state = 1;
+}

@@ -1,0 +1,160 @@
+// Copyright (C) 2021 Applied Intuition, Inc. All rights reserved.
+// This source code file is distributed under and subject to the LICENSE in license.txt
+
+syntax = "proto3";
+
+package simian_public.sensor_sim.models;
+
+import "applied/simian/public/proto/common.proto";
+import "applied/simian/public/proto/geometry.proto";
+import "applied/simian/public/proto/sensor_sim/fragment_description.proto";
+import "applied/simian/public/proto/sensor_sim/imported_vehicle_description.proto";
+import "applied/simian/public/proto/sensor_sim/models.proto";
+import "applied/simian/public/proto/sensor_sim/pedestrian_props.proto";
+import "applied/simian/public/proto/sensor_sim/spectral_materials.proto";
+import "applied/simian/public/proto/sensor_sim/materials/material_description.proto";
+import "applied/simian/public/proto/spatial.proto";
+import "applied/simian/public/proto/spectral_assets.proto";
+import "applied/simian/public/proto/sensor_sim/pedestrians/spectral_pedestrian.proto";
+
+// <!-- Next ID: 13 -->
+// The specifications for the Spectral model and properties of that model
+message SpectralModelSpec {
+  oneof model_type {
+    // An Applied Intuition provided asset
+    SpectralModel.SpectralModelEnum spectral_model = 1;
+    // An asset imported via the Content Manager.
+    CustomerAsset customer_asset = 9;
+    simian_public.sensor_sim.imported_vehicle_description.ImportedVehicleDescription
+        imported_vehicle_description = 10;
+  }
+
+  SpecificModelSpec specific_model_spec = 6;
+  simian_public.common.ScaleFactor scaling = 2;
+
+  oneof model_configuration_type {
+    VehicleSpec vehicle_spec = 3;
+    PedestrianSpec pedestrian_spec = 4;
+    ConfigurableObstacleSpec configurable_obstacle_spec = 5;
+    ImportedModelSpec imported_model_spec = 7;
+    StaticMeshObstacleSpec static_mesh_spec = 11;
+    simian_public.sensor_sim.spectral_pedestrian.Pedestrian pedestrian = 12;
+  }
+
+  // Optional relative decal placement specifications.
+  repeated simian_public.spectral.SpectralDecal decals = 8;
+
+  // <!-- Next ID: 19 -->
+  message VehicleSpec {
+    // Only supported for GENERIC_SEMI_TRUCK_TRAILER_COMPLEX and GENERIC_SEMI_TRUCK_TRAILER_28_FT
+    simian_public.spectral.TrailerConfiguration trailer_configuration = 2;
+    simian_public.spectral.VehicleHeadlights vehicle_headlights = 3;
+    simian_public.spectral.EmergencyLightsRotating emergency_lights_rotating = 5;
+    simian_public.spectral.EmergencyLightsFlashing emergency_lights_flashing = 6;
+    simian_public.spectral.VehicleDirt vehicle_dirt = 7;
+    simian_public.spectral.VehicleReflectors vehicle_reflectors = 9;
+    simian_public.spectral.BrakeLightsCustomization brakelights_customization = 10;
+    simian_public.spectral.TailLightsCustomization taillights_customization = 11;
+    simian_public.spectral.VehicleLicensePlate vehicle_license_plate = 12;
+    // Some vehicles have more than one carpaint, we can still opt to override just one (legacy) or
+    // specify multi (multi_carpaints actually works instead of main_carpaint too but it's less nice
+    // to write arrays of length 1)
+    oneof carpaint {
+      simian_public.spectral.VehicleCarPaintMaterial main_carpaint = 1;
+      MultiCarPaints multi_carpaints = 13;
+    }
+    message MultiCarPaints {
+      repeated simian_public.spectral.VehicleCarPaintMaterial carpaint = 1;
+    }
+    // Optional overrides for additional materials
+    repeated simian_public.spectral.VehicleMaterialOverride material_overrides = 14;
+    // Optional settings for parts of a vehicle, e.g. opening doors, adding roof-racks, etc.
+    simian_public.spectral.VehicleArticulation vehicle_parts = 15;
+    simian_public.spectral.WindshieldWipers windshield_wipers = 16;
+    simian_public.spectral.VehicleTireSpray vehicle_tire_spray = 17;
+    simian_public.sensor_sim.VehicleFragmentGeneration vehicle_fragment_generation = 18;
+  }
+
+  // <!-- Next ID: 11 -->
+  message PedestrianSpec {
+    enum SkinColorDefaults {
+      LIGHT = 0;
+      MEDIUMLIGHT = 1;
+      MEDIUM = 2;
+      MEDIUMDARK = 3;
+      DARK = 4;
+    }
+    oneof skin_color {
+      SkinColorDefaults skin_color_preset = 1;
+      simian_public.common.RGBA skin_color_custom = 2;
+    }
+    simian_public.common.RGBA top_color = 3;
+    simian_public.common.RGBA bottom_color = 4;
+    // Sets the model for GENERIC_PEDESTRIAN
+    uint32 pedestrian_selector = 5;
+    // Sets the idle animation for GENERIC_PEDESTRIAN
+    uint32 idle_state = 6;
+    // Sets the pedestrian animation scale factor
+    float anim_rate_scalar = 7;
+    simian_public.proto.sensor_sim.pedestrian_props.TwoHanded two_handed_prop = 8;
+    simian_public.proto.sensor_sim.pedestrian_props.OneHanded right_hand_prop = 9;
+    simian_public.proto.sensor_sim.pedestrian_props.OneHanded left_hand_prop = 10;
+    simian_public.sensor_sim.spectral_materials.MaterialColorModifier base_color_modifier = 11;
+  }
+
+  // <!-- Next ID: 13 -->
+  message ConfigurableObstacleSpec {
+    simian_public.spectral.SpectralUSSign us_sign_configuration = 1;  // for use with CUSTOM_US_SIGN
+    simian_public.spectral.SpectralSpotLight spot_light_configuration =
+        2;  // for use with CUSTOM_SPOT_LIGHT
+    simian_public.spectral.SpectralLambertianTarget lambertian_target_configuration =
+        3;                                                  // for use with CUSTOM_LAMBERTIAN_TARGET
+    simian_public.spectral.TrafficRobot traffic_robot = 4;  // for use with GENERIC_TRAFFIC ROBOT
+    simian_public.spectral.SpectralCustomMaterialTarget custom_material_target_configuration =
+        5;  // for use with CUSTOM_MATERIAL_TARGET
+    simian_public.spectral.SpectralCustomRetroreflectorTarget retroreflector_configuration =
+        6;  // for use with CUSTOM_RETROREFLECTOR_TARGET
+    simian_public.spectral.SpectralAttenuationVolume attenuation_volume_configuration =
+        7;  // for use with CUSTOM_RETROREFLECTOR_TARGET
+    simian_public.spectral.SpectralSign sign_configuration = 8;  // for use with CUSTOM_SIGN
+    simian_public.spectral.SpectralTrafficLightBlock traffic_light_block =
+        9;  // for use with CUSTOM_TRAFFIC_LIGHT_BLOCK
+    simian_public.spectral.SpectralConfigurableMesh spectral_mesh_configuration =
+        10;  // Will let you set the material values of a given obstacle
+    simian_public.spectral.SpectralRoadMarking spectral_road_marking =
+        11;  // for use with CUSTOM_ROAD_MARKING
+    simian_public.spectral.SpectralStreetLight street_light_configuration =
+        12;  // for use with CUSTOM_STREET_LIGHT
+  }
+
+  // <!-- Next ID: 2 -->
+  message SpecificModelSpec {
+    string mesh_name = 1;
+  }
+
+  // DEPRECATED; see ImportedVehicleDescription instead.
+  // <!-- Next ID: 7 -->
+  message ImportedModelSpec {
+    string file = 1;
+    spatial.PoseSpec.RollPitchYaw vertex_rotation = 2;
+    simian_public.common.Vector3 vertex_scale = 3;
+    // converts data from right-handed coordinate system to left-handed coordinate system
+    bool convert_to_left_handed = 4;
+    // specifies which UV channel should be used for this mesh
+    int32 uv_channel = 5;
+    // resolves vertices to world space if set to true
+    bool pretransform_vertices = 6;
+  }
+
+  message CustomerAsset {
+    string asset_name = 1;
+  }
+
+  // Configurations for static mesh obstacles
+  // <!-- Next ID: 2 -->
+  message StaticMeshObstacleSpec {
+    simian_public.sensor_sim.materials.material_description.MaterialDescription
+        material_description =
+        1;  // describes new material to be applied to the static mesh obstacle
+  }
+}

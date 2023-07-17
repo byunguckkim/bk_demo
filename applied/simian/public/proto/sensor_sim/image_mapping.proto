@@ -1,0 +1,23 @@
+// Copyright (C) 2022 Applied Intuition, Inc. All rights reserved.
+// This source code file is distributed under and subject to the LICENSE in license.txt
+
+syntax = "proto3";
+
+package simian_public.sensor_sim;
+
+import "applied/simian/public/proto/common.proto";
+
+message ImageMapping {
+  // `name` must be unique within the ImageProjection instances of a given scenario.
+  string name = 1;
+  // `resolution_in` encodes the resolution of the input to this ImageMapping.
+  common.Vector2 resolution_in = 2;
+  // `resolution_out` encodes the resolution of the output of this ImageMapping.
+  common.Vector2 resolution_out = 3;
+  // `mapping` is an array of resolution_out.x * resolution_out.y pairs of floats.
+  // To calculate the value of the a pixel in the output image at (row, col):
+  //   input_row = mapping[2 * (row * resolution_out.x + col)]
+  //   input_col = mapping[2 * (row * resolution_out.x + col) + 1]
+  //   output[row][col] = input[input_row][input_col]
+  repeated float mapping = 4;
+}

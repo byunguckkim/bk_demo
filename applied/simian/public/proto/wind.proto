@@ -1,0 +1,60 @@
+// Copyright (C) 2021 Applied Intuition, Inc. All rights reserved.
+// This source code file is distributed under and subject to the LICENSE in license.txt
+
+syntax = "proto3";
+
+package simian_public.wind;
+
+message WindSpec {
+  oneof wind_type {
+    SimpleWind simple_wind = 1;
+    ZeroWind zero_wind = 2;
+    AltitudeVaryingWind altitude_varying_wind = 3;
+  }
+}
+
+message ZeroWind {}
+
+message SimpleWind {
+  // TargetSimpleWind and SimpleWindPhase should not be used for any other wind types. They are
+  // placed here so that we can create more advanced messages in the future and not have conflicts
+  // with these very simple implemenations.
+  message TargetSimpleWind {
+    double magnitude = 1;  // [m/s]
+    double direction =
+        2;  // [rad] the (+CCW) heading of the wind, with zero aligned with the world frame x axis
+  }
+
+  message SimpleWindPhase {
+    double duration = 1;  // [s]
+    TargetSimpleWind target = 2;
+  }
+
+  // If loop is true, then the phases will repeat. Otherwise, the wind will cease to exist when the
+  // final phase ends.
+  bool loop = 1;
+  repeated SimpleWindPhase phases = 2;
+  TargetSimpleWind initial_wind = 3;
+}
+
+message AltitudeVaryingWind {
+  message TargetAltitudeVaryingWind {
+    double horizontal_magnitude = 1;  // [m/s] Does not include vertical component
+    double direction =
+        2;  // [rad] the (+CCW) heading of the wind, with zero aligned with the world frame x axis
+    double vertical_magnitude = 3;  // [m/s]
+    double altitude = 4;            // [m]
+  }
+
+  message AltitudeVaryingWindPhase {
+    double duration = 1;  // [s]
+    repeated TargetAltitudeVaryingWind target =
+        2;  // Using linear interpolation between the targets of the phase.
+  }
+
+  // If loop is true, then the phases will repeat. Otherwise, the wind will cease to exist when the
+  // final phase ends.
+  bool loop = 1;
+  repeated AltitudeVaryingWindPhase phases = 2;
+  repeated TargetAltitudeVaryingWind initial_wind = 3;
+}

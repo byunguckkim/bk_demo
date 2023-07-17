@@ -1,0 +1,85 @@
+// Copyright (C) 2023 Applied Intuition, Inc. All rights reserved.
+// This source code file is distributed under and subject to the LICENSE in license.txt
+
+syntax = "proto3";
+
+package simian_public.sensor_sim.pedestrians.body;
+
+import "applied/simian/public/proto/common.proto";
+import "applied/simian/public/proto/sensor_sim/pedestrians/clothing.proto";
+
+// The pedestrian's visual specification.
+message PersonConfig {
+  BodyConfig body = 1;
+  EthnicityEnum.Ethnicity ethnicity = 2;
+  HairDescription hair = 3;
+  simian_public.sensor_sim.pedestrians.clothing.PedestrianClothingDescription clothing = 4;
+}
+
+message EthnicityEnum {
+  enum Ethnicity {
+    DEFAULT = 0;
+    EUROPEAN_NORTHERN = 1;
+    EUROPEAN_SOUTHERN = 2;
+    LATIN = 3;
+    MEDITERRENEAN = 4;
+    ARABIC = 5;
+    CHINESE = 6;
+    KOREAN = 7;
+    JAPANESE = 8;
+    THAI = 9;
+    POLYNESIAN = 10;
+    AFRICAN = 11;
+    INDIAN = 12;
+  }
+}
+
+message HairDescription {
+  // Long is anything past shoulders
+  // Medium is anything in between shouders and ears
+  // Short is from ears up
+  enum HairEnum {
+    NO_HAIR = 0;
+    HAIR_LONG_STRAIGHT_1 = 1;
+    HAIR_LONG_STRAIGHT_2 = 2;
+    HAIR_MEDIUM_STRAIGHT_1 = 3;
+    HAIR_MEDIUM_STRAIGHT_2 = 4;
+    HAIR_MEDIUM_STRAIGHT_3 = 5;
+    HAIR_MEDIUM_STRAIGHT_4 = 6;
+    HAIR_SHORT_CURLY_1 = 7;
+    HAIR_SHORT_PONYTAIL_1 = 8;
+    HAIR_SHORT_WAVY_1 = 9;
+    HAIR_SHORT_WAVY_2 = 10;
+    HAIR_LONG_STRAIGHT_3 = 11;
+    HAIR_SHORT_STRAIGHT_1 = 12;
+    HAIR_SHORT_PONYTAIL_2 = 13;
+    HAIR_SHORT_STRAIGHT_2 = 14;
+    HAIR_SHORT_STRAIGHT_3 = 15;
+  }
+  HairEnum hair_type = 1;
+  simian_public.common.RGBA hair_color = 2;
+}
+
+message BodyConfig {
+  // [0, 1] feminine <-> masculine slider.
+  float body_type = 1;
+
+  // [0, 1] skinny <-> large slider
+  // Will change geometry of the specified pedestrian
+  float body_weight = 2;
+
+  // [0, 1] skinny <-> muscular slider
+  // Adds additional texture detail to pedestrians muscles
+  float body_muscularity = 3;
+
+  float head_scalar = 4;
+  float arm_length_scalar = 5;
+  float upper_body_scalar = 6;
+  float legs_length_scalar = 7;
+
+  // [0, 1] not pregnant <-> pregnant
+  float pregnancy_scalar = 8;
+
+  // [0, 1] child <> elderly
+  float age = 9;
+}

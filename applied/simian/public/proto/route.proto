@@ -1,0 +1,74 @@
+// Copyright (C) 2019 Applied Intuition, Inc. All rights reserved.
+// This source code file is distributed under and subject to the LICENSE in license.txt
+
+syntax = "proto3";
+
+package simian_public.common;
+
+import "google/protobuf/struct.proto";
+import "applied/simian/public/proto/common.proto";
+import "applied/simian/public/proto/planar.proto";
+import "applied/simian/public/proto/relative_position.proto";
+
+// Routes will be passed through to this field if route data is set from
+// the scenario. If it is not set, generate_route can generate route_pts
+// from the map given a start and dest.
+message TripAgentOutput {
+  // start and dest are only set for the generate_route trip_agent
+  UTM start = 1;
+  UTM dest = 2;
+  oneof route_type {
+    RoutePoints route_points = 3;
+    RoutePoses route_poses = 4;
+    RouteStates route_states = 5;
+  }
+}
+
+message RoutePoints {
+  repeated RoutePoint2d points = 1;
+}
+
+message RoutePoses {
+  repeated RoutePose2d poses = 1;
+}
+
+message RouteStates {
+  repeated RouteState2d states = 1;
+}
+
+message RoutePoint2d {
+  planar.Point2d point = 1;
+  google.protobuf.Value point_extra_data = 2;
+}
+
+message RoutePose2d {
+  oneof pose_type {
+    planar.Pose2d pose = 1;
+    simian.relative_position.RelativePosition relative_pose = 3;
+  }
+  google.protobuf.Value pose_extra_data = 2;
+}
+
+message RouteState2d {
+  planar.State2d state = 1;
+  google.protobuf.Value state_extra_data = 2;
+}
+
+// Simian internal representation of trip behaviors.
+message TripBehavior {
+  oneof behaviortype {
+    GenerateRoute generate_route = 1;
+    simian_public.common.RoutePoints fixed_route_points = 2;
+    simian_public.common.RoutePoses fixed_route_poses = 3;
+    simian_public.common.RouteStates fixed_route_states = 4;
+  }
+}
+
+// Simian internal representation of route generation.
+// This will query the map service for a route to send to the stack.
+// If interpolation_distance is 0, it will not change the original map points.
+message GenerateRoute {
+  simian_public.common.Point start = 1;
+  simian_public.common.Point dest = 2;
+  double interpolation_distance = 3;
+}

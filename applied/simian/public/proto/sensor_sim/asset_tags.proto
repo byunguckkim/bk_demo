@@ -1,0 +1,90 @@
+// Copyright (C) 2021 Applied Intuition, Inc. All rights reserved.
+// This source code file is distributed under and subject to the LICENSE in license.txt
+
+syntax = "proto3";
+
+package simian_public.sensor_sim.asset_tags;
+
+// Human readable tags that describe assets.
+//
+// Please use singular nouns or adjectives. There are contexts when both plural
+// and singular make more sense, but consistency is key.
+// We've chosen to adopt singular so that statements like:
+// "this model is a TREE" or "this model is VEGETATION" make sense.
+enum AssetTag {
+  ASSET_TAG_UNKNOWN = 0;
+  ASSET_TAG_VEHICLE = 1;
+  ASSET_TAG_PEDESTRIAN = 2;
+  ASSET_TAG_OBSTACLE = 3;
+  ASSET_TAG_VEGETATION = 4;
+  ASSET_TAG_TREE = 5;
+  ASSET_TAG_SHRUB = 6;
+  // this tag is for any 'Public' assets that are available
+  // for use in the SpectralEditor plugin
+  ASSET_TAG_SPECTRAL_EDITOR = 7;
+  ASSET_TAG_ROAD_MARKING = 8;
+  // Represents an asset that was imported by a customer
+  ASSET_TAG_CUSTOMER_IMPORTED = 9;
+  ASSET_TAG_TRAFFIC_SIGN = 10;
+
+  // reserved 11 to 1000;  // Reserved for shared tags
+
+  ASSET_TAG_PICKUP = 1001;
+  ASSET_TAG_SEDAN = 1002;
+  ASSET_TAG_SUV = 1003;
+  ASSET_TAG_CROSSOVER = 1004;
+  ASSET_TAG_SEMI_TRUCK = 1005;
+  ASSET_TAG_CONVERTIBLE = 1006;
+  ASSET_TAG_CONSTRUCTION = 1007;
+  ASSET_TAG_HATCHBACK = 1008;
+  ASSET_TAG_VAN = 1009;
+  ASSET_TAG_MINI_VAN = 1010;
+  ASSET_TAG_MOTORCYCLE = 1011;
+  ASSET_TAG_BICYCLE = 1012;
+  ASSET_TAG_TRAILER = 1013;
+  ASSET_TAG_BUS = 1014;
+  ASSET_TAG_BUGGY = 1015;
+  ASSET_TAG_GOLF_CART = 1016;
+  ASSET_TAG_ESCOOTER = 1017;
+  ASSET_TAG_MOPED = 1018;
+  ASSET_TAG_TANKER = 1019;
+  ASSET_TAG_FORKLIFT = 1020;
+  ASSET_TAG_AIRPLANE = 1021;
+  ASSET_TAG_TRACKED_VEHICLE = 1022;
+  ASSET_TAG_TRACTOR = 1023;
+  ASSET_TAG_GARBAGE_TRUCK = 1024;
+  ASSET_TAG_SNOW_PLOW = 1025;
+  ASSET_TAG_BOX_TRUCK = 1026;
+  ASSET_TAG_SHIP = 1027;
+
+  // reserved 1028 to 2000;  // Reserved for vehicle body type tags
+
+  ASSET_TAG_WAREHOUSE = 2001;
+  ASSET_TAG_AIRPORT = 2002;
+  ASSET_TAG_HARBOR = 2003;
+  ASSET_TAG_URBAN = 2004;
+  ASSET_TAG_SUBURBAN = 2005;
+  ASSET_TAG_RURAL = 2006;
+  ASSET_TAG_OFFROAD = 2007;
+  ASSET_TAG_AMR = 2008;
+  ASSET_TAG_MILITARY = 2009;
+
+  // reserved 2010 to 3000;  // Reserved for domain type tags
+
+  ASSET_TAG_POLICE = 3001;
+  ASSET_TAG_AMBULANCE = 3002;
+  ASSET_TAG_FIRETRUCK = 3003;
+  ASSET_TAG_ROADWORKS = 3004;
+  ASSET_TAG_PASSENGER = 3005;
+  ASSET_TAG_COMMERCIAL = 3006;
+  ASSET_TAG_RECREATIONAL = 3007;
+  ASSET_TAG_PUBLIC_TRANSPORT = 3008;
+
+  // reserved 3009 to 4000;  // Reserved for purpose type tags
+
+  ASSET_TAG_EUROPE = 4001;
+  ASSET_TAG_NORTH_AMERICA = 4002;
+  ASSET_TAG_ASIA = 4003;
+
+  // reserved 4004 to 5000;  // Reserved for region of usage type tags
+}

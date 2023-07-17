@@ -1,0 +1,210 @@
+// Copyright (C) 2021 Applied Intuition, Inc. All rights reserved.
+// This source code file is distributed under and subject to the LICENSE in
+// license.txt.
+
+syntax = "proto3";
+
+package simian_public.hdmap;
+
+import "applied/simian/public/proto/common.proto";
+import "applied/simian/public/proto/geometry.proto";
+import "applied/simian/public/proto/map/map_enums.proto";
+import "applied/simian/public/proto/map/map_id.proto";
+
+message CheckTypeEnum {
+  enum CheckType {
+    UNKNOWN = 0;
+    ERROR = 1;
+    WARNING = 2;
+  }
+}
+
+// <!--Next ID: 2-->
+message ValidationSummary {
+  repeated ValidationResult validation_result = 1;
+}
+
+// <!--Next ID: 6-->
+message ValidationResult {
+  string element_id = 1;
+  // Element type, e.g. LANE or REGION.
+  ElementTypeEnum.ElementType kind = 2;
+  // Coordinates representing the location of the element.
+  // For example, for lanes this is the first point on the central curve.
+  simian_public.common.PointENU coordinates = 4;
+  simian_public.common.UTMProjection utm = 5;
+  // Only failures are included.
+  // These are filled out when running the validation pipeline.
+  repeated ValidationCheck failures = 3;
+}
+
+// <!--Next ID: 3-->
+message ValidationCheck {
+  ValidationDefinition definition = 1;
+  // Descriptive message describing the result.
+  // For example, "Lane 42 is laterally isolated and has no forward and reverse neighbors."
+  string message = 2;
+}
+
+// <!--Next ID: 4-->
+message ValidationDefinition {
+  // Name of the check.
+  string name = 1;
+  // ERROR or WARNING.
+  CheckTypeEnum.CheckType check_type = 2;
+  bool is_custom = 3;
+}
+
+// <!--Next ID: 4-->
+// Describes a check that the user writes, used for custom map validation.
+message CustomCheck {
+  // Name of the check that will be displayed in the GUI, e.g. invalid_turn_angle.
+  string name = 1;
+  // Descriptive message about the results of the check, e.g. "Lane 123 is too narrow!".
+  string message = 2;
+  // Type of the check.
+  CheckTypeEnum.CheckType type = 3;
+}
+
+// <!--Next ID: 3-->
+message CustomValidationStatus {
+  string custom_stdout = 1;
+  string custom_stderr = 2;
+}
+
+// <!--Next ID: 5-->
+message ValidationStatus {
+  enum Status {
+    UNKNOWN = 0;
+    // Not yet validated.
+    UNVALIDATED = 1;
+    // Currently running validation.
+    RUNNING_VALIDATION = 2;
+    // Validated.
+    VALIDATED = 3;
+    // Error while validating.
+    ERROR_VALIDATING = 4;
+  }
+  Status status = 1;
+  int64 num_errors = 2;
+  int64 num_warnings = 3;
+  CustomValidationStatus custom_status = 4;
+}
+
+message FixErrorsStatus {
+  enum Status {
+    UNKNOWN = 0;
+    // Not yet fixed.
+    UNFIXED = 1;
+    // Currently fixing.
+    RUNNING_FIXES = 2;
+    // Fixed.
+    FIXED = 3;
+    // Error while fixing.
+    ERROR_FIXING = 4;
+  }
+  Status status = 1;
+}
+
+// <!--Next ID: 4-->
+// A "profile" that configures which checks to run during map validation.
+message ValidationProfile {
+  string name = 1;
+  repeated ValidationDefinition checks = 2;
+  bool enable_custom_validation = 3;
+}
+
+/****************************** DEPRECATED ******************************/
+
+message LaneError {
+  option deprecated = true;
+  string error_message = 1;
+  oneof error {
+    string custom_error_type = 2;
+    bool missing_connectivity = 3;
+    bool missing_speed_limit = 4;
+    bool missing_elevation_data = 5;
+    Id invalid_predecessor_id = 6;
+    Id invalid_successor_id = 7;
+    Id invalid_left_neighbor_forward_lane_id = 8;
+    Id invalid_right_neighbor_forward_lane_id = 9;
+    bool missing_left_boundary_type = 11;
+    bool missing_right_boundary_type = 12;
+    bool invalid_lane_geometry = 13;
+    bool invalid_width_data = 14;
+    bool invalid_elevation_data = 15;
+    bool invalid_lane_width_transitions = 16;
+    bool invalid_lane_curvature = 17;
+    bool invalid_duplicate_lane_id = 18;
+    bool missing_lane_id = 19;
+    bool lane_out_of_bounds = 20;
+  }
+}
+
+message LaneWarning {
+  option deprecated = true;
+  string warning_message = 1;
+  oneof warning {
+    string custom_warning_type = 2;
+    bool multiple_lane_boundary_types = 3;
+    bool multiple_segments = 4;
+    bool inconsistent_segment_lengths = 5;
+    bool too_many_lane_points = 6;
+    bool missing_width_sample = 7;
+    bool missing_left_neighbor_forward_lane_id = 8;
+    bool missing_right_neighbor_forward_lane_id = 9;
+    bool missing_elevation_data = 10;
+    bool missing_lane_info = 11;
+    bool no_neighbor_lane_ids = 12;
+  }
+}
+
+message RegionError {
+  option deprecated = true;
+  string error_message = 1;
+  oneof error {
+    string custom_error_type = 2;
+    bool missing_region_id = 3;
+    bool invalid_bounding_geometry = 4;
+    bool invalid_duplicate_region_id = 5;
+  }
+}
+
+message RegionWarning {
+  option deprecated = true;
+  string warning_message = 1;
+  oneof warning {
+    string custom_warning_type = 2;
+    bool missing_lane_association = 3;
+    bool invalid_lane_association_placement = 4;
+  }
+}
+
+message SignError {
+  option deprecated = true;
+  string error_message = 1;
+  oneof error {
+    string custom_error_type = 2;
+    bool missing_lane_association = 3;
+    bool missing_shape = 4;
+    bool missing_color = 5;
+  }
+}
+
+message SignalError {
+  option deprecated = true;
+  string error_message = 1;
+  oneof error {
+    string custom_error_type = 2;
+    bool missing_lane_association = 3;
+    bool missing_color = 4;
+  }
+}
+
+message LineError {
+  option deprecated = true;
+  string error_message = 1;
+  oneof error {
+    string custom_error_type = 2;
+  }
+}

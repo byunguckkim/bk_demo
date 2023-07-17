@@ -1,0 +1,139 @@
+// Copyright (C) 2021 Applied Intuition, Inc. All rights reserved.
+// This source code file is distributed under and subject to the LICENSE in license.txt
+
+syntax = "proto3";
+
+package simian_public.physics_engine;
+
+import "applied/simian/public/proto/common.proto";
+import "applied/simian/public/proto/scenario/common.proto";
+import "applied/simian/public/proto/spatial.proto";
+
+// Contains motion models that use a physics engine under the hood to update state.
+message PhysicsEngine {
+  oneof vehicle_type {
+    // Models a skid steer vehicle, i.e., a vehicle that yaws from controlling the relative
+    // velocities of the left and right side wheel or tracks. These tracks or wheels on a skid-steer
+    // vehicle remain parallel to the longitudinal axis of the vehicle and turning requires slippage
+    // of the wheels or tracks.
+    SkidSteer skid_steer = 1;
+  }
+  // Options for visualizing the chassis and wheels reported by the physics engine.
+  // Useful for debugging.
+  simian_public.scenario.VisualizationOptions visualization_options = 2;
+  oneof numerical_integration_type {
+    uint32 num_integration_steps = 3;  // Optional, defaults to 1.
+  }
+
+  // This version is currently unused.
+  // Applied may use this version field to handle future changes in functionality of physics_engine
+  // motion models.
+  simian_public.common.VersionMajorMinor version = 4;
+}
+
+message SkidSteer {
+  // Wheel assembly here consists of a tire, rim, and an independent suspension.
+  repeated WheelAssembly wheel_assemblies = 1;
+  // Chassis here refers to the rigid vehicle body held up by the suspension.
+  Chassis chassis = 2;
+  // Houses powertrain model types supported by the physics engine.
+  Powertrain powertrain = 3;
+  // Houses brake model types supported by the physics engine.
+  Brakes brakes = 4;
+}
+
+message WheelAssembly {
+  // This name must correspond to the name of a WheelConfig in the vehicle's repeated field of
+  // WheelConfigs.
+  string name = 1;
+  TireModelSpec tire = 2;
+  Suspension suspension = 3;
+}
+
+message TireModelSpec {
+  oneof tire_model_type {
+    CouloumbFrictionSpec coulomb_friction = 1;
+  }
+}
+
+message CouloumbFrictionSpec {
+  double static_friction_coefficient = 1;   // [-]
+  double dynamic_friction_coefficient = 2;  // [-]
+}
+
+message Suspension {
+  // Suspensions are modelled as vertical spring-mass-damper systems at each wheel. The following
+  // fields characterise this per-wheel model.
+  double spring_stiffness = 1;     // [N/m]
+  double damping_coefficient = 2;  // [N*m/s]
+}
+
+message Chassis {
+  double mass = 2;  // [kg]
+  // Inertia properties where CoM location is relative to center of rear axle and the roll, pitch,
+  // and yaw inertia values are relative to the +x, +y, and +z axis of the vehicle passing through
+  // the center of mass.
+  spatial.InertiaSpec inertia = 3;
+}
+
+message Powertrain {
+  // Houses powertrain model types supported by the physics engine.
+  oneof powertrain_type {
+    PowertrainLinearTorque powertrain_linear_torque = 1;
+  }
+}
+
+message PowertrainLinearTorque {
+  // Max wheel drive torque is specified per wheel. So total powertrain torque equals
+  // max_wheel_drive_torque * number_of_wheels
+  double max_wheel_drive_torque = 1;  // [N*m]
+}
+
+message Brakes {
+  // Houses brake model types supported by the physics engine.
+  oneof brake_type {
+    BrakeLinearTorque brake_linear_torque = 1;
+  }
+}
+
+message BrakeLinearTorque {
+  // Max wheel brake torque is specified per wheel. So total brake torque equals
+  // max_wheel_brake_torque * number_of_wheels
+  double max_wheel_brake_torque = 1;  // [N*m]
+}
+
+// A motion model input that contains command types for physics engine motion models.
+message PhysicsEngineCommand {
+  oneof motion_command {
+    // This command provides torque inputs to a skid-steer vehicle. The only vehicle that currently
+    // supports this command is the physics_engine skid_steer vehicle. For this model, left wheels
+    // are those whose mount has a positive y component in the vehicle frame. Right wheels are those
+    // whose mount has a negative y component in the vehicle frame. The torque commands are
+    // normalized; the actual torque applied to the wheel is determined by multiplying the command
+    // with a wheel's max drive torque or max brake torque (provided in the vehicle config). Drive
+    // torques can be positive or negative (to reverse); setting a negative left drive torque and
+    // positive right drive torque can cause the vehicle to turn left. Brake torques resist any
+    // rotation (reverse or forward) of the wheel. Contains 4 fields:
+    // * `left_drive_torque` in range [-1, 1]
+    // * `right_drive_torque` in range [-1, 1]
+    // * `left_brake_torque` in range [-1, 1]
+    // * `right_brake_torque` in range [-1, 1]
+    SkidSteerTorqueCommand skid_steer_torque_command = 21;
+  }
+
+  // This command provides torque inputs to a skid-steer vehicle.
+  // The only vehicle that currently supports this command is the physics_engine skid_steer vehicle.
+  message SkidSteerTorqueCommand {
+    // Left wheels are those whose mount has a positive y component in the vehicle frame.
+    // Right wheels are those whose mount has a negative y component in the vehicle frame.
+    // The torque commands are normalized; the actual torque applied to the wheel is determined by
+    // multiplying the command with a wheel's max drive torque or max brake torque (provided in the
+    // vehicle config). Drive torques can be positive or negative (to reverse); setting a negative
+    // left drive torque and positive right drive torque can cause the vehicle to turn left.
+    double left_drive_torque = 1;   // [-1, 1]
+    double right_drive_torque = 2;  // [-1, 1]
+    // Brake torques resist any rotation (reverse or forward) of the wheel.
+    double left_brake_torque = 3;   // [0, 1]
+    double right_brake_torque = 4;  // [0, 1]
+  }
+}

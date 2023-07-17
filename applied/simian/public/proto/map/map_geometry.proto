@@ -1,0 +1,81 @@
+// Copyright (C) 2019 Applied Intuition, Inc. All rights reserved.
+// This source code file is distributed under and subject to the LICENSE in
+// license.txt
+
+syntax = "proto2";
+
+package simian_public.hdmap;
+
+import "applied/simian/public/proto/geometry.proto";
+import "applied/simian/public/proto/map/map_common.proto";
+
+// Polygon, not necessary convex.
+message Polygon {
+  // A list of the points that make up the boundary of the polygon.
+  // The edges of the polygon are represented as line segments connecting these points.
+  repeated simian_public.common.PointENU point = 1;
+}
+
+// Line segment, can be arbitrarily long. Must be at least 2 points in
+// order to be registered by Simian.
+message LineSegment {
+  // A list of the points that make up the vertices of the line segment.
+  // The line segment is created by connecting these points in order using straight lines.
+  repeated simian_public.common.PointENU point = 1;
+
+  // Optional metadata associated with each point in the line segment.
+  // If this repeated message is not empty, then it should be the same size
+  // as the repeated message `point`. The nth entry in this field is the
+  // metadata associated with the nth point.
+  repeated PointMetadata metadata = 2;
+}
+
+// Point metadata is any per-point information that can associate other
+// geometric structures or map elements with individual lane points for
+// fast runtime access.
+message PointMetadata {
+  // The metadata for road base lane geometry, usually encoding the arc length and offset from the
+  // centerline of the point.
+  optional RoadReferenceMetadata road_reference = 1;
+  // Custom tags that can be used to store per-point information like uncertainties.
+  repeated CustomTag custom_tags = 2;
+}
+
+// Metadata for road based lane geometry.
+// Relate individual lane points to roads and other curve-like global map structures.
+// For example, this proto can be used to support the OpenDrive Reference Line coordinate system.
+message RoadReferenceMetadata {
+  // Road "s" coordinate.
+  // Should be computed by projecting this point onto the desired road reference line.
+  // This value should always be positive.
+  required double road_s = 1;
+
+  // Road "t" coordinate.
+  // Should be computed as the distance between this point and the closest point on the desired road
+  // reference line. Convention for positive and negative is decided by the chosen road reference
+  // system.
+  required double road_t = 2;
+}
+
+// Generalization of a line.
+message CurveSegment {
+  oneof curve_type {
+    // A polyline segmeent that makes up the geometry of the CurveSegment.
+    LineSegment line_segment = 1;
+    // <!-- TODO(Yousef): add other curve types -->
+  }
+  // Start position, measured as an arc-length in meters.
+  optional double s = 6;
+  // Start position in the map frame.
+  optional simian_public.common.PointENU start_position = 7;
+  // Starting orientation, in radians.
+  optional double heading = 8;
+  // The length of the curve segment in meters.
+  optional double length = 9;
+}
+
+// An object similar to a line but that need not be straight.
+message Curve {
+  // A list of curve segments that make up this particular curve.
+  repeated CurveSegment segment = 1;
+}
